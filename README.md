@@ -261,7 +261,6 @@ Then install the ntfy app and add your server.
 | **Thumbnail** | Preview photo from that specific year |
 | **Spacing** | Notifications spread throughout the day (default: 1 hour apart) |
 | **Click Action** | Opens Immich app via my.immich.app |
-| **Tags** | Camera and calendar emoji icons |
 
 ### Message Templates
 
@@ -316,11 +315,9 @@ Source files are mounted as volumes, so you can edit them without rebuilding:
 .
 ├── notify.py          # Main script (edit freely)
 ├── config.yaml        # Configuration (edit freely)
-├── state.json         # Sent notification tracking
 ├── Dockerfile         # Container definition
 ├── docker-compose.yml # Service definitions
-├── .env               # Your secrets (not in git)
-└── .env.example       # Template for others
+└── .env.example       # Template to start from
 ```
 
 After editing `notify.py`, changes take effect immediately on next run.
