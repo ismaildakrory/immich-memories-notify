@@ -1,0 +1,24 @@
+# Environment files with secrets
+.env
+
+# State file
+state.json
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Previous chat history (local only)
+PreviousChat.txt

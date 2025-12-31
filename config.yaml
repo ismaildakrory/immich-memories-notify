@@ -1,0 +1,54 @@
+# ============================================================
+# IMMICH MEMORIES NOTIFY - CONFIGURATION
+# ============================================================
+
+# Servers (loaded from .env)
+immich:
+  url: "${IMMICH_URL}"
+  external_url: "${IMMICH_EXTERNAL_URL}"
+
+ntfy:
+  url: "${NTFY_URL}"
+  external_url: "${NTFY_EXTERNAL_URL}"
+
+# Users
+users:
+  - name: "User1"
+    immich_api_key: "${IMMICH_API_KEY_USER1}"
+    ntfy_topic: "immich-memories-user1"
+    ntfy_username: "user1"
+    ntfy_password: "${NTFY_PASSWORD_USER1}"
+    enabled: true
+
+  - name: "User2"
+    immich_api_key: "${IMMICH_API_KEY_USER2}"
+    ntfy_topic: "immich-memories-user2"
+    ntfy_username: "user2"
+    ntfy_password: "${NTFY_PASSWORD_USER2}"
+    enabled: true
+
+# Settings
+settings:
+  retry:
+    max_attempts: 3
+    delay_seconds: 5
+  state_file: "state.json"
+  log_level: "INFO"
+
+  # Notification settings
+  max_notifications_per_day: 3
+  interval_minutes: 60  # Time between notifications
+
+# Notification messages (randomly selected)
+# Available placeholders: {year}, {years_ago}
+messages:
+  - "A little trip back to {year}..."
+  - "Remember this day {years_ago} years ago?"
+  - "Some memories from {year} want to say hello"
+  - "Throwback to {year}! Take a moment to smile"
+  - "Once upon a time in {year}..."
+  - "A cozy memory from {years_ago} years ago"
+  - "{year} called, it has something beautiful to show you"
+  - "Let's revisit {year} together"
+  - "A gentle reminder of {year}"
+  - "Look what we found from {year}!"

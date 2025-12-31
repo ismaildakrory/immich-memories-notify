@@ -1,0 +1,52 @@
+# ============================================================
+# IMMICH MEMORIES NOTIFY - DOCKER COMPOSE
+# ============================================================
+#
+# USAGE:
+#   docker compose run --rm notify              # Run once
+#   docker compose run --rm notify --test       # Test mode
+#   docker compose run --rm notify --dry-run    # Preview only
+#   docker compose up -d scheduler              # Start daily scheduler
+#
+# ============================================================
+
+services:
+  # ------------------------------------------------------------
+  # Main Service - Run on demand
+  # ------------------------------------------------------------
+  notify:
+    build: .
+    container_name: immich-memories-notify
+    volumes:
+      - ./notify.py:/app/notify.py:ro
+      - ./config.yaml:/app/config.yaml:ro
+      - ./state.json:/app/state.json
+    env_file: .env
+    network_mode: host
+    restart: "no"
+
+  # ------------------------------------------------------------
+  # Scheduler Service - Runs daily at configured time
+  # ------------------------------------------------------------
+  scheduler:
+    build: .
+    container_name: immich-memories-scheduler
+    volumes:
+      - ./notify.py:/app/notify.py:ro
+      - ./config.yaml:/app/config.yaml:ro
+      - ./state.json:/app/state.json
+    env_file: .env
+    network_mode: host
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "========================================"
+        echo "Immich Memories Notify - Scheduler"
+        echo "========================================"
+        echo "Schedule: $$NOTIFY_SCHEDULE"
+        echo ""
+        echo "$$NOTIFY_SCHEDULE cd /app && python notify.py >> /proc/1/fd/1 2>&1" > /etc/crontabs/root
+        echo "Starting scheduler... (waiting for scheduled time)"
+        crond -f -l 2
