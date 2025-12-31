@@ -7,8 +7,11 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 ## Features
 
 - **Daily Memory Notifications** - Get notified when you have photos from this day in previous years
-- **Rich Notifications** - Includes thumbnail preview, year info, and photo/video counts
+- **One Per Year** - Separate notification for each year, spaced throughout the day
+- **Cozy Messages** - 10 randomized warm message templates (customizable)
+- **Smart Limits** - Max 3 notifications per day (randomly selects years if you have more)
 - **Multi-User Support** - Send personalized notifications to each family member
+- **Rich Notifications** - Includes thumbnail preview from each year
 - **Click to Open** - Tap notification to open Immich app directly
 - **Self-Hosted** - Works with your self-hosted Immich and ntfy instances
 - **Docker Ready** - Easy deployment with Docker Compose
@@ -31,8 +34,9 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 
 1. Script fetches memories from Immich API
 2. Filters for today's "On This Day" memories
-3. Sends rich notification via ntfy with thumbnail
-4. You receive notification on your phone!
+3. Groups by year and selects up to 3 years (random if more)
+4. Sends first notification immediately, then spaces the rest throughout the day
+5. You receive cozy notifications with thumbnails from each year!
 
 ## Requirements
 
@@ -177,6 +181,8 @@ settings:
     delay_seconds: 5     # Delay between retries
   state_file: "state.json"  # Tracks sent notifications
   log_level: "INFO"      # DEBUG, INFO, WARNING, ERROR
+  max_notifications_per_day: 3  # Limit notifications (random selection if more years)
+  interval_minutes: 60   # Time between notifications
 
 # Users
 users:
@@ -250,11 +256,28 @@ Then install the ntfy app and add your server.
 
 | Feature | Description |
 |---------|-------------|
-| **Title** | "Memories from 2020, 2018, 2015" |
-| **Message** | "You have 5 photos and 2 videos from this day!" |
-| **Thumbnail** | Preview of first photo |
+| **Title** | "Memories from 2020" (one per year) |
+| **Message** | Randomized cozy messages like "A little trip back to 2020..." |
+| **Thumbnail** | Preview photo from that specific year |
+| **Spacing** | Notifications spread throughout the day (default: 1 hour apart) |
 | **Click Action** | Opens Immich app via my.immich.app |
 | **Tags** | Camera and calendar emoji icons |
+
+### Message Templates
+
+Messages are randomly selected from customizable templates in `config.yaml`:
+
+```yaml
+messages:
+  - "A little trip back to {year}..."
+  - "Remember this day {years_ago} years ago?"
+  - "Some memories from {year} want to say hello"
+  - "Throwback to {year}! Take a moment to smile"
+  - "Once upon a time in {year}..."
+  # ... and more!
+```
+
+Placeholders: `{year}` (e.g., 2020) and `{years_ago}` (e.g., 4)
 
 ## Troubleshooting
 
