@@ -3,10 +3,19 @@
 # ============================================================
 #
 # USAGE:
-#   docker compose run --rm notify              # Run once
-#   docker compose run --rm notify --test       # Test mode
-#   docker compose run --rm notify --dry-run    # Preview only
-#   docker compose up -d scheduler              # Start daily scheduler
+#   docker compose run --rm notify --slot 1              # Run slot 1
+#   docker compose run --rm notify --slot 1 --test       # Test mode
+#   docker compose run --rm notify --slot 1 --dry-run    # Preview only
+#   docker compose run --rm notify --slot 1 --no-delay   # Skip random delay
+#   docker compose up -d scheduler                       # Start scheduler
+#
+# SLOTS:
+#   Slot 1-3: Memory notifications (if memories exist) or person photos
+#   Slot 4:   Person photo notification
+#
+# CONFIGURATION:
+#   - Secrets (API keys, passwords): .env
+#   - Everything else (schedules, settings): config.yaml
 #
 # ============================================================
 
@@ -26,7 +35,7 @@ services:
     restart: "no"
 
   # ------------------------------------------------------------
-  # Scheduler Service - Runs daily at configured time
+  # Scheduler Service - Reads config from config.yaml
   # ------------------------------------------------------------
   scheduler:
     build: .
@@ -45,8 +54,29 @@ services:
         echo "========================================"
         echo "Immich Memories Notify - Scheduler"
         echo "========================================"
-        echo "Schedule: $$NOTIFY_SCHEDULE"
         echo ""
-        echo "$$NOTIFY_SCHEDULE cd /app && python notify.py >> /proc/1/fd/1 2>&1" > /etc/crontabs/root
-        echo "Starting scheduler... (waiting for scheduled time)"
+        # Generate crontab from config.yaml using Python
+        python -c "
+        import yaml
+        with open('config.yaml') as f:
+            config = yaml.safe_load(f)
+        windows = config.get('settings', {}).get('notification_windows', [])
+        print('Notification windows (random time within each):')
+        for i, w in enumerate(windows, 1):
+            start = w.get('start', '08:00')
+            end = w.get('end', '10:00')
+            # Generate cron from start time (e.g., '08:00' -> '0 8 * * *')
+            h, m = start.split(':')
+            cron = f'{int(m)} {int(h)} * * *'
+            print(f'  Slot {i}: {start}-{end} (triggers at {start})')
+        print()
+        # Write crontab
+        with open('/etc/crontabs/root', 'w') as f:
+            for i, w in enumerate(windows, 1):
+                start = w.get('start', '08:00')
+                h, m = start.split(':')
+                cron = f'{int(m)} {int(h)} * * *'
+                f.write(f'{cron} cd /app && python notify.py --slot {i} >> /proc/1/fd/1 2>&1\n')
+        "
+        echo "Starting scheduler..."
         crond -f -l 2

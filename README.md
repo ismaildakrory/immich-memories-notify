@@ -7,11 +7,12 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 ## Features
 
 - **Daily Memory Notifications** - Get notified when you have photos from this day in previous years
-- **One Per Year** - Separate notification for each year, spaced throughout the day
-- **Cozy Messages** - 10 randomized warm message templates (customizable)
-- **Smart Limits** - Max 3 notifications per day (randomly selects years if you have more)
-- **Multi-User Support** - Send personalized notifications to each family member
-- **Rich Notifications** - Includes thumbnail preview from each year
+- **Face Preference** - Prefers photos with recognized faces (your top 5 named people)
+- **Person Photos** - Random photos of your favorite people when no memories exist
+- **Smart Scheduling** - 4 notification slots with random timing within configurable windows
+- **Cozy Messages** - Randomized warm message templates (customizable)
+- **Multi-User Support** - Each user gets their own top people and personalized notifications
+- **Rich Notifications** - Includes thumbnail preview with person names
 - **Click to Open** - Tap notification to open Immich app directly
 - **Self-Hosted** - Works with your self-hosted Immich and ntfy instances
 - **Docker Ready** - Easy deployment with Docker Compose
@@ -24,19 +25,26 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 │   Immich    │ ───> │   Script    │ ───> │    ntfy     │
 │   Server    │      │  (Python)   │      │   Server    │
 └─────────────┘      └─────────────┘      └─────────────┘
-                                                 │
-                                                 ▼
+                                                │
+                                                ▼
                                           ┌─────────────┐
                                           │  Mobile App │
                                           │ Notification│
                                           └─────────────┘
 ```
 
-1. Script fetches memories from Immich API
-2. Filters for today's "On This Day" memories
-3. Groups by year and selects up to 3 years (random if more)
-4. Sends first notification immediately, then spaces the rest throughout the day
-5. You receive cozy notifications with thumbnails from each year!
+### Notification Logic
+
+| Scenario | Slots 1-3 | Slot 4 |
+|----------|-----------|--------|
+| Has memories today | Memory photo (prefers faces) | Random person photo |
+| No memories today | Random person photo | Random person photo |
+
+**Key features:**
+- Photos with recognized faces from your top 5 named people are prioritized
+- Person photos exclude the last 30 days (configurable)
+- Each slot sends at a random time within its window (e.g., 8-10 AM)
+- Per-user top people based on their own photo library
 
 ## Requirements
 
@@ -44,6 +52,7 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 - [ntfy](https://ntfy.sh/) server (self-hosted or use ntfy.sh)
 - Docker & Docker Compose (recommended) OR Python 3.8+
 - ntfy mobile app ([Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) / [iOS](https://apps.apple.com/app/ntfy/id1625396347))
+- **Named people in Immich** - For face preference and person photos, name your frequently appearing people in Immich
 
 ## Disclaimer
 
@@ -60,48 +69,66 @@ cd immich-memories-notify
 
 ### 2. Configure
 
-Copy the example environment file:
+**Step A: Create `.env` for secrets only:**
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your API keys:
-
 ```bash
-# Get your API key from Immich: Account Settings → API Keys
-IMMICH_API_KEY_ISMAIL=your-api-key-here
+# Server URLs
+IMMICH_URL=http://192.168.1.100:2283
+NTFY_URL=http://192.168.1.100:8090
+
+# API Keys (get from Immich: Account Settings → API Keys)
+IMMICH_API_KEY_USER1=your-api-key-here
+IMMICH_API_KEY_USER2=another-api-key
+
+# ntfy Passwords
+NTFY_PASSWORD_USER1=your-ntfy-password
+NTFY_PASSWORD_USER2=another-password
 ```
 
-Edit `config.yaml` with your server URLs:
+**Step B: Edit `config.yaml` for everything else:**
 
 ```yaml
-immich:
-  url: "http://192.168.1.100:2283"        # Your Immich internal URL
-  external_url: "https://photos.example.com"  # Your Immich external URL
-
-ntfy:
-  url: "http://192.168.1.100:8090"        # Your ntfy internal URL
-  external_url: "https://ntfy.example.com"    # Your ntfy external URL
-
 users:
-  - name: "YourName"
-    immich_api_key: "${IMMICH_API_KEY_ISMAIL}"
-    ntfy_topic: "immich-memories-yourname"  # Unique topic for your notifications
+  - name: "User1"
+    immich_api_key: "${IMMICH_API_KEY_USER1}"
+    ntfy_topic: "immich-memories-user1"
+    ntfy_username: "user1"
+    ntfy_password: "${NTFY_PASSWORD_USER1}"
     enabled: true
+
+settings:
+  memory_notifications: 3      # Slots for memory photos
+  person_notifications: 1      # Slots for person photos
+  top_persons_limit: 5         # Top N named people to consider
+  exclude_recent_days: 30      # Skip recent photos for person notifications
+
+  # Time windows - script triggers at start, sends randomly within window
+  notification_windows:
+    - start: "08:00"
+      end: "10:00"
+    - start: "12:00"
+      end: "14:00"
+    - start: "16:00"
+      end: "18:00"
+    - start: "19:00"
+      end: "20:00"
 ```
 
 ### 3. Subscribe to ntfy Topic
 
-Open the ntfy app on your phone and subscribe to your topic (e.g., `immich-memories-yourname`) on your ntfy server.
+Open the ntfy app on your phone and subscribe to your topic (e.g., `immich-memories-user1`) on your ntfy server.
 
 ### 4. Run with Docker
 
 ```bash
 # Test it first
-docker compose run --rm notify --test
+docker compose run --rm notify --slot 1 --test --no-delay
 
-# Start the daily scheduler (runs at 9:00 AM)
+# Start the daily scheduler
 docker compose up -d scheduler
 ```
 
@@ -110,22 +137,25 @@ docker compose up -d scheduler
 ### Docker Commands
 
 ```bash
-# Run once (check for today's memories)
-docker compose run --rm notify
+# Run a specific slot
+docker compose run --rm notify --slot 1
 
 # Test mode (uses any available date with memories)
-docker compose run --rm notify --test
+docker compose run --rm notify --slot 1 --test
 
 # Preview without sending (dry run)
-docker compose run --rm notify --dry-run
+docker compose run --rm notify --slot 1 --dry-run
+
+# Skip random delay, send immediately
+docker compose run --rm notify --slot 1 --no-delay
 
 # Force send even if already sent today
-docker compose run --rm notify --force
+docker compose run --rm notify --slot 1 --force
 
 # Check specific date
-docker compose run --rm notify --date 2024-12-25
+docker compose run --rm notify --slot 1 --date 2024-12-25
 
-# Start scheduler (daily at 9 AM)
+# Start scheduler (runs all 4 slots daily)
 docker compose up -d scheduler
 
 # View scheduler logs
@@ -141,75 +171,95 @@ docker compose down
 # Install dependencies
 pip install requests pyyaml
 
-# Set environment variable
-export IMMICH_API_KEY_ISMAIL="your-api-key"
-
 # Run
-python notify.py --test
-```
-
-### Cron Job (Alternative to Scheduler)
-
-If you prefer using system cron instead of the Docker scheduler:
-
-```bash
-# Edit crontab
-crontab -e
-
-# Add this line (runs daily at 9:00 AM)
-0 9 * * * cd /path/to/immich-memories-notify && docker compose run --rm notify
+python notify.py --slot 1 --test --no-delay
 ```
 
 ## Configuration
 
-### config.yaml
+### File Structure
 
+| File | Purpose |
+|------|---------|
+| `.env` | **Secrets only** - API keys, passwords, server URLs |
+| `config.yaml` | **All configuration** - users, schedules, settings, messages |
+| `state.json` | Tracks sent notifications (auto-generated) |
+
+### Notification Windows
+
+Each slot triggers at the window start time, then sends at a random time within that window:
+
+| Slot | Window | Purpose |
+|------|--------|---------|
+| 1 | 08:00-10:00 | Memory or person photo |
+| 2 | 12:00-14:00 | Memory or person photo |
+| 3 | 16:00-18:00 | Memory or person photo |
+| 4 | 19:00-20:00 | Person photo (when memories exist) |
+
+Configure windows in `config.yaml`:
 ```yaml
-# Server settings
-immich:
-  url: "${IMMICH_URL:-http://localhost:2283}"
-  external_url: "${IMMICH_EXTERNAL_URL:-https://photos.example.com}"
-
-ntfy:
-  url: "${NTFY_URL:-http://localhost:8090}"
-  external_url: "${NTFY_EXTERNAL_URL:-https://ntfy.example.com}"
-
-# Optional settings
-settings:
-  retry:
-    max_attempts: 3      # Retry failed requests
-    delay_seconds: 5     # Delay between retries
-  state_file: "state.json"  # Tracks sent notifications
-  log_level: "INFO"      # DEBUG, INFO, WARNING, ERROR
-  max_notifications_per_day: 3  # Limit notifications (random selection if more years)
-  interval_minutes: 60   # Time between notifications
-
-# Users
-users:
-  - name: "User1"
-    immich_api_key: "${IMMICH_API_KEY_USER1}"
-    ntfy_topic: "immich-memories-user1"
-    enabled: true
+notification_windows:
+  - start: "08:00"
+    end: "10:00"
+  # Add more as needed...
 ```
 
-### Environment Variables
+### Settings Reference
 
-| Variable | Description |
-|----------|-------------|
-| `IMMICH_API_KEY_*` | Immich API keys for each user |
-| `IMMICH_URL` | Override Immich internal URL |
-| `NTFY_URL` | Override ntfy internal URL |
-| `NOTIFY_SCHEDULE` | Cron schedule (default: `0 9 * * *`) |
+```yaml
+settings:
+  # Notification counts
+  memory_notifications: 3       # Max memory notifications per day
+  person_notifications: 1       # Person photo notifications (when memories exist)
+  fallback_notifications: 3     # Person photos when no memories today
+
+  # Person photo settings
+  top_persons_limit: 5          # Consider top N named people
+  exclude_recent_days: 30       # Skip photos from last N days
+
+  # Retry settings
+  retry:
+    max_attempts: 3
+    delay_seconds: 5
+
+  # Other
+  state_file: "state.json"
+  log_level: "INFO"             # DEBUG, INFO, WARNING, ERROR
+```
+
+### Message Templates
+
+Messages are randomly selected from customizable templates:
+
+```yaml
+# For "On This Day" memories
+messages:
+  - "A little trip back to {year}..."
+  - "Remember this day {years_ago} years ago?"
+  - "Throwback to {year}! Take a moment to smile"
+
+# For random person photos
+person_messages:
+  - "A lovely moment with {person_name}..."
+  - "Remember this time with {person_name}?"
+  - "Here's a favorite moment with {person_name}"
+```
+
+**Placeholders:**
+- `{year}` - The year (e.g., 2020)
+- `{years_ago}` - Years since (e.g., 4)
+- `{person_name}` - Person's name from Immich
 
 ## Multi-User Setup
 
-Adding family members is simple - just 2 files to edit:
+Each user gets personalized notifications based on their own Immich library:
 
 **Step 1:** Get API key from Immich (Account Settings → API Keys)
 
 **Step 2:** Add to `.env`:
 ```bash
 IMMICH_API_KEY_USER2=their-api-key-here
+NTFY_PASSWORD_USER2=their-ntfy-password
 ```
 
 **Step 3:** Add to `config.yaml`:
@@ -218,14 +268,17 @@ users:
   - name: "Mom"
     immich_api_key: "${IMMICH_API_KEY_USER2}"
     ntfy_topic: "immich-memories-mom"
+    ntfy_username: "mom"
+    ntfy_password: "${NTFY_PASSWORD_USER2}"
     enabled: true
 ```
 
-**Step 4:** Restart and subscribe:
+**Step 4:** Restart scheduler:
 ```bash
 docker compose restart scheduler
 ```
-Each user subscribes to their own ntfy topic in the app
+
+Each user subscribes to their own ntfy topic in the app.
 
 ## Self-Hosting ntfy
 
@@ -252,60 +305,34 @@ docker compose up -d
 
 Then install the ntfy app and add your server.
 
-## Notification Features
-
-| Feature | Description |
-|---------|-------------|
-| **Title** | "Memories from 2020" (one per year) |
-| **Message** | Randomized cozy messages like "A little trip back to 2020..." |
-| **Thumbnail** | Preview photo from that specific year |
-| **Spacing** | Notifications spread throughout the day (default: 1 hour apart) |
-| **Click Action** | Opens Immich app via my.immich.app |
-
-### Message Templates
-
-Messages are randomly selected from customizable templates in `config.yaml`:
-
-```yaml
-messages:
-  - "A little trip back to {year}..."
-  - "Remember this day {years_ago} years ago?"
-  - "Some memories from {year} want to say hello"
-  - "Throwback to {year}! Take a moment to smile"
-  - "Once upon a time in {year}..."
-  # ... and more!
-```
-
-Placeholders: `{year}` (e.g., 2020) and `{years_ago}` (e.g., 4)
-
 ## Troubleshooting
 
 ### No notifications received
 
-1. Check if you have memories for today: `docker compose run --rm notify --dry-run`
+1. Check if you have memories for today: `docker compose run --rm notify --slot 1 --dry-run --no-delay`
 2. Verify ntfy subscription in the app
 3. Check logs: `docker compose logs scheduler`
+
+### No person photos
+
+1. Make sure you have **named people** in Immich (People → click face → add name)
+2. Check you have photos older than 30 days for those people
+3. Verify with: `docker compose run --rm notify --slot 4 --dry-run --no-delay`
 
 ### API key errors
 
 1. Verify your API key in Immich web UI
 2. Make sure the key has "Read" permissions
-3. Check environment variable is set: `echo $IMMICH_API_KEY_*`
-
-### Network errors
-
-1. Verify Immich URL is accessible from Docker
-2. Check ntfy server is running
-3. Try using internal IPs instead of hostnames
+3. Check environment variable is set correctly in `.env`
 
 ### Already sent today
 
-The script tracks sent notifications to avoid duplicates. To resend:
+The script tracks sent notifications per slot to avoid duplicates. To resend:
 ```bash
-docker compose run --rm notify --force
+docker compose run --rm notify --slot 1 --force --no-delay
 ```
 
-Or delete `state.json` to reset.
+Or delete `state.json` to reset all slots.
 
 ## Development
 
@@ -313,14 +340,15 @@ Source files are mounted as volumes, so you can edit them without rebuilding:
 
 ```
 .
-├── notify.py          # Main script (edit freely)
-├── config.yaml        # Configuration (edit freely)
+├── notify.py          # Main script
+├── config.yaml        # Configuration (users, schedules, settings)
+├── .env               # Secrets only (API keys, passwords, URLs)
+├── state.json         # Tracks sent notifications (auto-generated)
 ├── Dockerfile         # Container definition
-├── docker-compose.yml # Service definitions
-└── .env.example       # Template to start from
+└── docker-compose.yml # Service definitions
 ```
 
-After editing `notify.py`, changes take effect immediately on next run.
+After editing, changes take effect immediately on next run.
 
 ## Contributing
 

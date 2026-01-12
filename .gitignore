@@ -22,3 +22,6 @@ Thumbs.db
 
 # Previous chat history (local only)
 PreviousChat.txt
+
+# Claude Code context (local only)
+CLAUDE.md

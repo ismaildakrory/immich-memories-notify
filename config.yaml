@@ -35,11 +35,29 @@ settings:
   state_file: "state.json"
   log_level: "INFO"
 
-  # Notification settings
-  max_notifications_per_day: 3
-  interval_minutes: 60  # Time between notifications
+  # Notification slot settings
+  memory_notifications: 3       # Number of memory notifications when memories exist
+  person_notifications: 1       # Number of person photo notifications (added after memories)
+  fallback_notifications: 3     # Number of person photos when no memories for today
 
-# Notification messages (randomly selected)
+  # Person photo settings
+  top_persons_limit: 5          # Number of top named persons to consider
+  exclude_recent_days: 30       # Exclude photos from last N days for person photos
+
+  # Notification time windows
+  # Script triggers at window_start, then sends at random time within window
+  # Format: "HH:MM" in local time
+  notification_windows:
+    - start: "08:00"
+      end: "10:00"
+    - start: "12:00"
+      end: "14:00"
+    - start: "16:00"
+      end: "18:00"
+    - start: "19:00"
+      end: "20:00"
+
+# Notification messages for "On This Day" memories (randomly selected)
 # Available placeholders: {year}, {years_ago}
 messages:
   - "A little trip back to {year}..."
@@ -52,3 +70,15 @@ messages:
   - "Let's revisit {year} together"
   - "A gentle reminder of {year}"
   - "Look what we found from {year}!"
+
+# Notification messages for random person photos (randomly selected)
+# Available placeholders: {person_name}
+person_messages:
+  - "A lovely moment with {person_name}..."
+  - "Remember this time with {person_name}?"
+  - "A random treasure featuring {person_name}"
+  - "Look who we found! {person_name} says hello"
+  - "A cozy memory with {person_name}"
+  - "Here's a favorite moment with {person_name}"
+  - "{person_name} wanted to brighten your day"
+  - "Throwback featuring {person_name}!"
