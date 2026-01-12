@@ -101,10 +101,16 @@ users:
     enabled: true
 
 settings:
-  memory_notifications: 3      # Slots for memory photos
-  person_notifications: 1      # Slots for person photos
-  top_persons_limit: 5         # Top N named people to consider
-  exclude_recent_days: 30      # Skip recent photos for person notifications
+
+  # Notification slot settings
+  memory_notifications: 3       # Number of memory notifications when memories exist
+  person_notifications: 1       # Number of person photo notifications (added after memories)
+  fallback_notifications: 3     # Number of person photos when no memories for today
+
+  # Person photo settings
+  top_persons_limit: 5          # Number of top named persons to consider
+  exclude_recent_days: 30       # Exclude photos from last N days for person photos
+
 
   # Time windows - script triggers at start, sends randomly within window
   notification_windows:
