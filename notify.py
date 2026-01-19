@@ -699,7 +699,6 @@ def process_user_slot(
         return result
 
     immich_url = config["immich"]["url"]
-    ntfy_url = config["ntfy"]["url"]
     retry_config = config["settings"]["retry"]
     messages = config.get("messages", [])
     person_messages = config.get("person_messages", [])
@@ -963,6 +962,7 @@ def send_single_notification(
     # Fetch thumbnail with retry
     thumbnail_data = None
     if asset_id:
+        click_url = "https://my.immich.app/memory?id=" + asset_id
         try:
             thumbnail_data = with_retry(
                 lambda: fetch_thumbnail(immich_url, api_key, asset_id),
@@ -973,10 +973,10 @@ def send_single_notification(
             logger.debug(f"  [{name}] Thumbnail: {len(thumbnail_data):,} bytes")
         except Exception as e:
             logger.warning(f"  [{name}] Could not fetch thumbnail: {e}")
-
+    else:
+        click_url = "https://my.immich.app/"
     # Send notification with retry
     try:
-        click_url = "https://my.immich.app/"
         success = with_retry(
             lambda: send_notification(
                 ntfy_url=ntfy_url,
