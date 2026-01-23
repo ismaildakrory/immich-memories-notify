@@ -699,7 +699,6 @@ def process_user_slot(
         return result
 
     immich_url = config["immich"]["url"]
-    ntfy_url = config["ntfy"]["url"]
     retry_config = config["settings"]["retry"]
     messages = config.get("messages", [])
     person_messages = config.get("person_messages", [])
@@ -976,7 +975,11 @@ def send_single_notification(
 
     # Send notification with retry
     try:
-        click_url = "https://my.immich.app/"
+        # Deep link to specific photo if we have an asset_id
+        if asset_id:
+            click_url = "https://my.immich.app/photos/" + asset_id
+        else:
+            click_url = "https://my.immich.app/"
         success = with_retry(
             lambda: send_notification(
                 ntfy_url=ntfy_url,
