@@ -962,7 +962,7 @@ def send_single_notification(
     # Fetch thumbnail with retry
     thumbnail_data = None
     if asset_id:
-        click_url = "https://my.immich.app/memory?id=" + asset_id
+        click_url = "https://my.immich.app/photos/" + asset_id
         try:
             thumbnail_data = with_retry(
                 lambda: fetch_thumbnail(immich_url, api_key, asset_id),
