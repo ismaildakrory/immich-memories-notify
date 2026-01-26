@@ -1,13 +1,10 @@
 # ============================================================
 # IMMICH MEMORIES NOTIFY - CONFIGURATION
 # ============================================================
-#
-# SETUP: Copy this file to config.yaml and customize
-#        cp config.yaml.example config.yaml
-#
+# Edit via web dashboard at http://localhost:5000
 # ============================================================
 
-# Servers (loaded from .env)
+# Servers (edit in dashboard → Secrets tab)
 immich:
   url: "${IMMICH_URL}"
   external_url: "${IMMICH_EXTERNAL_URL}"
@@ -16,9 +13,7 @@ ntfy:
   url: "${NTFY_URL}"
   external_url: "${NTFY_EXTERNAL_URL}"
 
-# Users
-# Add your users here. Environment variable names must match .env file
-# Example: name "Mom" uses IMMICH_API_KEY_MOM and NTFY_PASSWORD_MOM
+# Users (edit in dashboard → Settings tab)
 users:
   - name: "User1"
     immich_api_key: "${IMMICH_API_KEY_USER1}"
@@ -26,14 +21,6 @@ users:
     ntfy_username: "user1"
     ntfy_password: "${NTFY_PASSWORD_USER1}"
     enabled: true
-
-  # Add more users as needed:
-  # - name: "User2"
-  #   immich_api_key: "${IMMICH_API_KEY_USER2}"
-  #   ntfy_topic: "immich-memories-user2"
-  #   ntfy_username: "user2"
-  #   ntfy_password: "${NTFY_PASSWORD_USER2}"
-  #   enabled: true
 
 # Settings
 settings:
@@ -44,28 +31,26 @@ settings:
   log_level: "INFO"
 
   # Notification slot settings
-  memory_notifications: 3       # Number of memory notifications when memories exist
-  person_notifications: 2       # Number of person photo notifications (added after memories)
-  fallback_notifications: 3     # Number of person photos when no memories for today
+  memory_notifications: 3
+  person_notifications: 2
+  fallback_notifications: 3
 
   # Person photo settings
-  top_persons_limit: 5          # Number of top named persons to consider
-  exclude_recent_days: 30       # Exclude photos from last N days for person photos
+  top_persons_limit: 5
+  exclude_recent_days: 30
 
   # Context features
-  include_location: true        # Include location (city, country) in notifications (33% chance)
-  include_album: true           # Include album name when photo is in an album
+  include_location: true
+  include_album: true
 
   # Video handling
-  video_emoji: true             # Add 🎬 emoji to video notification titles
+  video_emoji: true
 
   # Group photo preference
-  prefer_group_photos: true     # Prioritize photos with multiple named people
-  min_group_size: 2             # Minimum number of named faces for a "group" photo
+  prefer_group_photos: true
+  min_group_size: 2
 
   # Notification time windows
-  # Script triggers at window start, then sends at random time within window
-  # Format: "HH:MM" in local time
   notification_windows:
     - start: "08:00"
       end: "10:00"
@@ -76,9 +61,7 @@ settings:
     - start: "19:00"
       end: "20:00"
 
-# Notification messages for "On This Day" memories (randomly selected)
-# Available placeholders: {year}, {years_ago}
-# Location and album are auto-appended when available
+# Message templates (edit in dashboard → Messages tab)
 messages:
   - "A little trip back to {year}..."
   - "Remember this day {years_ago} years ago?"
@@ -91,8 +74,6 @@ messages:
   - "A gentle reminder of {year}"
   - "Look what we found from {year}!"
 
-# Notification messages for random person photos (randomly selected)
-# Available placeholders: {person_name}
 person_messages:
   - "A lovely moment with {person_name}..."
   - "Remember this time with {person_name}?"
@@ -103,8 +84,6 @@ person_messages:
   - "{person_name} wanted to brighten your day"
   - "Throwback featuring {person_name}!"
 
-# Video notification messages (used for video memories)
-# Available placeholders: {year}, {years_ago}
 video_messages:
   - "Watch this moment from {year}..."
   - "A video memory from {years_ago} years ago"
@@ -112,8 +91,6 @@ video_messages:
   - "Press play on {year}"
   - "A moving memory from {years_ago} years ago"
 
-# Video person messages (used for person video notifications)
-# Available placeholders: {person_name}
 video_person_messages:
   - "Watch this moment with {person_name}..."
   - "A video featuring {person_name}"

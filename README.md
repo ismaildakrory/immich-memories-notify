@@ -67,95 +67,33 @@ Built this mostly vibe coding! Been running smoothly on my setup. PRs and feedba
 
 ## Quick Start
 
-### 1. Clone the Repository
-
 ```bash
+# 1. Clone and start
 git clone https://github.com/ismaildakrory/immich-memories-notify.git
 cd immich-memories-notify
+docker compose up -d dashboard
+
+# 2. Open dashboard and configure
+# http://localhost:5000
 ```
 
-### 2. Configure
+### Configure via Dashboard
 
-**Step A: Create `.env` for secrets only:**
+1. **Secrets tab** → Add your server URLs and API keys
+   - Get Immich API key from: Account Settings → API Keys
 
+2. **Settings tab** → Add/edit users and notification times
+
+3. **Test tab** → Send a test notification
+
+4. **Start the scheduler:**
 ```bash
-cp .env.example .env
+docker compose up -d scheduler
 ```
 
-```bash
-# Server URLs
-IMMICH_URL=http://192.168.1.100:2283
-NTFY_URL=http://192.168.1.100:8090
-
-# API Keys (get from Immich: Account Settings → API Keys)
-IMMICH_API_KEY_USER1=your-api-key-here
-IMMICH_API_KEY_USER2=another-api-key
-
-# ntfy Passwords
-NTFY_PASSWORD_USER1=your-ntfy-password
-NTFY_PASSWORD_USER2=another-password
-
-# Dashboard (optional)
-DASHBOARD_USER=admin
-DASHBOARD_TOKEN=your-secret-token
-```
-
-**Step B: Create `config.yaml` from example:**
-
-```bash
-cp config.yaml.example config.yaml
-```
-
-Edit `config.yaml` with your settings:
-
-```yaml
-users:
-  - name: "User1"
-    immich_api_key: "${IMMICH_API_KEY_USER1}"
-    ntfy_topic: "immich-memories-user1"
-    ntfy_username: "user1"
-    ntfy_password: "${NTFY_PASSWORD_USER1}"
-    enabled: true
-
-settings:
-  memory_notifications: 3      # Slots for memory photos
-  person_notifications: 1      # Slots for person photos
-  top_persons_limit: 5         # Top N named people to consider
-  exclude_recent_days: 30      # Skip recent photos for person notifications
-  include_location: true       # Add location context (33% chance)
-  include_album: true          # Show album name when applicable
-  video_emoji: true            # Add 🎬 emoji for videos
-  prefer_group_photos: true    # Prioritize photos with 2+ people
-  min_group_size: 2            # Minimum people for "group photo"
-
-  # Time windows - script triggers at start, sends randomly within window
-  notification_windows:
-    - start: "08:00"
-      end: "10:00"
-    - start: "12:00"
-      end: "14:00"
-    - start: "16:00"
-      end: "18:00"
-    - start: "19:00"
-      end: "20:00"
-```
-
-### 3. Subscribe to ntfy Topic
+### Subscribe to ntfy
 
 Open the ntfy app on your phone and subscribe to your topic (e.g., `immich-memories-user1`) on your ntfy server.
-
-### 4. Run with Docker
-
-```bash
-# Test it first
-docker compose run --rm notify --slot 1 --test --no-delay
-
-# Start the daily scheduler
-docker compose up -d scheduler
-
-# Start the web dashboard (optional)
-docker compose up -d dashboard
-```
 
 ## Web Dashboard
 

@@ -1,8 +1,5 @@
-# Environment files with secrets
-.env
-
-# Personal config (use config.yaml.example as template)
-config.yaml
+# Local overrides (keep your real secrets here)
+.env.local
 
 # State file
 state.json
@@ -22,9 +19,6 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Previous chat history (local only)
-PreviousChat.txt
 
 # Claude Code context (local only)
 CLAUDE.md
