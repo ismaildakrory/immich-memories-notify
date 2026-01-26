@@ -8,12 +8,17 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 
 - **Daily Memory Notifications** - Get notified when you have photos from this day in previous years
 - **Face Preference** - Prefers photos with recognized faces (your top 5 named people)
+- **Group Photo Priority** - Prioritizes photos with 2+ named people
 - **Person Photos** - Random photos of your favorite people when no memories exist
-- **Smart Scheduling** - 4 notification slots with random timing within configurable windows
+- **Location Context** - Shows city/country when available (33% chance)
+- **Album Awareness** - Displays album name when photo is in an album
+- **Video Support** - Different emoji (🎬) and message templates for videos
+- **Smart Scheduling** - Multiple notification slots with random timing within configurable windows
+- **Web Dashboard** - Browser-based UI to manage settings, users, and trigger tests
 - **Cozy Messages** - Randomized warm message templates (customizable)
 - **Multi-User Support** - Each user gets their own top people and personalized notifications
 - **Rich Notifications** - Includes thumbnail preview with person names
-- **Click to Open** - Tap notification to open Immich app directly
+- **Click to Open** - Tap notification to open photo directly in Immich
 - **Self-Hosted** - Works with your self-hosted Immich and ntfy instances
 - **Docker Ready** - Easy deployment with Docker Compose
 - **Privacy First** - Your photos never leave your network
@@ -25,12 +30,12 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 │   Immich    │ ───> │   Script    │ ───> │    ntfy     │
 │   Server    │      │  (Python)   │      │   Server    │
 └─────────────┘      └─────────────┘      └─────────────┘
-                                                │
-                                                ▼
-                                          ┌─────────────┐
-                                          │  Mobile App │
-                                          │ Notification│
-                                          └─────────────┘
+                            │                    │
+                            ▼                    ▼
+                     ┌─────────────┐      ┌─────────────┐
+                     │  Dashboard  │      │  Mobile App │
+                     │  (Web UI)   │      │ Notification│
+                     └─────────────┘      └─────────────┘
 ```
 
 ### Notification Logic
@@ -42,9 +47,11 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 
 **Key features:**
 - Photos with recognized faces from your top 5 named people are prioritized
+- Group photos (2+ named people) get highest priority
 - Person photos exclude the last 30 days (configurable)
 - Each slot sends at a random time within its window (e.g., 8-10 AM)
 - Per-user top people based on their own photo library
+- Location and album info added when available
 
 ## Requirements
 
@@ -87,6 +94,10 @@ IMMICH_API_KEY_USER2=another-api-key
 # ntfy Passwords
 NTFY_PASSWORD_USER1=your-ntfy-password
 NTFY_PASSWORD_USER2=another-password
+
+# Dashboard (optional)
+DASHBOARD_USER=admin
+DASHBOARD_TOKEN=your-secret-token
 ```
 
 **Step B: Edit `config.yaml` for everything else:**
@@ -105,6 +116,11 @@ settings:
   person_notifications: 1      # Slots for person photos
   top_persons_limit: 5         # Top N named people to consider
   exclude_recent_days: 30      # Skip recent photos for person notifications
+  include_location: true       # Add location context (33% chance)
+  include_album: true          # Show album name when applicable
+  video_emoji: true            # Add 🎬 emoji for videos
+  prefer_group_photos: true    # Prioritize photos with 2+ people
+  min_group_size: 2            # Minimum people for "group photo"
 
   # Time windows - script triggers at start, sends randomly within window
   notification_windows:
@@ -130,7 +146,46 @@ docker compose run --rm notify --slot 1 --test --no-delay
 
 # Start the daily scheduler
 docker compose up -d scheduler
+
+# Start the web dashboard (optional)
+docker compose up -d dashboard
 ```
+
+## Web Dashboard
+
+Access the dashboard at `http://localhost:5000` to manage your setup through a browser interface.
+
+### Features
+
+- **Status Tab** - View today's sent notifications per user
+- **Settings Tab** - Edit notification windows, manage users, toggle features
+- **Messages Tab** - Customize message templates
+- **Secrets Tab** - View/edit API keys and passwords (masked display)
+- **Test Tab** - Trigger test notifications for any slot
+
+### Screenshots
+
+The dashboard provides a clean interface to:
+- Add/remove/rename users
+- Adjust notification time windows
+- Toggle features (location, album, video emoji, group preference)
+- Edit message templates for memories, person photos, and videos
+- Test notifications without waiting for scheduled times
+
+### Authentication
+
+Set `DASHBOARD_TOKEN` in `.env` to enable authentication:
+
+```bash
+DASHBOARD_USER=admin
+DASHBOARD_TOKEN=your-secret-token
+```
+
+If not set, the dashboard is open (suitable for local network use).
+
+### Auto-Restart
+
+When you save notification windows or secrets through the dashboard, the scheduler automatically restarts to apply changes.
 
 ## Usage
 
@@ -155,14 +210,21 @@ docker compose run --rm notify --slot 1 --force
 # Check specific date
 docker compose run --rm notify --slot 1 --date 2024-12-25
 
-# Start scheduler (runs all 4 slots daily)
+# Start scheduler (runs all slots daily)
 docker compose up -d scheduler
 
-# View scheduler logs
-docker compose logs -f scheduler
+# Start dashboard
+docker compose up -d dashboard
 
-# Stop scheduler
+# View logs
+docker compose logs -f scheduler
+docker compose logs -f dashboard
+
+# Stop services
 docker compose down
+
+# Rebuild after updates
+docker compose up -d --build dashboard
 ```
 
 ### Without Docker
@@ -184,6 +246,7 @@ python notify.py --slot 1 --test --no-delay
 | `.env` | **Secrets only** - API keys, passwords, server URLs |
 | `config.yaml` | **All configuration** - users, schedules, settings, messages |
 | `state.json` | Tracks sent notifications (auto-generated) |
+| `dashboard/` | Web dashboard (FastAPI + HTML) |
 
 ### Notification Windows
 
@@ -217,6 +280,13 @@ settings:
   top_persons_limit: 5          # Consider top N named people
   exclude_recent_days: 30       # Skip photos from last N days
 
+  # Enhanced features
+  include_location: true        # Add city/country (33% random chance)
+  include_album: true           # Show album name when in album
+  video_emoji: true             # Add 🎬 emoji for video notifications
+  prefer_group_photos: true     # Prioritize photos with multiple people
+  min_group_size: 2             # Minimum faces for "group photo"
+
   # Retry settings
   retry:
     max_attempts: 3
@@ -243,12 +313,26 @@ person_messages:
   - "A lovely moment with {person_name}..."
   - "Remember this time with {person_name}?"
   - "Here's a favorite moment with {person_name}"
+
+# For video memories
+video_messages:
+  - "Watch this moment from {year}..."
+  - "A video memory from {years_ago} years ago"
+
+# For videos with people
+video_person_messages:
+  - "Watch this moment with {person_name}..."
+  - "A video featuring {person_name} from {year}"
 ```
 
 **Placeholders:**
 - `{year}` - The year (e.g., 2020)
 - `{years_ago}` - Years since (e.g., 4)
 - `{person_name}` - Person's name from Immich
+
+**Auto-appended context (when available):**
+- Location: `📍 Cairo, Egypt` (33% chance)
+- Album: `📁 Summer Vacation 2023`
 
 ## Multi-User Setup
 
@@ -277,6 +361,8 @@ users:
 ```bash
 docker compose restart scheduler
 ```
+
+Or use the web dashboard to add users with the "Add User" button.
 
 Each user subscribes to their own ntfy topic in the app.
 
@@ -334,21 +420,36 @@ docker compose run --rm notify --slot 1 --force --no-delay
 
 Or delete `state.json` to reset all slots.
 
+### Dashboard not loading
+
+1. Check if container is running: `docker compose ps`
+2. View logs: `docker compose logs dashboard`
+3. Verify port 5000 is accessible
+
 ## Development
 
 Source files are mounted as volumes, so you can edit them without rebuilding:
 
 ```
 .
-├── notify.py          # Main script
-├── config.yaml        # Configuration (users, schedules, settings)
-├── .env               # Secrets only (API keys, passwords, URLs)
-├── state.json         # Tracks sent notifications (auto-generated)
-├── Dockerfile         # Container definition
-└── docker-compose.yml # Service definitions
+├── notify.py              # Main notification script
+├── config.yaml            # Configuration (users, schedules, settings)
+├── .env                   # Secrets only (API keys, passwords, URLs)
+├── state.json             # Tracks sent notifications (auto-generated)
+├── Dockerfile             # Main container definition
+├── Dockerfile.dashboard   # Dashboard container
+├── docker-compose.yml     # Service definitions
+└── dashboard/             # Web dashboard
+    ├── main.py            # FastAPI app
+    ├── models.py          # Pydantic models
+    ├── routers/           # API endpoints
+    └── templates/         # HTML UI
 ```
 
-After editing, changes take effect immediately on next run.
+After editing, changes take effect immediately on next run. For dashboard changes, rebuild with:
+```bash
+docker compose up -d --build dashboard
+```
 
 ## Contributing
 
