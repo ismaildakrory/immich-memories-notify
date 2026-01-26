@@ -1,6 +1,9 @@
 # Environment files with secrets
 .env
 
+# Personal config (use config.yaml.example as template)
+config.yaml
+
 # State file
 state.json
 

@@ -100,7 +100,13 @@ DASHBOARD_USER=admin
 DASHBOARD_TOKEN=your-secret-token
 ```
 
-**Step B: Edit `config.yaml` for everything else:**
+**Step B: Create `config.yaml` from example:**
+
+```bash
+cp config.yaml.example config.yaml
+```
+
+Edit `config.yaml` with your settings:
 
 ```yaml
 users:
