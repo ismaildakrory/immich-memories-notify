@@ -108,6 +108,13 @@ Access the dashboard at `http://localhost:5000` to manage your setup through a b
 - **Test Tab** - Trigger test notifications for any slot
 
 ### Screenshots
+![ntfy](https://github.com/user-attachments/assets/b685ebab-2256-4da4-8b80-e00d4d110cd0)
+![expand](https://github.com/user-attachments/assets/f039766a-5b87-4bbd-8965-3e1cad0da19f)
+<img width="1256" height="590" alt="Status" src="https://github.com/user-attachments/assets/9d00c677-5124-4617-b89f-9468b279e818" />
+<img width="1031" height="1201" alt="Settings" src="https://github.com/user-attachments/assets/829b0fc4-4af3-45e7-a4e0-0e8cfe9221d4" />
+<img width="1257" height="1115" alt="Messages" src="https://github.com/user-attachments/assets/94df34a8-17d9-47c3-a865-ea3286fd5516" />
+<img width="1242" height="1196" alt="Secrets" src="https://github.com/user-attachments/assets/732ace52-0ea0-4ab7-bb42-82c543beaae2" />
+<img width="1250" height="1115" alt="Test" src="https://github.com/user-attachments/assets/2ea0e52e-4854-4268-8b79-a14905428e71" />
 
 The dashboard provides a clean interface to:
 - Add/remove/rename users
