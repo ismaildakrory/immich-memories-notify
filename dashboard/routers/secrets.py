@@ -135,14 +135,14 @@ async def get_secrets_masked():
             "user1": {
                 "api_key": mask_secret(env_vars.get("IMMICH_API_KEY_USER1", "")),
                 "api_key_set": bool(env_vars.get("IMMICH_API_KEY_USER1")),
-                "ntfy_password": mask_secret(env_vars.get("NTFY_PASSWORD_ISMAIL", "")),
-                "ntfy_password_set": bool(env_vars.get("NTFY_PASSWORD_ISMAIL")),
+                "ntfy_password": mask_secret(env_vars.get("NTFY_PASSWORD_USER1", "")),
+                "ntfy_password_set": bool(env_vars.get("NTFY_PASSWORD_USER1")),
             },
             "user2": {
                 "api_key": mask_secret(env_vars.get("IMMICH_API_KEY_USER2", "")),
                 "api_key_set": bool(env_vars.get("IMMICH_API_KEY_USER2")),
-                "ntfy_password": mask_secret(env_vars.get("NTFY_PASSWORD_RANYA", "")),
-                "ntfy_password_set": bool(env_vars.get("NTFY_PASSWORD_RANYA")),
+                "ntfy_password": mask_secret(env_vars.get("NTFY_PASSWORD_USER2", "")),
+                "ntfy_password_set": bool(env_vars.get("NTFY_PASSWORD_USER2")),
             },
         },
         "env_file_exists": Path(ENV_PATH).exists(),
@@ -180,16 +180,16 @@ async def update_secrets(update: SecretsUpdate):
         env_vars["IMMICH_API_KEY_USER1"] = update.user1_api_key
         updated.append("IMMICH_API_KEY_USER1")
     if update.user1_ntfy_password is not None and update.user1_ntfy_password:
-        env_vars["NTFY_PASSWORD_ISMAIL"] = update.user1_ntfy_password
-        updated.append("NTFY_PASSWORD_ISMAIL")
+        env_vars["NTFY_PASSWORD_USER1"] = update.user1_ntfy_password
+        updated.append("NTFY_PASSWORD_USER1")
 
     # User 2 secrets
     if update.user2_api_key is not None and update.user2_api_key:
         env_vars["IMMICH_API_KEY_USER2"] = update.user2_api_key
         updated.append("IMMICH_API_KEY_USER2")
     if update.user2_ntfy_password is not None and update.user2_ntfy_password:
-        env_vars["NTFY_PASSWORD_RANYA"] = update.user2_ntfy_password
-        updated.append("NTFY_PASSWORD_RANYA")
+        env_vars["NTFY_PASSWORD_USER2"] = update.user2_ntfy_password
+        updated.append("NTFY_PASSWORD_USER2")
 
     if updated:
         save_env_file(ENV_PATH, env_vars)

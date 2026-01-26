@@ -115,14 +115,6 @@ Access the dashboard at `http://localhost:5000` to manage your setup through a b
 <img width="1257" height="1115" alt="Messages" src="https://github.com/user-attachments/assets/94df34a8-17d9-47c3-a865-ea3286fd5516" />
 <img width="1242" height="1196" alt="Secrets" src="https://github.com/user-attachments/assets/732ace52-0ea0-4ab7-bb42-82c543beaae2" />
 <img width="1250" height="1115" alt="Test" src="https://github.com/user-attachments/assets/2ea0e52e-4854-4268-8b79-a14905428e71" />
-
-The dashboard provides a clean interface to:
-- Add/remove/rename users
-- Adjust notification time windows
-- Toggle features (location, album, video emoji, group preference)
-- Edit message templates for memories, person photos, and videos
-- Test notifications without waiting for scheduled times
-
 ### Authentication
 
 Set `DASHBOARD_TOKEN` in `.env` to enable authentication:
@@ -287,33 +279,14 @@ video_person_messages:
 
 ## Multi-User Setup
 
-Each user gets personalized notifications based on their own Immich library:
+Each user gets personalized notifications based on their own Immich library.
 
-**Step 1:** Get API key from Immich (Account Settings → API Keys)
+**Via Dashboard (recommended):**
+1. Go to **Settings tab** → Click **Add User**
+2. Go to **Secrets tab** → Add the user's API key and ntfy password
+3. Scheduler auto-restarts with new user
 
-**Step 2:** Add to `.env`:
-```bash
-IMMICH_API_KEY_USER2=their-api-key-here
-NTFY_PASSWORD_USER2=their-ntfy-password
-```
-
-**Step 3:** Add to `config.yaml`:
-```yaml
-users:
-  - name: "Mom"
-    immich_api_key: "${IMMICH_API_KEY_USER2}"
-    ntfy_topic: "immich-memories-mom"
-    ntfy_username: "mom"
-    ntfy_password: "${NTFY_PASSWORD_USER2}"
-    enabled: true
-```
-
-**Step 4:** Restart scheduler:
-```bash
-docker compose restart scheduler
-```
-
-Or use the web dashboard to add users with the "Add User" button.
+**Manually:** Edit `config.yaml` and `.env` files, then restart scheduler.
 
 Each user subscribes to their own ntfy topic in the app.
 
