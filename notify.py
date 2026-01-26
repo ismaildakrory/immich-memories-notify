@@ -525,6 +525,68 @@ def get_asset_people(immich_url: str, api_key: str, asset_id: str, timeout: int 
     return asset_data.get("people", [])
 
 
+# Asset details cache (per-session)
+_asset_details_cache = {}
+
+
+def fetch_asset_details(immich_url: str, api_key: str, asset_id: str, timeout: int = 10) -> dict:
+    """
+    Fetch full asset details including exifInfo, albums, and people.
+    Results are cached for the session to avoid repeated API calls.
+    """
+    cache_key = f"{immich_url}:{asset_id}"
+    if cache_key in _asset_details_cache:
+        return _asset_details_cache[cache_key]
+
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    response = requests.get(f"{immich_url}/api/assets/{asset_id}", headers=headers, timeout=timeout)
+    response.raise_for_status()
+    asset_data = response.json()
+
+    _asset_details_cache[cache_key] = asset_data
+    return asset_data
+
+
+def format_location(exif_info: dict) -> dict:
+    """
+    Extract location from exifInfo.
+    Returns dict with 'location', 'city', 'country' keys.
+    Location is formatted as "City, Country" or just one if other is missing.
+    """
+    if not exif_info:
+        return {"location": "", "city": "", "country": ""}
+
+    city = exif_info.get("city", "")
+    country = exif_info.get("country", "")
+
+    # Build location string
+    if city and country:
+        location = f"{city}, {country}"
+    elif city:
+        location = city
+    elif country:
+        location = country
+    else:
+        location = ""
+
+    return {
+        "location": location,
+        "city": city,
+        "country": country,
+    }
+
+
+def get_primary_album(asset_details: dict) -> Optional[str]:
+    """
+    Get the first album name from asset's albums array.
+    Returns album name or None if not in any album.
+    """
+    albums = asset_details.get("albums", [])
+    if albums and len(albums) > 0:
+        return albums[0].get("albumName")
+    return None
+
+
 def select_asset_with_face_preference(
     assets: list,
     top_person_ids: set,
@@ -532,10 +594,22 @@ def select_asset_with_face_preference(
     api_key: str,
     exclude_asset_ids: set = None,
     logger=None,
+    prefer_groups: bool = False,
+    min_group_size: int = 2,
 ) -> Optional[dict]:
     """
     Select an asset preferring those with recognized faces from top persons.
+
+    When prefer_groups is False (default):
     Priority: 1) Has top person face, 2) Has any named face, 3) Random
+
+    When prefer_groups is True:
+    Priority:
+      1) Group photos with multiple top persons (>= min_group_size)
+      2) Group photos with multiple named faces (>= min_group_size)
+      3) Single top person
+      4) Single named face
+      5) Random
 
     Returns the selected asset or None.
     """
@@ -550,10 +624,12 @@ def select_asset_with_face_preference(
     if not available:
         return None
 
-    # Categorize assets
-    with_top_person = []
-    with_any_face = []
-    without_face = []
+    # Categorize assets with face counts
+    group_top_persons = []      # Multiple top persons
+    group_named = []            # Multiple named faces
+    single_top_person = []      # One top person
+    single_named = []           # One named face
+    without_face = []           # No faces
 
     for asset in available:
         asset_id = asset.get("id")
@@ -563,11 +639,19 @@ def select_asset_with_face_preference(
         try:
             people = get_asset_people(immich_url, api_key, asset_id)
             named_people = [p for p in people if p.get("name")]
+            top_people = [p for p in named_people if p.get("id") in top_person_ids]
 
-            if any(p.get("id") in top_person_ids for p in named_people):
-                with_top_person.append(asset)
-            elif named_people:
-                with_any_face.append(asset)
+            top_count = len(top_people)
+            named_count = len(named_people)
+
+            if top_count >= min_group_size:
+                group_top_persons.append(asset)
+            elif named_count >= min_group_size:
+                group_named.append(asset)
+            elif top_count > 0:
+                single_top_person.append(asset)
+            elif named_count > 0:
+                single_named.append(asset)
             else:
                 without_face.append(asset)
         except Exception as e:
@@ -576,21 +660,53 @@ def select_asset_with_face_preference(
             without_face.append(asset)
 
     # Select by priority
-    if with_top_person:
-        chosen = random.choice(with_top_person)
-        if logger:
-            logger.debug(f"Selected asset with top person face")
-        return chosen
-    elif with_any_face:
-        chosen = random.choice(with_any_face)
-        if logger:
-            logger.debug(f"Selected asset with named face")
-        return chosen
+    if prefer_groups:
+        # Group preference enabled - use new priority order
+        if group_top_persons:
+            chosen = random.choice(group_top_persons)
+            if logger:
+                logger.debug(f"Selected group photo with multiple top persons")
+            return chosen
+        elif group_named:
+            chosen = random.choice(group_named)
+            if logger:
+                logger.debug(f"Selected group photo with multiple named faces")
+            return chosen
+        elif single_top_person:
+            chosen = random.choice(single_top_person)
+            if logger:
+                logger.debug(f"Selected asset with single top person")
+            return chosen
+        elif single_named:
+            chosen = random.choice(single_named)
+            if logger:
+                logger.debug(f"Selected asset with single named face")
+            return chosen
+        else:
+            chosen = random.choice(without_face) if without_face else random.choice(available)
+            if logger:
+                logger.debug(f"Selected random asset (no face preference available)")
+            return chosen
     else:
-        chosen = random.choice(without_face) if without_face else random.choice(available)
-        if logger:
-            logger.debug(f"Selected random asset (no face preference available)")
-        return chosen
+        # Original behavior - combine groups with singles
+        with_top_person = group_top_persons + single_top_person
+        with_any_face = group_named + single_named
+
+        if with_top_person:
+            chosen = random.choice(with_top_person)
+            if logger:
+                logger.debug(f"Selected asset with top person face")
+            return chosen
+        elif with_any_face:
+            chosen = random.choice(with_any_face)
+            if logger:
+                logger.debug(f"Selected asset with named face")
+            return chosen
+        else:
+            chosen = random.choice(without_face) if without_face else random.choice(available)
+            if logger:
+                logger.debug(f"Selected random asset (no face preference available)")
+            return chosen
 
 
 # =============================================================================
@@ -621,6 +737,7 @@ def send_notification(
     click_url: str = None,
     auth: tuple = None,
     timeout: int = 10,
+    is_video: bool = False,
 ) -> bool:
     """Send a notification to ntfy."""
     from urllib.parse import quote
@@ -630,9 +747,12 @@ def send_notification(
     # URL-encode non-ASCII characters in title for HTTP header safety
     encoded_title = quote(title, safe=' ')
 
+    # Use different tags for videos
+    tags = "movie,calendar" if is_video else "camera,calendar"
+
     headers = {
         "Title": encoded_title,
-        "Tags": "camera,calendar",
+        "Tags": tags,
         "Priority": "default",
     }
 
@@ -702,6 +822,8 @@ def process_user_slot(
     retry_config = config["settings"]["retry"]
     messages = config.get("messages", [])
     person_messages = config.get("person_messages", [])
+    video_messages = config.get("video_messages", [])
+    video_person_messages = config.get("video_person_messages", [])
     settings = config["settings"]
 
     memory_notifications = settings.get("memory_notifications", 3)
@@ -746,6 +868,9 @@ def process_user_slot(
     parsed = parse_memories(todays) if todays else {"years": [], "by_year": {}}
     has_memories = bool(parsed["years"])
 
+    if has_memories:
+        logger.debug(f"  [{name}] Memories: {parsed['total_assets']} assets ({parsed['image_count']} images, {parsed['video_count']} videos)")
+
     # Get top persons for this user
     try:
         top_persons = with_retry(
@@ -779,6 +904,8 @@ def process_user_slot(
                 messages=messages,
                 test_mode=test_mode,
                 logger=logger,
+                settings=settings,
+                video_messages=video_messages,
             )
         elif slot <= total_slots:
             # Send a person photo notification
@@ -791,6 +918,8 @@ def process_user_slot(
                 person_messages=person_messages,
                 test_mode=test_mode,
                 logger=logger,
+                settings=settings,
+                video_person_messages=video_person_messages,
             )
         else:
             logger.info(f"  [{name}] Slot {slot} exceeds configured slots ({total_slots}), skipping")
@@ -807,6 +936,8 @@ def process_user_slot(
                 person_messages=person_messages,
                 test_mode=test_mode,
                 logger=logger,
+                settings=settings,
+                video_person_messages=video_person_messages,
             )
         else:
             logger.info(f"  [{name}] Slot {slot} exceeds fallback slots ({fallback_notifications}), skipping")
@@ -818,6 +949,13 @@ def process_user_slot(
 
     if dry_run:
         logger.info(f"  [{name}] [DRY RUN] Would send: {notification['title']} - {notification['message']}")
+        # Log additional details in debug mode
+        if notification.get("location"):
+            logger.debug(f"  [{name}] Location: {notification['location']}")
+        if notification.get("album_name"):
+            logger.debug(f"  [{name}] Album: {notification['album_name']}")
+        if notification.get("is_video"):
+            logger.debug(f"  [{name}] Type: VIDEO")
         return result
 
     # Send the notification
@@ -852,11 +990,18 @@ def prepare_memory_notification(
     messages: list,
     test_mode: bool,
     logger: logging.Logger,
+    settings: dict = None,
+    video_messages: list = None,
 ) -> Optional[dict]:
     """Prepare a memory notification for a specific slot, preferring faces."""
     years = parsed["years"]
     if not years:
         return None
+
+    if settings is None:
+        settings = {}
+    if video_messages is None:
+        video_messages = []
 
     # Select year for this slot (cycle through available years)
     year_index = (slot - 1) % len(years)
@@ -867,7 +1012,10 @@ def prepare_memory_notification(
     if not assets:
         return None
 
-    # Select asset with face preference
+    # Select asset with face preference (and group preference if enabled)
+    prefer_groups = settings.get("prefer_group_photos", False)
+    min_group_size = settings.get("min_group_size", 2)
+
     selected_asset = select_asset_with_face_preference(
         assets=assets,
         top_person_ids=top_person_ids,
@@ -875,6 +1023,8 @@ def prepare_memory_notification(
         api_key=api_key,
         exclude_asset_ids=assets_sent,
         logger=logger,
+        prefer_groups=prefer_groups,
+        min_group_size=min_group_size,
     )
 
     if not selected_asset:
@@ -882,15 +1032,71 @@ def prepare_memory_notification(
         available = [a for a in assets if a.get("id") not in assets_sent]
         selected_asset = available[0] if available else assets[0]
 
+    asset_id = selected_asset.get("id")
+
+    # Detect if video
+    is_video = selected_asset.get("type") == "VIDEO"
+
+    # Fetch asset details for location and album
+    location_str = ""
+    album_name = None
+    include_location = settings.get("include_location", False)
+    include_album = settings.get("include_album", False)
+
+    if asset_id and (include_location or include_album):
+        try:
+            asset_details = fetch_asset_details(immich_url, api_key, asset_id)
+            if include_location:
+                exif_info = asset_details.get("exifInfo", {})
+                location_data = format_location(exif_info)
+                location_str = location_data.get("location", "")
+            if include_album:
+                album_name = get_primary_album(asset_details)
+        except Exception as e:
+            if logger:
+                logger.debug(f"Could not fetch asset details for {asset_id}: {e}")
+
     # Format notification
     years_ago = date.today().year - year
-    if messages:
-        message_template = random.choice(messages)
-        message = message_template.format(year=year, years_ago=years_ago)
-    else:
-        message = f"You have memories from {year}!"
 
-    title = f"Memories from {year}"
+    # Choose message template based on video type
+    if is_video and video_messages:
+        message_template = random.choice(video_messages)
+    elif messages:
+        message_template = random.choice(messages)
+    else:
+        message_template = "You have memories from {year}!"
+
+    # Build format kwargs
+    format_kwargs = {
+        "year": year,
+        "years_ago": years_ago,
+        "location": location_str,
+        "album_name": album_name or "",
+    }
+
+    # Safely format message (ignore missing placeholders)
+    try:
+        message = message_template.format(**format_kwargs)
+    except KeyError:
+        # Fallback if template has unknown placeholders
+        message = message_template.format(year=year, years_ago=years_ago)
+
+    # Append location context if available (33% chance)
+    if location_str and location_str not in message and random.random() < 0.33:
+        message = f"{message}\n\n📍 {location_str}"
+
+    # Append album context if available (33% chance)
+    if album_name and album_name not in message and random.random() < 0.33:
+        message = f"{message}\n📁 {album_name}"
+
+    # Build title
+    video_emoji = settings.get("video_emoji", False)
+    if is_video and video_emoji:
+        title = f"\U0001F3AC Memories from {year}"
+    else:
+        title = f"Memories from {year}"
+
     if test_mode:
         title = "[TEST] " + title
 
@@ -898,9 +1104,12 @@ def prepare_memory_notification(
         "title": title,
         "message": message,
         "has_content": True,
-        "asset_id": selected_asset.get("id"),
+        "asset_id": asset_id,
         "year": year,
         "is_person_photo": False,
+        "is_video": is_video,
+        "location": location_str,
+        "album_name": album_name,
     }
 
 
@@ -913,12 +1122,19 @@ def prepare_person_notification(
     person_messages: list,
     test_mode: bool,
     logger: logging.Logger,
+    settings: dict = None,
+    video_person_messages: list = None,
 ) -> Optional[dict]:
     """Prepare a random person photo notification."""
     if not top_persons:
         if logger:
             logger.info("No named persons available for person notification")
         return None
+
+    if settings is None:
+        settings = {}
+    if video_person_messages is None:
+        video_person_messages = []
 
     result = get_random_person_photo(
         immich_url=immich_url,
@@ -934,12 +1150,82 @@ def prepare_person_notification(
             logger.info("Could not find valid person photo")
         return None
 
-    return format_person_notification(
-        person_name=result["person_name"],
-        asset=result["asset"],
-        person_messages=person_messages,
-        test_mode=test_mode,
-    )
+    asset = result["asset"]
+    person_name = result["person_name"]
+    asset_id = asset.get("id")
+
+    # Detect if video
+    is_video = asset.get("type") == "VIDEO"
+
+    # Fetch asset details for location and album
+    location_str = ""
+    album_name = None
+    include_location = settings.get("include_location", False)
+    include_album = settings.get("include_album", False)
+
+    if asset_id and (include_location or include_album):
+        try:
+            asset_details = fetch_asset_details(immich_url, api_key, asset_id)
+            if include_location:
+                exif_info = asset_details.get("exifInfo", {})
+                location_data = format_location(exif_info)
+                location_str = location_data.get("location", "")
+            if include_album:
+                album_name = get_primary_album(asset_details)
+        except Exception as e:
+            if logger:
+                logger.debug(f"Could not fetch asset details for {asset_id}: {e}")
+
+    # Choose message template based on video type
+    if is_video and video_person_messages:
+        message_template = random.choice(video_person_messages)
+    elif person_messages:
+        message_template = random.choice(person_messages)
+    else:
+        message_template = "A lovely moment with {person_name}..."
+
+    # Build format kwargs
+    format_kwargs = {
+        "person_name": person_name,
+        "location": location_str,
+        "album_name": album_name or "",
+    }
+
+    # Safely format message
+    try:
+        message = message_template.format(**format_kwargs)
+    except KeyError:
+        message = message_template.format(person_name=person_name)
+
+    # Append location context if available (33% chance)
+    if location_str and location_str not in message and random.random() < 0.33:
+        message = f"{message}\n\n📍 {location_str}"
+
+    # Append album context if available (33% chance)
+    if album_name and album_name not in message and random.random() < 0.33:
+        message = f"{message}\n📁 {album_name}"
+
+    # Build title
+    video_emoji = settings.get("video_emoji", False)
+    if is_video and video_emoji:
+        title = f"\U0001F3AC A memory with {person_name}"
+    else:
+        title = f"A memory with {person_name}"
+
+    if test_mode:
+        title = "[TEST] " + title
+
+    return {
+        "title": title,
+        "message": message,
+        "has_content": True,
+        "asset_id": asset_id,
+        "person_name": person_name,
+        "is_person_photo": True,
+        "is_video": is_video,
+        "location": location_str,
+        "album_name": album_name,
+    }
 
 
 def send_single_notification(
@@ -980,6 +1266,7 @@ def send_single_notification(
             click_url = "https://my.immich.app/photos/" + asset_id
         else:
             click_url = "https://my.immich.app/"
+        is_video = notification.get("is_video", False)
         success = with_retry(
             lambda: send_notification(
                 ntfy_url=ntfy_url,
@@ -989,6 +1276,7 @@ def send_single_notification(
                 thumbnail_data=thumbnail_data,
                 click_url=click_url,
                 auth=ntfy_auth,
+                is_video=is_video,
             ),
             max_attempts=retry_config["max_attempts"],
             delay=retry_config["delay_seconds"],

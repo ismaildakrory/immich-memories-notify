@@ -1,0 +1,31 @@
+# Immich Memories Notify - Dashboard
+# FastAPI web dashboard for managing notifications
+
+FROM python:3.11-alpine
+
+# Install Docker CLI for restart functionality
+RUN apk add --no-cache docker-cli docker-cli-compose
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn[standard] \
+    pyyaml \
+    requests
+
+# Create app directory
+WORKDIR /app
+
+# Copy dashboard code
+COPY dashboard/ /app/dashboard/
+COPY notify.py /app/notify.py
+
+# Expose port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5000/health || exit 1
+
+# Run uvicorn
+CMD ["uvicorn", "dashboard.main:app", "--host", "0.0.0.0", "--port", "5000"]

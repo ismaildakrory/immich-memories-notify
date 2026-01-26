@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immich Memories Notify - Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --card-bg: #16213e;
+            --accent: #4a90d9;
+            --accent-hover: #5ba0e9;
+            --text: #e0e0e0;
+            --text-muted: #8899a6;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --border: #2a3f5f;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-color);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--card-bg);
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            border-radius: 6px 6px 0 0;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: rgba(74, 144, 217, 0.1);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            background: var(--card-bg);
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 16px;
+            color: var(--accent);
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            margin: 20px 0 12px;
+            color: var(--text);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="time"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-color);
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        button.danger {
+            background: var(--error);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--border);
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text);
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        }
+
+        .user-card {
+            background: var(--bg-color);
+            padding: 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info h4 {
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+
+        .user-info p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background: rgba(74, 222, 128, 0.2);
+            color: var(--success);
+        }
+
+        .status-badge.pending {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--warning);
+        }
+
+        .window-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .window-row span {
+            color: var(--text-muted);
+        }
+
+        .slot-card {
+            background: var(--bg-color);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .slot-card h4 {
+            margin-bottom: 8px;
+        }
+
+        .slot-card button {
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .output-box {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .alert.success {
+            background: rgba(74, 222, 128, 0.15);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .alert.error {
+            background: rgba(248, 113, 113, 0.15);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--text-muted);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .state-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .state-user {
+            background: var(--bg-color);
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        .state-user h4 {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slots-display {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .slot-indicator {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+        }
+
+        .slot-indicator.sent {
+            background: var(--success);
+            color: var(--bg-color);
+            border-color: var(--success);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .tab-btn {
+                padding: 8px 16px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Immich Memories Notify</h1>
+            <p>Dashboard for managing memory notifications</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="state">Today's Status</button>
+            <button class="tab-btn" data-tab="settings">Settings</button>
+            <button class="tab-btn" data-tab="messages">Messages</button>
+            <button class="tab-btn" data-tab="secrets">Secrets</button>
+            <button class="tab-btn" data-tab="test">Test</button>
+        </div>
+
+        <!-- State Tab -->
+        <div id="state-tab" class="tab-content active">
+            <div class="card">
+                <h2>Today's Notifications</h2>
+                <div id="state-alert"></div>
+                <div id="state-summary" class="state-summary">
+                    <p style="color: var(--text-muted)">Loading...</p>
+                </div>
+                <div class="btn-group" style="margin-top: 20px;">
+                    <button onclick="refreshState()">Refresh</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="card">
+                <h2>Users</h2>
+                <div id="users-list" class="grid grid-2">
+                    <p style="color: var(--text-muted)">Loading...</p>
+                </div>
+                <div class="btn-group" style="margin-top: 16px;">
+                    <button class="secondary" onclick="showAddUserModal()">Add User</button>
+                </div>
+            </div>
+
+            <!-- Add User Modal -->
+            <div id="add-user-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+                <div class="card" style="max-width: 400px; margin: 20px;">
+                    <h2>Add New User</h2>
+                    <div id="add-user-alert"></div>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="new-user-name" placeholder="e.g., John">
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy Topic</label>
+                        <input type="text" id="new-user-topic" placeholder="e.g., immich-memories-john">
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy Username</label>
+                        <input type="text" id="new-user-ntfy-username" placeholder="e.g., john">
+                    </div>
+                    <div class="btn-group">
+                        <button onclick="addUser()">Add User</button>
+                        <button class="secondary" onclick="hideAddUserModal()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Notification Time:</h2>
+                <div id="windows-list">
+                    <p style="color: var(--text-muted)">Loading...</p>
+                </div>
+                <div class="btn-group" style="margin-top: 20px;">
+                    <button onclick="saveWindows()">Save Windows</button>
+                    <button class="secondary" onclick="addWindow()">Add Window</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>General Settings</h2>
+                <div id="settings-alert"></div>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Memory Notifications</label>
+                        <input type="number" id="memory_notifications" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Person Notifications</label>
+                        <input type="number" id="person_notifications" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Fallback Notifications</label>
+                        <input type="number" id="fallback_notifications" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Top Persons Limit</label>
+                        <input type="number" id="top_persons_limit" min="1" max="20">
+                    </div>
+                    <div class="form-group">
+                        <label>Exclude Recent Days</label>
+                        <input type="number" id="exclude_recent_days" min="0" max="365">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Group Size</label>
+                        <input type="number" id="min_group_size" min="2" max="10">
+                    </div>
+                </div>
+
+                <h3>Feature Toggles</h3>
+                <div class="grid grid-3">
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="include_location">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Location</span>
+                    </div>
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="include_album">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Album</span>
+                    </div>
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="video_emoji">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Video Emoji</span>
+                    </div>
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="prefer_group_photos">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Prefer Groups</span>
+                    </div>
+                </div>
+
+                <div class="btn-group" style="margin-top: 20px;">
+                    <button onclick="saveSettings()">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Tab -->
+        <div id="messages-tab" class="tab-content">
+            <div class="card">
+                <h2>Message Templates</h2>
+                <div id="messages-alert"></div>
+
+                <div class="form-group">
+                    <label>Memory Messages (one per line)</label>
+                    <textarea id="messages" placeholder="A little trip back to {year}..."></textarea>
+                    <small style="color: var(--text-muted)">Placeholders: {year}, {years_ago}, {location}, {album_name}</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Person Messages (one per line)</label>
+                    <textarea id="person_messages" placeholder="A lovely moment with {person_name}..."></textarea>
+                    <small style="color: var(--text-muted)">Placeholders: {person_name}, {location}, {album_name}</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Video Messages (one per line)</label>
+                    <textarea id="video_messages" placeholder="Watch this moment from {year}..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Video Person Messages (one per line)</label>
+                    <textarea id="video_person_messages" placeholder="Watch this moment with {person_name}..."></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button onclick="saveMessages()">Save Messages</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secrets Tab -->
+        <div id="secrets-tab" class="tab-content">
+            <div class="card">
+                <h2>Server URLs</h2>
+                <div id="secrets-alert"></div>
+                <p style="color: var(--text-muted); margin-bottom: 16px;">
+                    Server connection URLs. Changes require container restart.
+                </p>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Immich URL (internal)</label>
+                        <input type="text" id="immich_url" placeholder="http://192.168.1.100:2283">
+                    </div>
+                    <div class="form-group">
+                        <label>Immich External URL</label>
+                        <input type="text" id="immich_external_url" placeholder="https://photos.example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy URL (internal)</label>
+                        <input type="text" id="ntfy_url" placeholder="http://192.168.1.100:8080">
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy External URL</label>
+                        <input type="text" id="ntfy_external_url" placeholder="https://ntfy.example.com">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>API Keys & Passwords</h2>
+                <p style="color: var(--text-muted); margin-bottom: 16px;">
+                    Sensitive credentials are masked. Enter new values to update. Leave empty to keep current.
+                </p>
+
+                <h3>User 1 (Ismail)</h3>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Immich API Key</label>
+                        <input type="password" id="user1_api_key" placeholder="Enter new API key...">
+                        <small id="user1_api_key_status" style="color: var(--text-muted)"></small>
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy Password</label>
+                        <input type="password" id="user1_ntfy_password" placeholder="Enter new password...">
+                        <small id="user1_ntfy_password_status" style="color: var(--text-muted)"></small>
+                    </div>
+                </div>
+
+                <h3>User 2 (Ranya)</h3>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Immich API Key</label>
+                        <input type="password" id="user2_api_key" placeholder="Enter new API key...">
+                        <small id="user2_api_key_status" style="color: var(--text-muted)"></small>
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy Password</label>
+                        <input type="password" id="user2_ntfy_password" placeholder="Enter new password...">
+                        <small id="user2_ntfy_password_status" style="color: var(--text-muted)"></small>
+                    </div>
+                </div>
+
+                <h3>Dashboard</h3>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Dashboard Token (for authentication)</label>
+                        <input type="password" id="dashboard_token" placeholder="Enter new token...">
+                        <small id="dashboard_token_status" style="color: var(--text-muted)"></small>
+                    </div>
+                </div>
+
+                <div class="btn-group" style="margin-top: 20px;">
+                    <button onclick="saveSecrets()">Save Secrets</button>
+                </div>
+
+                <div id="restart-notice" style="display: none; margin-top: 16px; padding: 12px; background: rgba(251, 191, 36, 0.15); border: 1px solid var(--warning); border-radius: 6px; color: var(--warning);">
+                    <strong>Restart Required:</strong> Run <code style="background: var(--bg-color); padding: 2px 6px; border-radius: 4px;">docker compose restart scheduler dashboard</code> to apply changes.
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Tab -->
+        <div id="test-tab" class="tab-content">
+            <div class="card">
+                <h2>Test Notifications</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">
+                    Send test notifications for specific slots. Uses test mode with minimal delays.
+                </p>
+
+                <div id="test-alert"></div>
+
+                <div class="grid grid-3" id="test-slots">
+                    <!-- Slots will be populated by JS -->
+                </div>
+
+                <div class="form-group" style="margin-top: 20px;">
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="test-dry-run">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Dry Run (preview only)</span>
+                    </div>
+                </div>
+
+                <div id="test-output" class="output-box" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>Clear State</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">
+                    Clear notification state to allow re-sending notifications.
+                </p>
+                <div class="btn-group">
+                    <button class="danger" onclick="clearAllState()">Clear All State</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+            });
+        });
+
+        // API helpers
+        async function api(endpoint, options = {}) {
+            const response = await fetch('/api' + endpoint, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers,
+                },
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+                throw new Error(error.detail || 'Request failed');
+            }
+            return response.json();
+        }
+
+        function showAlert(containerId, message, type = 'success') {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `<div class="alert ${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // State functions
+        async function refreshState() {
+            try {
+                const data = await api('/state/today');
+                const container = document.getElementById('state-summary');
+
+                if (Object.keys(data.users).length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted)">No users configured</p>';
+                    return;
+                }
+
+                container.innerHTML = Object.entries(data.users).map(([name, state]) => `
+                    <div class="state-user">
+                        <h4>
+                            ${name}
+                            <span class="status-badge ${state.notification_count > 0 ? 'success' : 'pending'}">
+                                ${state.notification_count} sent
+                            </span>
+                        </h4>
+                        <div class="slots-display">
+                            ${[1,2,3,4,5].map(s => `
+                                <div class="slot-indicator ${state.slots_sent.includes(s) ? 'sent' : ''}">${s}</div>
+                            `).join('')}
+                        </div>
+                        ${state.last_sent ? `<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">Last: ${new Date(state.last_sent).toLocaleTimeString()}</p>` : ''}
+                    </div>
+                `).join('');
+            } catch (e) {
+                showAlert('state-alert', e.message, 'error');
+            }
+        }
+
+        // Settings functions
+        async function loadSettings() {
+            try {
+                const data = await api('/settings/');
+
+                // Users
+                document.getElementById('users-list').innerHTML = data.users.map(user => `
+                    <div class="user-card" style="flex-direction: column; align-items: stretch; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div class="user-info">
+                                <h4>${user.name}</h4>
+                                <p>${user.ntfy_topic}</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${user.enabled ? 'checked' : ''} onchange="toggleUser('${user.name}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="btn-group" style="justify-content: flex-end;">
+                            <button class="secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="renameUser('${user.name}')">Rename</button>
+                            <button class="danger" style="padding: 4px 10px; font-size: 0.8rem;" onclick="deleteUser('${user.name}')">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Windows
+                renderWindows(data.settings.notification_windows);
+
+                // Settings
+                document.getElementById('memory_notifications').value = data.settings.memory_notifications;
+                document.getElementById('person_notifications').value = data.settings.person_notifications;
+                document.getElementById('fallback_notifications').value = data.settings.fallback_notifications;
+                document.getElementById('top_persons_limit').value = data.settings.top_persons_limit;
+                document.getElementById('exclude_recent_days').value = data.settings.exclude_recent_days;
+                document.getElementById('min_group_size').value = data.settings.min_group_size;
+                document.getElementById('include_location').checked = data.settings.include_location;
+                document.getElementById('include_album').checked = data.settings.include_album;
+                document.getElementById('video_emoji').checked = data.settings.video_emoji;
+                document.getElementById('prefer_group_photos').checked = data.settings.prefer_group_photos;
+
+                // Messages
+                document.getElementById('messages').value = data.messages.join('\n');
+                document.getElementById('person_messages').value = data.person_messages.join('\n');
+                document.getElementById('video_messages').value = data.video_messages.join('\n');
+                document.getElementById('video_person_messages').value = data.video_person_messages.join('\n');
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+            }
+        }
+
+        function renderWindows(windows) {
+            document.getElementById('windows-list').innerHTML = windows.map((w, i) => `
+                <div class="window-row" data-index="${i}">
+                    <span>Slot ${i + 1}:</span>
+                    <input type="time" value="${w.start}" class="window-start" style="width: auto;">
+                    <span>to</span>
+                    <input type="time" value="${w.end}" class="window-end" style="width: auto;">
+                    <button class="secondary" onclick="removeWindow(${i})" style="padding: 6px 12px;">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function addWindow() {
+            const list = document.getElementById('windows-list');
+            const count = list.querySelectorAll('.window-row').length;
+            const row = document.createElement('div');
+            row.className = 'window-row';
+            row.dataset.index = count;
+            row.innerHTML = `
+                <span>Slot ${count + 1}:</span>
+                <input type="time" value="08:00" class="window-start" style="width: auto;">
+                <span>to</span>
+                <input type="time" value="10:00" class="window-end" style="width: auto;">
+                <button class="secondary" onclick="removeWindow(${count})" style="padding: 6px 12px;">Remove</button>
+            `;
+            list.appendChild(row);
+        }
+
+        function removeWindow(index) {
+            const rows = document.querySelectorAll('#windows-list .window-row');
+            rows[index]?.remove();
+            // Re-index remaining rows
+            document.querySelectorAll('#windows-list .window-row').forEach((row, i) => {
+                row.dataset.index = i;
+                row.querySelector('span').textContent = `Slot ${i + 1}:`;
+            });
+        }
+
+        async function saveWindows() {
+            const rows = document.querySelectorAll('#windows-list .window-row');
+            const windows = Array.from(rows).map(row => ({
+                start: row.querySelector('.window-start').value,
+                end: row.querySelector('.window-end').value,
+            }));
+
+            try {
+                await api('/settings/windows', {
+                    method: 'PUT',
+                    body: JSON.stringify({ notification_windows: windows }),
+                });
+                showAlert('settings-alert', 'Windows saved! Restarting scheduler...');
+
+                // Auto-restart scheduler
+                try {
+                    await api('/restart/scheduler', { method: 'POST' });
+                    showAlert('settings-alert', 'Windows saved and scheduler restarted!');
+                } catch (restartErr) {
+                    showAlert('settings-alert', 'Windows saved but restart failed. Run: docker compose restart scheduler', 'error');
+                }
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+            }
+        }
+
+        async function saveSettings() {
+            const settings = {
+                memory_notifications: parseInt(document.getElementById('memory_notifications').value),
+                person_notifications: parseInt(document.getElementById('person_notifications').value),
+                fallback_notifications: parseInt(document.getElementById('fallback_notifications').value),
+                top_persons_limit: parseInt(document.getElementById('top_persons_limit').value),
+                exclude_recent_days: parseInt(document.getElementById('exclude_recent_days').value),
+                min_group_size: parseInt(document.getElementById('min_group_size').value),
+                include_location: document.getElementById('include_location').checked,
+                include_album: document.getElementById('include_album').checked,
+                video_emoji: document.getElementById('video_emoji').checked,
+                prefer_group_photos: document.getElementById('prefer_group_photos').checked,
+            };
+
+            try {
+                await api('/settings/', {
+                    method: 'PUT',
+                    body: JSON.stringify(settings),
+                });
+                showAlert('settings-alert', 'Settings saved successfully');
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+            }
+        }
+
+        async function toggleUser(name, enabled) {
+            try {
+                await api(`/settings/users/${encodeURIComponent(name)}/enabled`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ enabled }),
+                });
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+                loadSettings(); // Reload to reset toggle
+            }
+        }
+
+        // User management functions
+        function showAddUserModal() {
+            document.getElementById('add-user-modal').style.display = 'flex';
+            document.getElementById('new-user-name').value = '';
+            document.getElementById('new-user-topic').value = '';
+            document.getElementById('new-user-ntfy-username').value = '';
+        }
+
+        function hideAddUserModal() {
+            document.getElementById('add-user-modal').style.display = 'none';
+        }
+
+        async function addUser() {
+            const name = document.getElementById('new-user-name').value.trim();
+            const topic = document.getElementById('new-user-topic').value.trim();
+            const ntfyUsername = document.getElementById('new-user-ntfy-username').value.trim();
+
+            if (!name || !topic) {
+                showAlert('add-user-alert', 'Name and topic are required', 'error');
+                return;
+            }
+
+            try {
+                const result = await api('/settings/users', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: name,
+                        ntfy_topic: topic,
+                        ntfy_username: ntfyUsername || name.toLowerCase(),
+                    }),
+                });
+                hideAddUserModal();
+                showAlert('settings-alert', `User '${name}' added! Add these env vars: ${result.env_vars_needed.join(', ')}`);
+                loadSettings();
+            } catch (e) {
+                showAlert('add-user-alert', e.message, 'error');
+            }
+        }
+
+        async function renameUser(oldName) {
+            const newName = prompt(`Enter new name for ${oldName}:`);
+            if (!newName || newName === oldName) return;
+
+            try {
+                await api(`/settings/users/${encodeURIComponent(oldName)}/rename`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ new_name: newName }),
+                });
+                showAlert('settings-alert', `User renamed from '${oldName}' to '${newName}'`);
+                loadSettings();
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+            }
+        }
+
+        async function deleteUser(name) {
+            if (!confirm(`Are you sure you want to delete user '${name}'?`)) return;
+
+            try {
+                await api(`/settings/users/${encodeURIComponent(name)}`, {
+                    method: 'DELETE',
+                });
+                showAlert('settings-alert', `User '${name}' deleted`);
+                loadSettings();
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+            }
+        }
+
+        async function saveMessages() {
+            const messages = {
+                messages: document.getElementById('messages').value.split('\n').filter(m => m.trim()),
+                person_messages: document.getElementById('person_messages').value.split('\n').filter(m => m.trim()),
+                video_messages: document.getElementById('video_messages').value.split('\n').filter(m => m.trim()),
+                video_person_messages: document.getElementById('video_person_messages').value.split('\n').filter(m => m.trim()),
+            };
+
+            try {
+                await api('/settings/messages', {
+                    method: 'PUT',
+                    body: JSON.stringify(messages),
+                });
+                showAlert('messages-alert', 'Messages saved successfully');
+            } catch (e) {
+                showAlert('messages-alert', e.message, 'error');
+            }
+        }
+
+        // Test functions
+        function initTestSlots() {
+            document.getElementById('test-slots').innerHTML = [1,2,3,4,5].map(slot => `
+                <div class="slot-card">
+                    <h4>Slot ${slot}</h4>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">
+                        ${slot <= 3 ? 'Memory/Fallback' : 'Person Photo'}
+                    </p>
+                    <button onclick="triggerTest(${slot})">Send Test</button>
+                </div>
+            `).join('');
+        }
+
+        async function triggerTest(slot) {
+            const dryRun = document.getElementById('test-dry-run').checked;
+            const outputBox = document.getElementById('test-output');
+            outputBox.style.display = 'block';
+            outputBox.textContent = 'Sending notification...';
+
+            try {
+                const data = await api(`/test/trigger/${slot}?dry_run=${dryRun}`, {
+                    method: 'POST',
+                });
+                outputBox.textContent = data.output || data.message;
+                showAlert('test-alert', data.message, data.success ? 'success' : 'error');
+            } catch (e) {
+                outputBox.textContent = 'Error: ' + e.message;
+                showAlert('test-alert', e.message, 'error');
+            }
+        }
+
+        async function clearAllState() {
+            if (!confirm('Are you sure you want to clear all notification state?')) return;
+
+            try {
+                await api('/state/', { method: 'DELETE' });
+                showAlert('test-alert', 'All state cleared');
+                refreshState();
+            } catch (e) {
+                showAlert('test-alert', e.message, 'error');
+            }
+        }
+
+        // Secrets functions
+        async function loadSecrets() {
+            try {
+                const data = await api('/secrets/');
+
+                // Server URLs
+                document.getElementById('immich_url').value = data.urls.immich_url || '';
+                document.getElementById('immich_external_url').value = data.urls.immich_external_url || '';
+                document.getElementById('ntfy_url').value = data.urls.ntfy_url || '';
+                document.getElementById('ntfy_external_url').value = data.urls.ntfy_external_url || '';
+
+                // User 1
+                document.getElementById('user1_api_key_status').textContent =
+                    data.users.user1.api_key_set ? `Current: ${data.users.user1.api_key}` : 'Not set';
+                document.getElementById('user1_ntfy_password_status').textContent =
+                    data.users.user1.ntfy_password_set ? `Current: ${data.users.user1.ntfy_password}` : 'Not set';
+
+                // User 2
+                document.getElementById('user2_api_key_status').textContent =
+                    data.users.user2.api_key_set ? `Current: ${data.users.user2.api_key}` : 'Not set';
+                document.getElementById('user2_ntfy_password_status').textContent =
+                    data.users.user2.ntfy_password_set ? `Current: ${data.users.user2.ntfy_password}` : 'Not set';
+
+                // Dashboard
+                document.getElementById('dashboard_token_status').textContent =
+                    data.dashboard.token_set ? 'Token is set' : 'Not set (no authentication)';
+
+            } catch (e) {
+                showAlert('secrets-alert', e.message, 'error');
+            }
+        }
+
+        async function saveSecrets() {
+            const secrets = {};
+
+            // Only include non-empty values
+            const immichUrl = document.getElementById('immich_url').value.trim();
+            const immichExternalUrl = document.getElementById('immich_external_url').value.trim();
+            const ntfyUrl = document.getElementById('ntfy_url').value.trim();
+            const ntfyExternalUrl = document.getElementById('ntfy_external_url').value.trim();
+            const user1ApiKey = document.getElementById('user1_api_key').value.trim();
+            const user1NtfyPassword = document.getElementById('user1_ntfy_password').value.trim();
+            const user2ApiKey = document.getElementById('user2_api_key').value.trim();
+            const user2NtfyPassword = document.getElementById('user2_ntfy_password').value.trim();
+            const dashboardToken = document.getElementById('dashboard_token').value.trim();
+
+            if (immichUrl) secrets.immich_url = immichUrl;
+            if (immichExternalUrl) secrets.immich_external_url = immichExternalUrl;
+            if (ntfyUrl) secrets.ntfy_url = ntfyUrl;
+            if (ntfyExternalUrl) secrets.ntfy_external_url = ntfyExternalUrl;
+            if (user1ApiKey) secrets.user1_api_key = user1ApiKey;
+            if (user1NtfyPassword) secrets.user1_ntfy_password = user1NtfyPassword;
+            if (user2ApiKey) secrets.user2_api_key = user2ApiKey;
+            if (user2NtfyPassword) secrets.user2_ntfy_password = user2NtfyPassword;
+            if (dashboardToken) secrets.dashboard_token = dashboardToken;
+
+            if (Object.keys(secrets).length === 0) {
+                showAlert('secrets-alert', 'No changes to save', 'error');
+                return;
+            }
+
+            try {
+                const result = await api('/secrets/', {
+                    method: 'PUT',
+                    body: JSON.stringify(secrets),
+                });
+
+                if (result.restart_required) {
+                    showAlert('secrets-alert', `Secrets saved! Restarting services...`, 'success');
+
+                    // Auto-restart services
+                    try {
+                        await api('/restart/all', { method: 'POST' });
+                        showAlert('secrets-alert', `Secrets saved and services restarted!`, 'success');
+                        document.getElementById('restart-notice').style.display = 'none';
+                    } catch (restartErr) {
+                        document.getElementById('restart-notice').style.display = 'block';
+                        showAlert('secrets-alert', `Secrets saved but restart failed. Run: docker compose restart scheduler dashboard`, 'error');
+                    }
+                } else {
+                    showAlert('secrets-alert', result.message, 'success');
+                }
+
+                // Clear password fields and reload
+                document.getElementById('user1_api_key').value = '';
+                document.getElementById('user1_ntfy_password').value = '';
+                document.getElementById('user2_api_key').value = '';
+                document.getElementById('user2_ntfy_password').value = '';
+                document.getElementById('dashboard_token').value = '';
+                loadSecrets();
+
+            } catch (e) {
+                showAlert('secrets-alert', e.message, 'error');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshState();
+            loadSettings();
+            loadSecrets();
+            initTestSlots();
+        });
+    </script>
+</body>
+</html>

@@ -8,14 +8,19 @@
 #   docker compose run --rm notify --slot 1 --dry-run    # Preview only
 #   docker compose run --rm notify --slot 1 --no-delay   # Skip random delay
 #   docker compose up -d scheduler                       # Start scheduler
+#   docker compose up -d dashboard                       # Start web dashboard
 #
 # SLOTS:
 #   Slot 1-3: Memory notifications (if memories exist) or person photos
-#   Slot 4:   Person photo notification
+#   Slot 4-5: Person photo notifications
 #
 # CONFIGURATION:
 #   - Secrets (API keys, passwords): .env
 #   - Everything else (schedules, settings): config.yaml
+#
+# DASHBOARD:
+#   - Access at http://localhost:5000
+#   - Set DASHBOARD_TOKEN env var for authentication
 #
 # ============================================================
 
@@ -80,3 +85,31 @@ services:
         "
         echo "Starting scheduler..."
         crond -f -l 2
+
+  # ------------------------------------------------------------
+  # Dashboard Service - Web UI for managing notifications
+  # ------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: immich-memories-dashboard
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./state.json:/app/state.json
+      - ./notify.py:/app/notify.py:ro
+      - ./.env:/app/.env
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/project:ro
+    env_file: .env
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - STATE_PATH=/app/state.json
+      - ENV_PATH=/app/.env
+      - PROJECT_DIR=/app/project
+      - DASHBOARD_USER=${DASHBOARD_USER:-admin}
+      - DASHBOARD_TOKEN=${DASHBOARD_TOKEN:-}
+    network_mode: host
+    restart: unless-stopped
