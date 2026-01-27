@@ -637,32 +637,9 @@
                     Sensitive credentials are masked. Enter new values to update. Leave empty to keep current.
                 </p>
 
-                <h3>User 1</h3>
-                <div class="grid grid-2">
-                    <div class="form-group">
-                        <label>Immich API Key</label>
-                        <input type="password" id="user1_api_key" placeholder="Enter new API key...">
-                        <small id="user1_api_key_status" style="color: var(--text-muted)"></small>
-                    </div>
-                    <div class="form-group">
-                        <label>ntfy Password</label>
-                        <input type="password" id="user1_ntfy_password" placeholder="Enter new password...">
-                        <small id="user1_ntfy_password_status" style="color: var(--text-muted)"></small>
-                    </div>
-                </div>
-
-                <h3>User 2</h3>
-                <div class="grid grid-2">
-                    <div class="form-group">
-                        <label>Immich API Key</label>
-                        <input type="password" id="user2_api_key" placeholder="Enter new API key...">
-                        <small id="user2_api_key_status" style="color: var(--text-muted)"></small>
-                    </div>
-                    <div class="form-group">
-                        <label>ntfy Password</label>
-                        <input type="password" id="user2_ntfy_password" placeholder="Enter new password...">
-                        <small id="user2_ntfy_password_status" style="color: var(--text-muted)"></small>
-                    </div>
+                <div id="user-secrets-container">
+                    <!-- Dynamically populated by JavaScript -->
+                    <p style="color: var(--text-muted)">Loading users...</p>
                 </div>
 
                 <h3>Dashboard</h3>
@@ -1071,6 +1048,8 @@
         }
 
         // Secrets functions
+        let currentSecretUsers = [];
+
         async function loadSecrets() {
             try {
                 const data = await api('/secrets/');
@@ -1081,17 +1060,33 @@
                 document.getElementById('ntfy_url').value = data.urls.ntfy_url || '';
                 document.getElementById('ntfy_external_url').value = data.urls.ntfy_external_url || '';
 
-                // User 1
-                document.getElementById('user1_api_key_status').textContent =
-                    data.users.user1.api_key_set ? `Current: ${data.users.user1.api_key}` : 'Not set';
-                document.getElementById('user1_ntfy_password_status').textContent =
-                    data.users.user1.ntfy_password_set ? `Current: ${data.users.user1.ntfy_password}` : 'Not set';
+                // Dynamic user secrets
+                const container = document.getElementById('user-secrets-container');
+                currentSecretUsers = Object.keys(data.users || {});
 
-                // User 2
-                document.getElementById('user2_api_key_status').textContent =
-                    data.users.user2.api_key_set ? `Current: ${data.users.user2.api_key}` : 'Not set';
-                document.getElementById('user2_ntfy_password_status').textContent =
-                    data.users.user2.ntfy_password_set ? `Current: ${data.users.user2.ntfy_password}` : 'Not set';
+                if (currentSecretUsers.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted)">No users configured. Add users in the Settings tab.</p>';
+                } else {
+                    container.innerHTML = currentSecretUsers.map(userName => {
+                        const user = data.users[userName];
+                        const safeId = userName.replace(/[^a-zA-Z0-9]/g, '_');
+                        return `
+                            <h3>${userName}</h3>
+                            <div class="grid grid-2">
+                                <div class="form-group">
+                                    <label>Immich API Key <small style="color: var(--text-muted)">(${user.api_key_var})</small></label>
+                                    <input type="password" id="secret_${safeId}_api_key" placeholder="Enter new API key...">
+                                    <small style="color: var(--text-muted)">${user.api_key_set ? `Current: ${user.api_key}` : 'Not set'}</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>ntfy Password <small style="color: var(--text-muted)">(${user.ntfy_password_var})</small></label>
+                                    <input type="password" id="secret_${safeId}_ntfy_password" placeholder="Enter new password...">
+                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${user.ntfy_password}` : 'Not set'}</small>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
 
                 // Dashboard
                 document.getElementById('dashboard_token_status').textContent =
@@ -1105,26 +1100,35 @@
         async function saveSecrets() {
             const secrets = {};
 
-            // Only include non-empty values
+            // Server URLs
             const immichUrl = document.getElementById('immich_url').value.trim();
             const immichExternalUrl = document.getElementById('immich_external_url').value.trim();
             const ntfyUrl = document.getElementById('ntfy_url').value.trim();
             const ntfyExternalUrl = document.getElementById('ntfy_external_url').value.trim();
-            const user1ApiKey = document.getElementById('user1_api_key').value.trim();
-            const user1NtfyPassword = document.getElementById('user1_ntfy_password').value.trim();
-            const user2ApiKey = document.getElementById('user2_api_key').value.trim();
-            const user2NtfyPassword = document.getElementById('user2_ntfy_password').value.trim();
             const dashboardToken = document.getElementById('dashboard_token').value.trim();
 
             if (immichUrl) secrets.immich_url = immichUrl;
             if (immichExternalUrl) secrets.immich_external_url = immichExternalUrl;
             if (ntfyUrl) secrets.ntfy_url = ntfyUrl;
             if (ntfyExternalUrl) secrets.ntfy_external_url = ntfyExternalUrl;
-            if (user1ApiKey) secrets.user1_api_key = user1ApiKey;
-            if (user1NtfyPassword) secrets.user1_ntfy_password = user1NtfyPassword;
-            if (user2ApiKey) secrets.user2_api_key = user2ApiKey;
-            if (user2NtfyPassword) secrets.user2_ntfy_password = user2NtfyPassword;
             if (dashboardToken) secrets.dashboard_token = dashboardToken;
+
+            // Dynamic user secrets
+            const userSecrets = {};
+            for (const userName of currentSecretUsers) {
+                const safeId = userName.replace(/[^a-zA-Z0-9]/g, '_');
+                const apiKey = document.getElementById(`secret_${safeId}_api_key`)?.value.trim();
+                const ntfyPassword = document.getElementById(`secret_${safeId}_ntfy_password`)?.value.trim();
+
+                if (apiKey || ntfyPassword) {
+                    userSecrets[userName] = {};
+                    if (apiKey) userSecrets[userName].api_key = apiKey;
+                    if (ntfyPassword) userSecrets[userName].ntfy_password = ntfyPassword;
+                }
+            }
+            if (Object.keys(userSecrets).length > 0) {
+                secrets.users = userSecrets;
+            }
 
             if (Object.keys(secrets).length === 0) {
                 showAlert('secrets-alert', 'No changes to save', 'error');
@@ -1154,10 +1158,6 @@
                 }
 
                 // Clear password fields and reload
-                document.getElementById('user1_api_key').value = '';
-                document.getElementById('user1_ntfy_password').value = '';
-                document.getElementById('user2_api_key').value = '';
-                document.getElementById('user2_ntfy_password').value = '';
                 document.getElementById('dashboard_token').value = '';
                 loadSecrets();
 
