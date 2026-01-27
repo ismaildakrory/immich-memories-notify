@@ -35,7 +35,10 @@ services:
       - ./notify.py:/app/notify.py:ro
       - ./config.yaml:/app/config.yaml:ro
       - ./state.json:/app/state.json
+      - /etc/localtime:/etc/localtime:ro
     env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}   
     network_mode: host
     restart: "no"
 
@@ -49,7 +52,10 @@ services:
       - ./notify.py:/app/notify.py:ro
       - ./config.yaml:/app/config.yaml:ro
       - ./state.json:/app/state.json
+      - /etc/localtime:/etc/localtime:ro
     env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
     network_mode: host
     restart: unless-stopped
     entrypoint: /bin/sh
@@ -103,8 +109,10 @@ services:
       - ./.env:/app/.env
       - /var/run/docker.sock:/var/run/docker.sock
       - .:/app/project:ro
+      - /etc/localtime:/etc/localtime:ro
     env_file: .env
     environment:
+      - TZ=${TZ:-UTC}
       - CONFIG_PATH=/app/config.yaml
       - STATE_PATH=/app/state.json
       - ENV_PATH=/app/.env
