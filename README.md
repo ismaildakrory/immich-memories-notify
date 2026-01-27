@@ -73,6 +73,10 @@ git clone https://github.com/ismaildakrory/immich-memories-notify.git
 cd immich-memories-notify
 docker compose up -d dashboard
 
+# Important Note for Updating:
+# Rebuild after updates (must recreate container for volume mounts)
+docker compose down dashboard && docker compose up -d --build dashboard
+
 # 2. Open dashboard and configure
 # http://localhost:5000
 ```
