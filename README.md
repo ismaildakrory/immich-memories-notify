@@ -166,8 +166,8 @@ docker compose logs -f dashboard
 # Stop services
 docker compose down
 
-# Rebuild after updates
-docker compose up -d --build dashboard
+# Rebuild after updates (must recreate container for volume mounts)
+docker compose down dashboard && docker compose up -d --build dashboard
 ```
 
 ### Without Docker
