@@ -740,18 +740,14 @@ def send_notification(
     is_video: bool = False,
 ) -> bool:
     """Send a notification to ntfy."""
-    from urllib.parse import quote
 
     url = f"{ntfy_url}/{topic}"
-
-    # URL-encode non-ASCII characters in title for HTTP header safety
-    encoded_title = quote(title, safe=' ')
 
     # Use different tags for videos
     tags = "movie,calendar" if is_video else "camera,calendar"
 
     headers = {
-        "Title": encoded_title,
+        "Title": title,
         "Tags": tags,
         "Priority": "default",
     }
