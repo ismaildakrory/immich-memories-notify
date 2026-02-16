@@ -73,6 +73,13 @@ async def get_settings(request: Request):
         notification_windows=[
             NotificationWindow(**w) for w in settings_data.get("notification_windows", [])
         ],
+        weekly_collage_enabled=settings_data.get("weekly_collage_enabled", False),
+        weekly_collage_day=settings_data.get("weekly_collage_day", 6),
+        weekly_collage_slots=settings_data.get("weekly_collage_slots", 1),
+        collage_person_limit=settings_data.get("collage_person_limit", 5),
+        collage_year_range=settings_data.get("collage_year_range", 5),
+        collage_template=settings_data.get("collage_template", "grid"),
+        collage_album_name=settings_data.get("collage_album_name", "Weekly Highlights"),
     )
 
     # Redact sensitive user info

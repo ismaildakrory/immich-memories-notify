@@ -1,98 +1,84 @@
-# ============================================================
-# IMMICH MEMORIES NOTIFY - CONFIGURATION
-# ============================================================
-# Edit via web dashboard at http://localhost:5000
-# ============================================================
-
-# Servers (edit in dashboard → Secrets tab)
 immich:
-  url: "${IMMICH_URL}"
-  external_url: "${IMMICH_EXTERNAL_URL}"
-
+  url: ${IMMICH_URL}
+  external_url: ${IMMICH_EXTERNAL_URL}
 ntfy:
-  url: "${NTFY_URL}"
-  external_url: "${NTFY_EXTERNAL_URL}"
-
-# Users (edit in dashboard → Settings tab)
+  url: ${NTFY_URL}
+  external_url: ${NTFY_EXTERNAL_URL}
 users:
-  - name: "User1"
-    immich_api_key: "${IMMICH_API_KEY_USER1}"
-    ntfy_topic: "immich-memories-user1"
-    ntfy_username: "user1"
-    ntfy_password: "${NTFY_PASSWORD_USER1}"
-    enabled: true
-
-# Settings
+- name: User1
+  immich_api_key: ${IMMICH_API_KEY_USER1}
+  ntfy_topic: immich-memories-user1
+  ntfy_username: user1
+  ntfy_password: ${NTFY_PASSWORD_USER1}
+  enabled: true
+- name: User2
+  immich_api_key: ${IMMICH_API_KEY_USER2}
+  ntfy_topic: immich-memories-user2
+  ntfy_username: user2
+  ntfy_password: ${NTFY_PASSWORD_USER2}
+  enabled: true
 settings:
   retry:
     max_attempts: 3
     delay_seconds: 5
-  state_file: "state.json"
-  log_level: "INFO"
-
-  # Notification slot settings
+  state_file: state.json
+  log_level: INFO
   memory_notifications: 3
   person_notifications: 2
-  fallback_notifications: 3
-
-  # Person photo settings
+  fallback_notifications: 4
   top_persons_limit: 5
   exclude_recent_days: 30
-
-  # Context features
   include_location: true
   include_album: true
-
-  # Video handling
   video_emoji: true
-
-  # Group photo preference
   prefer_group_photos: true
   min_group_size: 2
-
-  # Notification time windows
+  weekly_collage_enabled: true
+  weekly_collage_day: 4
+  weekly_collage_slots: 2
+  collage_person_limit: 5
+  collage_year_range: 20
+  collage_template: random
+  collage_album_name: Weekly Highlights
   notification_windows:
-    - start: "08:00"
-      end: "10:00"
-    - start: "12:00"
-      end: "14:00"
-    - start: "16:00"
-      end: "18:00"
-    - start: "19:00"
-      end: "20:00"
-
-# Message templates (edit in dashboard → Messages tab)
+  - start: 08:00
+    end: 09:00
+  - start: '10:30'
+    end: '12:00'
+  - start: '14:00'
+    end: '16:00'
+  - start: '17:00'
+    end: '19:00'
+  - start: '21:00'
+    end: '23:00'
 messages:
-  - "A little trip back to {year}..."
-  - "Remember this day {years_ago} years ago?"
-  - "Some memories from {year} want to say hello"
-  - "Throwback to {year}! Take a moment to smile"
-  - "Once upon a time in {year}..."
-  - "A cozy memory from {years_ago} years ago"
-  - "{year} called, it has something beautiful to show you"
-  - "Let's revisit {year} together"
-  - "A gentle reminder of {year}"
-  - "Look what we found from {year}!"
-
+- A little trip back to {year}...
+- Remember this day {years_ago} years ago?
+- Some memories from {year} want to say hello
+- Throwback to {year}! Take a moment to smile
+- Once upon a time in {year}...
+- A cozy memory from {years_ago} years ago
+- '{year} called, it has something beautiful to show you'
+- Let's revisit {year} together
+- A gentle reminder of {year}
+- Look what we found from {year}!
 person_messages:
-  - "A lovely moment with {person_name}..."
-  - "Remember this time with {person_name}?"
-  - "A random treasure featuring {person_name}"
-  - "Look who we found! {person_name} says hello"
-  - "A cozy memory with {person_name}"
-  - "Here's a favorite moment with {person_name}"
-  - "{person_name} wanted to brighten your day"
-  - "Throwback featuring {person_name}!"
-
+- A lovely moment with {person_name}...
+- Remember this time with {person_name}?
+- A random treasure featuring {person_name}
+- Look who we found! {person_name} says hello
+- A cozy memory with {person_name}
+- Here's a favorite moment with {person_name}
+- '{person_name} wanted to brighten your day'
+- Throwback featuring {person_name}!
 video_messages:
-  - "Watch this moment from {year}..."
-  - "A video memory from {years_ago} years ago"
-  - "Relive this video from {year}"
-  - "Press play on {year}"
-  - "A moving memory from {years_ago} years ago"
-
+- Watch this moment from {year}...
+- A video memory from {years_ago} years ago
+- Relive this video from {year}
+- Press play on {year}
+- A moving memory from {years_ago} years ago
 video_person_messages:
-  - "Watch this moment with {person_name}..."
-  - "A video featuring {person_name}"
-  - "Press play on this memory with {person_name}"
-  - "Relive this moment with {person_name}"
+- Watch this moment with {person_name}...
+- A video featuring {person_name}
+- Press play on this memory with {person_name}
+- Relive this moment with {person_name}

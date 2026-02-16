@@ -2,6 +2,8 @@
 
 Get daily push notifications when you have photo memories in [Immich](https://immich.app/) - just like Google Photos!
 
+**⭐ NEW in v2.1:** Beautiful weekly collages with 12 template combinations! [Jump to Collage Feature →](#-weekly-collage-feature-v21)
+
 ![Notification Example](https://via.placeholder.com/400x200?text=Memory+Notification+Preview)
 
 ## Features
@@ -22,6 +24,12 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 - **Self-Hosted** - Works with your self-hosted Immich and ntfy instances
 - **Docker Ready** - Easy deployment with Docker Compose
 - **Privacy First** - Your photos never leave your network
+- **Weekly Collages (NEW v2.1)** - Beautiful collages with 12 professional template combinations
+  - 4 templates: Grid, Mosaic, Polaroid, Strip
+  - 3 unique overlays per template
+  - Face-based smart cropping
+  - Random or manual template selection
+  - Photoshop-customizable backgrounds
 
 ## How It Works
 
@@ -53,6 +61,68 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 - Per-user top people based on their own photo library
 - Location and album info added when available
 
+## ✨ Weekly Collage Feature (v2.1)
+
+**NEW in v2.1:** Hybrid custom template system with beautiful overlay designs!
+
+Instead of receiving individual photos, users can receive weekly photo collages featuring their top people. The system now includes 4 professional templates with 3 unique overlay variants each — **12 stunning combinations** that rotate randomly.
+
+### Features
+
+- **🎨 12 Beautiful Combinations** - 4 templates × 3 overlays, randomly selected
+- **🖼️ Professional Templates**
+  - **Grid** (3×2) - Clean 6-photo layout
+  - **Mosaic** (1 large + 6 small) - Hero photo with supporting cast
+  - **Polaroid** (5 photos) - Scattered photos with rotation
+  - **Strip** (3 photos) - Vertical magazine-style layout
+- **👤 Face-Based Smart Cropping** - Photos are intelligently cropped to keep faces centered
+- **🎭 Custom Overlay Support** - Each template includes decorative overlays designed in Photoshop
+- **📐 JSON-Driven Layouts** - Precise control over photo positions, sizes, and rotation
+- **🔄 Transparent Rotation** - Photos can overlap naturally without rectangular cutouts
+- **📅 Configurable Schedule** - Choose which day of the week to receive collages
+- **📁 Auto-Upload to Immich** - Collages are saved to a named album for easy access
+
+### How It Works
+
+1. **Schedule**: Configure a specific day of the week (e.g., Thursday = 4, where 0=Sunday, 6=Saturday)
+2. **Generation**: On the selected day, the system:
+   - Finds photos of your top people from across multiple years
+   - Uses face detection data to intelligently crop photos
+   - Selects a random template and overlay combination
+   - Generates a beautiful 1920×1920px collage
+3. **Delivery**: Collage is uploaded to Immich album and sent as a rich notification
+
+### Configuration
+
+```yaml
+settings:
+  weekly_collage_enabled: true
+  weekly_collage_day: 4              # Thursday (0=Sunday, 6=Saturday)
+  weekly_collage_slots: 2            # Number of slots for collages
+  collage_person_limit: 7            # Max people in collage (for mosaic)
+  collage_year_range: 20             # Look back 20 years
+  collage_template: random           # or: grid_custom, mosaic_custom, polaroid_custom, strip_custom
+  collage_album_name: Weekly Highlights
+```
+
+### Dashboard Integration
+
+All collage settings are available in the web dashboard:
+- **Settings Tab** → Collage section
+  - Enable/disable collages
+  - Choose template (random or specific)
+  - Configure day, person limit, year range
+  - Set album name
+- **Test Tab** → Trigger test collage generation
+
+### Customization
+
+Advanced users can create custom backgrounds and overlays:
+- Edit backgrounds in Photoshop (1920×1920px PNG)
+- Design decorative overlays (transparent PNG)
+- Modify photo positions via JSON layouts
+- See `custom_templates/` directory for templates and guides
+
 ## Requirements
 
 - [Immich](https://immich.app/) server (self-hosted)
@@ -60,6 +130,11 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 - Docker & Docker Compose (recommended) OR Python 3.8+
 - ntfy mobile app ([Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) / [iOS](https://apps.apple.com/app/ntfy/id1625396347))
 - **Named people in Immich** - For face preference and person photos, name your frequently appearing people in Immich
+
+### For Weekly Collages (Optional)
+- **Pillow (PIL)** - Image processing library, included in Docker image
+- **Named faces in Immich** - Face detection data is used for smart cropping
+- If running without Docker: `pip install Pillow`
 
 ## Disclaimer
 
@@ -310,7 +385,28 @@ services:
       - "8090:80"
     volumes:
       - ./ntfy-cache:/var/cache/ntfy
+      - ./ntfy-config:/etc/ntfy
     restart: unless-stopped
+```
+
+Create a `ntfy-config/server.yaml` next to your docker-compose file. The `base-url` and attachment settings are **required** for thumbnail previews to work:
+
+```yaml
+# ntfy-config/server.yaml
+
+# Must be your externally reachable URL — not localhost
+base-url: "https://notify.yourdomain.com"
+
+# Required for thumbnail previews in notifications
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+attachment-total-size-limit: "1G"
+attachment-file-size-limit: "15M"
+attachment-expiry-duration: "3h"
+```
+
+If you use authentication, make sure your users have upload permissions:
+```bash
+ntfy access <username> --upload
 ```
 
 ```bash
@@ -326,6 +422,37 @@ Then install the ntfy app and add your server.
 1. Check if you have memories for today: `docker compose run --rm notify --slot 1 --dry-run --no-delay`
 2. Verify ntfy subscription in the app
 3. Check logs: `docker compose logs scheduler`
+
+### No thumbnail previews
+
+Notifications arrive but without the photo preview. Run a test — the script will log exactly where it fails:
+
+```bash
+docker compose run --rm notify --slot 1 --test --no-delay --force
+```
+
+Look for a warning in the output. You'll see one of the following, each with a different fix:
+
+**`ntfy upload failed: 401` or `403`** — ntfy rejected the upload due to permissions. By default, ntfy may require an admin account to upload attachments. Grant upload permissions to your user:
+```bash
+ntfy access <username> --upload
+```
+
+**`ntfy upload failed: {other status}`** — the upload was rejected for another reason. Verify your ntfy username/password in `.env` and that your server allows PUT requests.
+
+**`ntfy upload returned 200 but no attachment URL`** — the upload went through but ntfy didn't return an attachment URL. Attachment hosting is not enabled on your ntfy server. Add the following to your ntfy `server.yaml` (update `base-url` to your actual domain — not localhost):
+```yaml
+base-url: "https://notify.yourdomain.com"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+attachment-total-size-limit: "1G"
+attachment-file-size-limit: "15M"
+attachment-expiry-duration: "3h"
+```
+Then restart ntfy and rerun the test.
+
+**`Thumbnail upload failed for topic '...' — notification will be sent without preview (X bytes attempted)`** — check the byte count at the end. If it exceeds your `attachment-file-size-limit`, increase that value in your ntfy config. The `15M` default above is more than enough for thumbnails.
+
+**No warnings appear** — the upload is succeeding on the server side. The issue is on the receiving end. Check your ntfy app settings, notification channel config, or device notification permissions.
 
 ### No person photos
 

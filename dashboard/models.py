@@ -30,6 +30,13 @@ class Settings(BaseModel):
     prefer_group_photos: bool = True
     min_group_size: int = 2
     notification_windows: List[NotificationWindow] = Field(default_factory=list)
+    weekly_collage_enabled: bool = False
+    weekly_collage_day: int = 6  # Saturday (0=Sunday, 6=Saturday)
+    weekly_collage_slots: int = 1
+    collage_person_limit: int = 5
+    collage_year_range: int = 5
+    collage_template: str = "grid"
+    collage_album_name: str = "Weekly Highlights"
 
 
 class UserInfo(BaseModel):
@@ -73,6 +80,13 @@ class SettingsUpdate(BaseModel):
     video_emoji: Optional[bool] = None
     prefer_group_photos: Optional[bool] = None
     min_group_size: Optional[int] = None
+    weekly_collage_enabled: Optional[bool] = None
+    weekly_collage_day: Optional[int] = None
+    weekly_collage_slots: Optional[int] = None
+    collage_person_limit: Optional[int] = None
+    collage_year_range: Optional[int] = None
+    collage_template: Optional[str] = None
+    collage_album_name: Optional[str] = None
 
 
 class UserEnabledUpdate(BaseModel):

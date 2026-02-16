@@ -27,6 +27,8 @@ from typing import Optional, List
 
 import requests
 import yaml
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 
 
 # =============================================================================
@@ -335,11 +337,15 @@ def format_person_notification(
     }
 
 
-def fetch_thumbnail(immich_url: str, api_key: str, asset_id: str, timeout: int = 30) -> bytes:
-    """Fetch thumbnail image from Immich."""
+def fetch_thumbnail(immich_url: str, api_key: str, asset_id: str, timeout: int = 30, size: str = "thumbnail") -> bytes:
+    """Fetch thumbnail/preview image from Immich.
+
+    Args:
+        size: "thumbnail" (small), "preview" (medium), or "original" (full size)
+    """
     headers = {"x-api-key": api_key}
     url = f"{immich_url}/api/assets/{asset_id}/thumbnail"
-    response = requests.get(url, headers=headers, params={"size": "thumbnail"}, timeout=timeout)
+    response = requests.get(url, headers=headers, params={"size": size}, timeout=timeout)
     response.raise_for_status()
     return response.content
 
@@ -715,6 +721,7 @@ def select_asset_with_face_preference(
 
 def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, timeout: int = 30) -> Optional[str]:
     """Upload an image to ntfy and return the URL."""
+    logger = logging.getLogger("immich-memories-notify")
     temp_topic = f"upload-{int(time.time())}"
     url = f"{ntfy_url}/{temp_topic}"
 
@@ -724,7 +731,12 @@ def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, t
     if response.status_code == 200:
         data = response.json()
         attachment = data.get("attachment", {})
-        return attachment.get("url")
+        attachment_url = attachment.get("url")
+        if not attachment_url:
+            logger.warning("ntfy upload returned 200 but no attachment URL — check that NTFY_BASE_URL and NTFY_ATTACHMENT_CACHE_SIZE are set on your ntfy server")
+        return attachment_url
+
+    logger.warning(f"ntfy upload failed: {response.status_code} — {response.text[:200]}")
     return None
 
 
@@ -740,11 +752,20 @@ def send_notification(
     is_video: bool = False,
 ) -> bool:
     """Send a notification to ntfy."""
-
     url = f"{ntfy_url}/{topic}"
 
     # Use different tags for videos
     tags = "movie,calendar" if is_video else "camera,calendar"
+
+    # Encode title for HTTP header (RFC 2047 for non-ASCII)
+    try:
+        # Try latin-1 encoding first (fast path)
+        title.encode('latin-1')
+        encoded_title = title
+    except UnicodeEncodeError:
+        # Contains non-ASCII, use base64 encoding for header
+        import base64
+        encoded_title = f"=?UTF-8?B?{base64.b64encode(title.encode('utf-8')).decode('ascii')}?="
 
     headers = {
         "Title": title,
@@ -760,6 +781,10 @@ def send_notification(
         image_url = upload_image_to_ntfy(ntfy_url, thumbnail_data, auth=auth)
         if image_url:
             headers["Attach"] = image_url
+        else:
+            logging.getLogger("immich-memories-notify").warning(
+                f"Thumbnail upload failed for topic '{topic}' — notification will be sent without preview ({len(thumbnail_data):,} bytes attempted)"
+            )
 
     response = requests.post(url, headers=headers, data=message.encode("utf-8"), auth=auth, timeout=timeout)
     return response.status_code == 200
@@ -1080,7 +1105,7 @@ def prepare_memory_notification(
 
     # Append location context if available (33% chance)
     if location_str and location_str not in message and random.random() < 0.33:
-        message = f"{message}\n\n📍 {location_str}"
+        message = f"{message} 📍 {location_str}"
 
     # Append album context if available (33% chance)
     if album_name and album_name not in message and random.random() < 0.33:
@@ -1195,7 +1220,7 @@ def prepare_person_notification(
 
     # Append location context if available (33% chance)
     if location_str and location_str not in message and random.random() < 0.33:
-        message = f"{message}\n\n📍 {location_str}"
+        message = f"{message} 📍 {location_str}"
 
     # Append album context if available (33% chance)
     if album_name and album_name not in message and random.random() < 0.33:
@@ -1224,12 +1249,464 @@ def prepare_person_notification(
     }
 
 
+def is_collage_day(settings: dict, target_date: date) -> bool:
+    """Check if today is the configured collage day.
+
+    Config uses Sun=0, Sat=6 convention.
+    Python weekday() uses Mon=0, Sun=6.
+    Convert Python weekday to config convention: (weekday + 1) % 7
+    """
+    if not settings.get("weekly_collage_enabled", False):
+        return False
+
+    collage_day = settings.get("weekly_collage_day", 6)  # Saturday in Sun=0 convention
+    python_as_config = (target_date.weekday() + 1) % 7
+    return python_as_config == collage_day
+
+
+# =============================================================================
+# Collage Template System
+# =============================================================================
+
+def cover_crop_image(img: Image.Image, target_w: int, target_h: int, faces: list = None) -> Image.Image:
+    """Scale image to cover target dimensions and crop intelligently.
+
+    Uses face bounding boxes to position the crop, ensuring faces are visible.
+    Falls back to center crop if no faces provided.
+
+    Args:
+        img: Source image
+        target_w: Target width
+        target_h: Target height
+        faces: List of face dicts with boundingBoxX1, boundingBoxY1, boundingBoxX2, boundingBoxY2 (normalized 0-1)
+    """
+    img_w, img_h = img.size
+    img_ratio = img_w / img_h
+    target_ratio = target_w / target_h
+
+    # Scale to cover (fill the space completely)
+    if img_ratio > target_ratio:
+        # Image is wider - fit to height and crop width
+        scale = target_h / img_h
+    else:
+        # Image is taller - fit to width and crop height
+        scale = target_w / img_w
+
+    new_w = int(img_w * scale)
+    new_h = int(img_h * scale)
+    scaled = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    # Determine crop position
+    if faces and len(faces) > 0:
+        # Calculate bounding box containing all faces (in scaled coordinates)
+        min_x = min(f.get("boundingBoxX1", 0.5) for f in faces) * new_w
+        max_x = max(f.get("boundingBoxX2", 0.5) for f in faces) * new_w
+        min_y = min(f.get("boundingBoxY1", 0.5) for f in faces) * new_h
+        max_y = max(f.get("boundingBoxY2", 0.5) for f in faces) * new_h
+
+        # Center of all faces
+        face_center_x = (min_x + max_x) / 2
+        face_center_y = (min_y + max_y) / 2
+
+        # Position crop to center on faces
+        crop_x = int(face_center_x - target_w / 2)
+        crop_y = int(face_center_y - target_h / 2)
+
+        # Clamp to image bounds
+        crop_x = max(0, min(crop_x, new_w - target_w))
+        crop_y = max(0, min(crop_y, new_h - target_h))
+    else:
+        # Center crop (fallback)
+        crop_x = (new_w - target_w) // 2
+        crop_y = (new_h - target_h) // 2
+
+    # Crop to target size
+    cropped = scaled.crop((crop_x, crop_y, crop_x + target_w, crop_y + target_h))
+    return cropped
+
+
+
+
+COLLAGE_TEMPLATES = {
+    # Built-in templates removed - using only custom templates with overlays
+}
+
+
+def load_custom_templates(templates_dir: str = "custom_templates"):
+    """Load custom templates from Python files in templates_dir.
+
+    Each custom template file should define a render(images, names, width, height) function.
+    Template name is taken from the filename (without .py extension).
+    """
+    templates_path = Path(templates_dir)
+    if not templates_path.exists():
+        return
+
+    import importlib.util
+    import sys
+
+    for template_file in templates_path.glob("*.py"):
+        template_name = template_file.stem
+        try:
+            # Load module from file
+            spec = importlib.util.spec_from_file_location(template_name, template_file)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[template_name] = module
+            spec.loader.exec_module(module)
+
+            # Get render function
+            if hasattr(module, 'render'):
+                COLLAGE_TEMPLATES[template_name] = module.render
+                logging.getLogger("immich-memories-notify").info(
+                    f"Loaded custom template: {template_name}"
+                )
+        except Exception as e:
+            logging.getLogger("immich-memories-notify").warning(
+                f"Failed to load custom template {template_name}: {e}"
+            )
+
+
+# Load custom templates at module level
+load_custom_templates()
+
+
+def generate_weekly_collage(
+    user: dict,
+    config: dict,
+    target_date: date,
+    settings: dict,
+    logger: logging.Logger,
+    test_mode: bool = False
+) -> Optional[dict]:
+    """Generate a collage of top people's photos for weekly notification."""
+    try:
+        immich_url = config["immich"]["url"]
+        api_key = user["immich_api_key"]
+        limit = settings.get("collage_person_limit", 5)
+
+        # Get top persons using existing function
+        top_persons = get_top_persons(immich_url, api_key, limit=limit, logger=logger)
+        if not top_persons:
+            logger.info(f"No top people found for user {user['name']}")
+            return None
+
+        # Get one random photo per person
+        image_data_list = []
+        asset_ids = []
+        person_names = []
+        exclude_days = settings.get("exclude_recent_days", 30)
+
+        for person in top_persons:
+            result = get_random_person_photo(
+                immich_url=immich_url,
+                api_key=api_key,
+                top_persons=[person],
+                exclude_days=exclude_days,
+                logger=logger,
+            )
+            if result:
+                asset_id = result["asset"].get("id")
+                if asset_id:
+                    try:
+                        # Use preview size for better quality collages
+                        thumb_bytes = fetch_thumbnail(immich_url, api_key, asset_id, size="preview")
+                        image_data_list.append(thumb_bytes)
+                        asset_ids.append(asset_id)
+                        person_names.append(result["person_name"])
+                    except Exception as e:
+                        logger.warning(f"Could not fetch image for {result['person_name']}: {e}")
+
+        if not image_data_list:
+            logger.info(f"No photos found for top people for user {user['name']}")
+            return None
+
+        # Create collage with high quality settings (portrait for mobile)
+        template_name = settings.get("collage_template", "grid")
+        collage_bytes = create_collage_image(
+            image_data_list=image_data_list,
+            asset_ids=asset_ids,
+            person_names=person_names,
+            template_name=template_name,
+            logger=logger,
+            immich_url=immich_url,
+            api_key=api_key,
+            width=1080,
+            height=1920,
+        )
+
+        if not collage_bytes:
+            logger.warning(f"Failed to create collage for user {user['name']}")
+            return None
+
+        # Upload collage to Immich album
+        album_name = settings.get("collage_album_name", "Weekly Highlights")
+        asset_id = None
+
+        try:
+            album_id = get_or_create_album(immich_url, api_key, album_name, logger)
+            if album_id:
+                asset_id = upload_collage_to_album(immich_url, api_key, collage_bytes, album_id, logger)
+                if asset_id:
+                    logger.info(f"Collage uploaded to album '{album_name}' with asset ID: {asset_id}")
+        except Exception as e:
+            logger.warning(f"Failed to upload collage to album: {e}")
+
+        names_str = ", ".join(person_names[:3])
+        if len(person_names) > 3:
+            names_str += f" +{len(person_names) - 3} more"
+
+        title = "Weekly Highlights"
+        if test_mode:
+            title = "[TEST] " + title
+
+        return {
+            "title": title,
+            "message": f"Your weekly highlights with {names_str}",
+            "has_content": True,
+            "asset_id": asset_id,
+            "is_collage": True,
+            "is_video": False,
+            "collage_data": collage_bytes if not asset_id else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating collage for user {user['name']}: {e}")
+        return None
+
+
+def create_collage_image(
+    image_data_list: List[bytes],
+    person_names: List[str],
+    template_name: str,
+    logger: logging.Logger,
+    asset_ids: List[str] = None,
+    immich_url: str = None,
+    api_key: str = None,
+    width: int = 1080,
+    height: int = 1920,
+) -> Optional[bytes]:
+    """Create a collage image from raw thumbnail bytes using the selected template."""
+    try:
+        # Convert bytes to PIL Images
+        pil_images = []
+        for data in image_data_list:
+            img = Image.open(BytesIO(data)).convert("RGB")
+            pil_images.append(img)
+
+        if not pil_images:
+            return None
+
+        # Fetch face data for smart cropping
+        faces_list = []
+        if asset_ids and immich_url and api_key:
+            for asset_id in asset_ids:
+                try:
+                    people = get_asset_people(immich_url, api_key, asset_id)
+                    faces_list.append(people)
+                except Exception as e:
+                    logger.debug(f"Could not fetch faces for asset {asset_id}: {e}")
+                    faces_list.append([])
+        else:
+            # No face data available, templates will use center crop
+            faces_list = [[] for _ in pil_images]
+
+        # Select template (random if requested)
+        if template_name == "random":
+            template_name = random.choice(list(COLLAGE_TEMPLATES.keys()))
+            logger.debug(f"Random template selected: {template_name}")
+
+        render_fn = COLLAGE_TEMPLATES.get(template_name)
+        if not render_fn:
+            logger.error(f"Template '{template_name}' not found. Available: {list(COLLAGE_TEMPLATES.keys())}")
+            return None
+
+        # Check if template accepts faces_list parameter (backward compatibility)
+        import inspect
+        sig = inspect.signature(render_fn)
+        if len(sig.parameters) >= 5:
+            # New signature with faces_list
+            collage = render_fn(pil_images, person_names, width, height, faces_list)
+        else:
+            # Old signature without faces_list (custom templates)
+            logger.debug(f"Template '{template_name}' uses old signature (no faces_list), using fallback")
+            collage = render_fn(pil_images, person_names, width, height)
+
+        # Save to JPEG bytes with high quality
+        buf = BytesIO()
+        collage.save(buf, format='JPEG', quality=95)
+        buf.seek(0)
+        return buf.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error creating collage image: {e}")
+        return None
+
+
+def get_or_create_album(immich_url: str, api_key: str, album_name: str, logger: logging.Logger) -> Optional[str]:
+    """Get or create an album with the given name."""
+    try:
+        headers = {"Accept": "application/json", "x-api-key": api_key}
+
+        # List existing albums
+        response = requests.get(f"{immich_url}/api/albums", headers=headers, timeout=30)
+        if response.status_code == 200:
+            albums = response.json()
+            for album in albums:
+                if album.get("albumName") == album_name:
+                    return album.get("id")
+
+        # Create new album
+        response = requests.post(
+            f"{immich_url}/api/albums",
+            headers=headers,
+            json={"albumName": album_name, "description": "Weekly highlights collage"},
+            timeout=30,
+        )
+        if response.status_code in (200, 201):
+            return response.json().get("id")
+        else:
+            logger.warning(f"Failed to create album '{album_name}': {response.status_code}")
+            return None
+
+    except Exception as e:
+        logger.warning(f"Error with album handling: {e}")
+        return None
+
+
+def upload_collage_to_album(
+    immich_url: str,
+    api_key: str,
+    collage_data: bytes,
+    album_id: str,
+    logger: logging.Logger,
+) -> Optional[str]:
+    """Upload collage image to Immich and add to album."""
+    try:
+        headers = {"x-api-key": api_key}
+        now_iso = datetime.now().isoformat()
+        device_asset_id = f"memnotify-collage-{int(time.time())}"
+
+        # Upload via POST /api/assets with multipart
+        files = {"assetData": ("collage.jpg", collage_data, "image/jpeg")}
+        data = {
+            "deviceAssetId": device_asset_id,
+            "deviceId": "memnotify",
+            "fileCreatedAt": now_iso,
+            "fileModifiedAt": now_iso,
+        }
+
+        response = requests.post(
+            f"{immich_url}/api/assets",
+            headers=headers,
+            files=files,
+            data=data,
+            timeout=60,
+        )
+
+        if response.status_code not in (200, 201):
+            logger.warning(f"Failed to upload collage: {response.status_code}")
+            return None
+
+        asset_id = response.json().get("id")
+        if not asset_id:
+            return None
+
+        # Add to album via PUT /api/albums/{id}/assets
+        add_headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
+        response = requests.put(
+            f"{immich_url}/api/albums/{album_id}/assets",
+            headers=add_headers,
+            json={"ids": [asset_id]},
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            logger.info(f"Collage added to album, asset ID: {asset_id}")
+        else:
+            logger.warning(f"Failed to add collage to album: {response.status_code} (asset still uploaded)")
+
+        return asset_id
+
+    except Exception as e:
+        logger.error(f"Error uploading collage: {e}")
+        return None
+
+
+def process_collage_slot(
+    user: dict,
+    config: dict,
+    state: dict,
+    target_date: date,
+    slot: int,
+    test_mode: bool = False,
+    dry_run: bool = False,
+    force: bool = False,
+    logger: logging.Logger = None,
+) -> dict:
+    """Process a collage notification for a user."""
+    try:
+        user_name = user["name"]
+        ntfy_user = user.get("ntfy_username")
+        ntfy_pass = user.get("ntfy_password")
+        ntfy_auth = (ntfy_user, ntfy_pass) if ntfy_user and ntfy_pass else None
+
+        # Check if slot already sent
+        slots_sent = get_slots_sent_today(state, user_name, target_date)
+        if not force and not test_mode and slot in slots_sent:
+            logger.info(f"  [{user_name}] Collage slot {slot} already sent today")
+            return {"success": True, "message": "Already sent"}
+
+        settings = config.get("settings", {})
+        collage_notification = generate_weekly_collage(
+            user=user,
+            config=config,
+            target_date=target_date,
+            settings=settings,
+            logger=logger,
+            test_mode=test_mode,
+        )
+
+        if not collage_notification or not collage_notification.get("has_content"):
+            logger.info(f"  [{user_name}] No collage generated")
+            return {"success": False, "message": "No collage generated"}
+
+        if dry_run:
+            logger.info(f"  [{user_name}] [DRY RUN] Would send collage: {collage_notification['title']}")
+            return {"success": True, "message": "Dry run successful"}
+
+        # Always provide collage_data as thumbnail fallback (Immich needs time to process uploads)
+        thumbnail_override = collage_notification.get("collage_data")
+
+        success = send_single_notification(
+            user=user,
+            notification=collage_notification,
+            config=config,
+            ntfy_auth=ntfy_auth,
+            logger=logger,
+            thumbnail_override=thumbnail_override,
+        )
+
+        if success:
+            if not test_mode:
+                mark_slot_sent(state, user_name, target_date, slot, collage_notification.get("asset_id"))
+            logger.info(f"  [{user_name}] Collage sent for slot {slot}")
+        else:
+            logger.warning(f"  [{user_name}] Failed to send collage")
+
+        return {"success": success, "message": "Sent" if success else "Failed"}
+
+    except Exception as e:
+        logger.error(f"Error processing collage slot for {user['name']}: {e}")
+        return {"success": False, "message": str(e)}
+
+
 def send_single_notification(
     user: dict,
     notification: dict,
     config: dict,
     ntfy_auth: tuple,
     logger: logging.Logger,
+    thumbnail_override: bytes = None,
 ) -> bool:
     """Send a single notification."""
     name = user["name"]
@@ -1254,12 +1731,19 @@ def send_single_notification(
             logger.debug(f"  [{name}] Thumbnail: {len(thumbnail_data):,} bytes")
         except Exception as e:
             logger.warning(f"  [{name}] Could not fetch thumbnail: {e}")
+            # Fall back to override if fetch failed
+            if thumbnail_override:
+                thumbnail_data = thumbnail_override
+                logger.debug(f"  [{name}] Using fallback thumbnail: {len(thumbnail_data):,} bytes")
+    elif thumbnail_override:
+        # No asset_id, use override directly
+        thumbnail_data = thumbnail_override
 
     # Send notification with retry
     try:
-        # Deep link to specific photo if we have an asset_id
+        # Deep link using my.immich.app for mobile app compatibility
         if asset_id:
-            click_url = "https://my.immich.app/photos/" + asset_id
+            click_url = f"https://my.immich.app/photos/{asset_id}"
         else:
             click_url = "https://my.immich.app/"
         is_video = notification.get("is_video", False)
@@ -1416,6 +1900,11 @@ Examples:
     state_file = settings.get("state_file", "state.json")
     state = load_state(state_file)
 
+    # Check if this is a collage day
+    collage_day = is_collage_day(settings, target_date)
+    if collage_day:
+        logger.info("Collage: YES (weekly collage day)")
+
     # Get enabled users
     users = [u for u in config.get("users", []) if u.get("enabled", True)]
     logger.info(f"Users:   {len(users)}")
@@ -1424,23 +1913,49 @@ Examples:
         logger.warning("No enabled users found in config")
         return 0
 
+    # Determine if this slot is a person-photo slot (eligible for collage replacement)
+    memory_notifications = settings.get("memory_notifications", 3)
+    person_notifications = settings.get("person_notifications", 1)
+    total_slots = memory_notifications + person_notifications
+    is_person_slot = args.slot > memory_notifications and args.slot <= total_slots
+
+    # On collage day, replace person-photo slots with collage
+    use_collage_for_slot = collage_day and is_person_slot
+
     # Process each user for this slot
     success_count = 0
 
     for user in users:
-        result = process_user_slot(
-            user=user,
-            config=config,
-            state=state,
-            target_date=target_date,
-            slot=args.slot,
-            test_mode=args.test,
-            dry_run=args.dry_run,
-            force=args.force,
-            logger=logger,
-        )
-        if result["success"]:
-            success_count += 1
+        if use_collage_for_slot:
+            # Send collage instead of person photo for this slot
+            result = process_collage_slot(
+                user=user,
+                config=config,
+                state=state,
+                target_date=target_date,
+                slot=args.slot,
+                test_mode=args.test,
+                dry_run=args.dry_run,
+                force=args.force,
+                logger=logger,
+            )
+            if result.get("success"):
+                success_count += 1
+        else:
+            # Normal notification (memory or person photo)
+            result = process_user_slot(
+                user=user,
+                config=config,
+                state=state,
+                target_date=target_date,
+                slot=args.slot,
+                test_mode=args.test,
+                dry_run=args.dry_run,
+                force=args.force,
+                logger=logger,
+            )
+            if result["success"]:
+                success_count += 1
 
     # Save state
     if not args.dry_run:

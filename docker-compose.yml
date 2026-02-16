@@ -35,10 +35,11 @@ services:
       - ./notify.py:/app/notify.py:ro
       - ./config.yaml:/app/config.yaml:ro
       - ./state.json:/app/state.json
+      - ./custom_templates:/app/custom_templates
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
     environment:
-      - TZ=${TZ:-UTC}   
+      - TZ=${TZ:-UTC}
     network_mode: host
     restart: "no"
 
@@ -52,6 +53,7 @@ services:
       - ./notify.py:/app/notify.py:ro
       - ./config.yaml:/app/config.yaml:ro
       - ./state.json:/app/state.json
+      - ./custom_templates:/app/custom_templates
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
     environment:

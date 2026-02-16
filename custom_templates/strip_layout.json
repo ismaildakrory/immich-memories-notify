@@ -1,0 +1,28 @@
+{
+  "template": "strip",
+  "canvas_width": 1920,
+  "canvas_height": 1920,
+  "positions": [
+    {
+      "x": 100,
+      "y": 100,
+      "width": 875,
+      "height": 545,
+      "z_order": 0
+    },
+    {
+      "x": 100,
+      "y": 690,
+      "width": 875,
+      "height": 545,
+      "z_order": 1
+    },
+    {
+      "x": 100,
+      "y": 1285,
+      "width": 875,
+      "height": 545,
+      "z_order": 2
+    }
+  ]
+}

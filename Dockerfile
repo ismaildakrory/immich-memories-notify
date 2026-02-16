@@ -4,7 +4,7 @@
 FROM python:3.11-alpine
 
 # Install dependencies
-RUN pip install --no-cache-dir requests pyyaml
+RUN pip install --no-cache-dir requests pyyaml Pillow
 
 # Create app directory
 WORKDIR /app

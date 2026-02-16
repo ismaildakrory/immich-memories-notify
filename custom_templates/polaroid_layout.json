@@ -1,0 +1,50 @@
+{
+  "comment": "Polaroid layout configuration - fill in values from Photoshop",
+  "photo_positions": [
+    {
+      "id": 1,
+      "x": 558,
+      "y": 137,
+      "width": 458,
+      "height": 480,
+      "rotation": 4.4,
+      "z_order": 1
+    },
+    {
+      "id": 2,
+      "x": 6.22,
+      "y": 148.5,
+      "width": 452,
+      "height": 537,
+      "rotation": -4,
+      "z_order": 2
+    },
+    {
+      "id": 3,
+      "x": 221.55,
+      "y": 543.6,
+      "width": 593,
+      "height": 740,
+      "rotation": -349.1,
+      "z_order": 5
+    },
+    {
+      "id": 4,
+      "x": 50,
+      "y": 1170.7,
+      "width": 506,
+      "height": 559,
+      "rotation": 0.0,
+      "z_order": 3
+    },
+    {
+      "id": 5,
+      "x": 587,
+      "y": 1314,
+      "width": 477,
+      "height": 531,
+      "rotation": 0.1,
+      "z_order": 4
+    }
+  ]
+}

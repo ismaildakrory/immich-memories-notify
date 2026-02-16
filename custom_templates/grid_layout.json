@@ -1,0 +1,49 @@
+{
+  "template": "grid",
+  "canvas_width": 1920,
+  "canvas_height": 1920,
+  "positions": [
+    {
+      "x": 4,
+      "y": 5,
+      "width": 529,
+      "height": 605,
+      "z_order": 0
+    },
+    {
+      "x": 548,
+      "y": 5,
+      "width": 529,
+      "height": 605,
+      "z_order": 1
+    },
+    {
+      "x": 4,
+      "y": 645,
+      "width": 529,
+      "height": 605,
+      "z_order": 2
+    },
+    {
+      "x": 548,
+      "y": 645,
+      "width": 529,
+      "height": 605,
+      "z_order": 3
+    },
+    {
+      "x": 4,
+      "y": 1285,
+      "width": 529,
+      "height": 605,
+      "z_order": 3
+    },
+    {
+      "x": 548,
+      "y": 1288,
+      "width": 529,
+      "height": 605,
+      "z_order": 4
+    }
+  ]
+}

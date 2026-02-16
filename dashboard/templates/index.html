@@ -563,6 +563,62 @@
                     </div>
                 </div>
 
+                <h3>Weekly Collage Settings</h3>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Collage Enabled</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="weekly_collage_enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Collage Day</label>
+                        <select id="weekly_collage_day">
+                            <option value="0">Sunday</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Collage Slots</label>
+                        <input type="number" id="weekly_collage_slots" min="1" max="3" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Person Limit</label>
+                        <input type="number" id="collage_person_limit" min="1" max="10" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Year Range</label>
+                        <input type="number" id="collage_year_range" min="1" max="10" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Album Name</label>
+                        <input type="text" id="collage_album_name" value="Weekly Highlights">
+                    </div>
+                    <div class="form-group">
+                        <label>Collage Template</label>
+                        <select id="collage_template">
+                            <option value="random">Random (Surprise me!)</option>
+                            <option value="grid_custom">Grid (3x2)</option>
+                            <option value="mosaic_custom">Mosaic (1 large + 6 small)</option>
+                            <option value="polaroid_custom">Polaroid (5 photos)</option>
+                            <option value="strip_custom">Strip (3 photos)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <h3>Collage Preview</h3>
+                    <div id="collage-preview" style="background: #2a3f5f; padding: 20px; border-radius: 8px; text-align: center;">
+                        <p style="color: #8899a6;">Collage preview will appear here</p>
+                    </div>
+                </div>
+
                 <div class="btn-group" style="margin-top: 20px;">
                     <button onclick="saveSettings()">Save Settings</button>
                 </div>
@@ -805,6 +861,16 @@
                 document.getElementById('video_emoji').checked = data.settings.video_emoji;
                 document.getElementById('prefer_group_photos').checked = data.settings.prefer_group_photos;
 
+                // Collage settings
+                document.getElementById('weekly_collage_enabled').checked = data.settings.weekly_collage_enabled;
+                document.getElementById('weekly_collage_day').value = data.settings.weekly_collage_day;
+                document.getElementById('weekly_collage_slots').value = data.settings.weekly_collage_slots;
+                document.getElementById('collage_person_limit').value = data.settings.collage_person_limit;
+                document.getElementById('collage_year_range').value = data.settings.collage_year_range;
+                document.getElementById('collage_album_name').value = data.settings.collage_album_name;
+                document.getElementById('collage_template').value = data.settings.collage_template || 'grid';
+                updateCollagePreview();
+
                 // Messages
                 document.getElementById('messages').value = data.messages.join('\n');
                 document.getElementById('person_messages').value = data.person_messages.join('\n');
@@ -891,6 +957,13 @@
                 include_album: document.getElementById('include_album').checked,
                 video_emoji: document.getElementById('video_emoji').checked,
                 prefer_group_photos: document.getElementById('prefer_group_photos').checked,
+                weekly_collage_enabled: document.getElementById('weekly_collage_enabled').checked,
+                weekly_collage_day: parseInt(document.getElementById('weekly_collage_day').value),
+                weekly_collage_slots: parseInt(document.getElementById('weekly_collage_slots').value),
+                collage_person_limit: parseInt(document.getElementById('collage_person_limit').value),
+                collage_year_range: parseInt(document.getElementById('collage_year_range').value),
+                collage_album_name: document.getElementById('collage_album_name').value,
+                collage_template: document.getElementById('collage_template').value,
             };
 
             try {
@@ -1172,6 +1245,60 @@
             loadSettings();
             loadSecrets();
             initTestSlots();
+        });
+
+        // Collage preview function
+        function updateCollagePreview() {
+            const preview = document.getElementById('collage-preview');
+            const enabled = document.getElementById('weekly_collage_enabled').checked;
+            const template = document.getElementById('collage_template')?.value || 'grid';
+            const people = document.getElementById('collage_person_limit')?.value || '5';
+            const years = document.getElementById('collage_year_range')?.value || '5';
+            const album = document.getElementById('collage_album_name')?.value || 'Weekly Highlights';
+            const daySelect = document.getElementById('weekly_collage_day');
+            const dayName = daySelect?.options[daySelect.selectedIndex]?.text || 'Saturday';
+
+            const templateDescriptions = {
+                random: 'Randomly picks from 12 template/overlay combinations',
+                grid_custom: '6 photos in 3x2 grid with custom overlay (3 variants)',
+                mosaic_custom: '1 large + 6 small photos with custom overlay (3 variants)',
+                polaroid_custom: '5 photos with custom overlay (3 variants)',
+                strip_custom: '3 photos vertical strip with custom overlay (3 variants)',
+            };
+
+            preview.innerHTML = `
+                <p style="color: ${enabled ? '#4ade80' : '#f87171'}; font-weight: 600; margin-bottom: 10px;">
+                    ${enabled ? 'Enabled' : 'Disabled'}
+                </p>
+                <p style="font-size: 0.9rem; color: #8899a6; text-align: left;">
+                    <strong>Template:</strong> ${template} — ${templateDescriptions[template] || ''}<br>
+                    <strong>People:</strong> Top ${people} named people<br>
+                    <strong>Year range:</strong> Last ${years} years<br>
+                    <strong>Album:</strong> ${album}<br>
+                    <strong>Day:</strong> Every ${dayName}
+                </p>
+            `;
+        }
+
+        // Update preview when settings change
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add event listeners to collage settings to update preview
+            const collageSettings = [
+                'weekly_collage_enabled',
+                'weekly_collage_day',
+                'weekly_collage_slots',
+                'collage_person_limit',
+                'collage_year_range',
+                'collage_album_name',
+                'collage_template'
+            ];
+
+            collageSettings.forEach(settingId => {
+                const element = document.getElementById(settingId);
+                if (element) {
+                    element.addEventListener('change', updateCollagePreview);
+                }
+            });
         });
     </script>
 </body>
