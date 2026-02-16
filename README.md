@@ -81,6 +81,12 @@ Instead of receiving individual photos, users can receive weekly photo collages 
 - **🔄 Transparent Rotation** - Photos can overlap naturally without rectangular cutouts
 - **📅 Configurable Schedule** - Choose which day of the week to receive collages
 - **📁 Auto-Upload to Immich** - Collages are saved to a named album for easy access
+  
+<img width="1716" height="927" alt="image" src="https://github.com/user-attachments/assets/33e533c7-f397-444c-b795-6fc6f0979175" />
+
+<img width="999" height="1752" alt="image" src="https://github.com/user-attachments/assets/bd67c5ee-0862-492b-85ee-bdc222bd979b" />
+
+<img width="999" height="1764" alt="image" src="https://github.com/user-attachments/assets/d4b59780-f2b6-41ac-a11a-f6f42a2c4e4c" />
 
 ### How It Works
 
