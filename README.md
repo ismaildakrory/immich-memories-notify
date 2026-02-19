@@ -149,9 +149,10 @@ Built this mostly vibe coding! Been running smoothly on my setup. PRs and feedba
 ## Quick Start
 
 ```bash
-# 1. Clone and start
+# 1. Clone and build
 git clone https://github.com/ismaildakrory/immich-memories-notify.git
 cd immich-memories-notify
+docker compose build
 docker compose up -d dashboard
 
 # Important Note for Updating:
@@ -259,7 +260,7 @@ docker compose down dashboard && docker compose up -d --build dashboard
 
 ```bash
 # Install dependencies
-pip install requests pyyaml
+pip install requests pyyaml Pillow
 
 # Run
 python notify.py --slot 1 --test --no-delay
@@ -273,7 +274,7 @@ python notify.py --slot 1 --test --no-delay
 |------|---------|
 | `.env` | **Secrets only** - API keys, passwords, server URLs |
 | `config.yaml` | **All configuration** - users, schedules, settings, messages |
-| `state.json` | Tracks sent notifications (auto-generated) |
+| `state/state.json` | Tracks sent notifications (auto-generated) |
 | `dashboard/` | Web dashboard (FastAPI + HTML) |
 
 ### Notification Windows
@@ -321,7 +322,7 @@ settings:
     delay_seconds: 5
 
   # Other
-  state_file: "state.json"
+  state_file: "state/state.json"
   log_level: "INFO"             # DEBUG, INFO, WARNING, ERROR
 ```
 
@@ -479,7 +480,7 @@ The script tracks sent notifications per slot to avoid duplicates. To resend:
 docker compose run --rm notify --slot 1 --force --no-delay
 ```
 
-Or delete `state.json` to reset all slots.
+Or delete `state/state.json` to reset all slots.
 
 ### Dashboard not loading
 
@@ -496,7 +497,8 @@ Source files are mounted as volumes, so you can edit them without rebuilding:
 ├── notify.py              # Main notification script
 ├── config.yaml            # Configuration (users, schedules, settings)
 ├── .env                   # Secrets only (API keys, passwords, URLs)
-├── state.json             # Tracks sent notifications (auto-generated)
+├── state/
+│   └── state.json         # Tracks sent notifications (auto-generated)
 ├── Dockerfile             # Main container definition
 ├── Dockerfile.dashboard   # Dashboard container
 ├── docker-compose.yml     # Service definitions

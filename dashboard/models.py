@@ -17,7 +17,7 @@ class NotificationWindow(BaseModel):
 
 class Settings(BaseModel):
     retry: RetrySettings = Field(default_factory=RetrySettings)
-    state_file: str = "state.json"
+    state_file: str = "state/state.json"
     log_level: str = "INFO"
     memory_notifications: int = 3
     person_notifications: int = 2

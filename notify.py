@@ -103,7 +103,7 @@ def load_config(config_path: str = "config.yaml") -> dict:
 
     settings = config["settings"]
     settings.setdefault("retry", {"max_attempts": 3, "delay_seconds": 5})
-    settings.setdefault("state_file", "state.json")
+    settings.setdefault("state_file", "state/state.json")
     settings.setdefault("log_level", "INFO")
 
     return config
@@ -116,6 +116,11 @@ def load_config(config_path: str = "config.yaml") -> dict:
 def load_state(state_file: str) -> dict:
     """Load state from JSON file."""
     path = Path(state_file)
+    if path.is_dir():
+        raise RuntimeError(
+            f"'{path}' is a directory, not a file — this is a Docker bind-mount artifact.\n"
+            f"Fix: on the host run:  rm -rf {path} && mkdir -p {path.parent}"
+        )
     if path.exists():
         try:
             with open(path) as f:
@@ -128,6 +133,11 @@ def load_state(state_file: str) -> dict:
 def save_state(state_file: str, state: dict):
     """Save state to JSON file."""
     path = Path(state_file)
+    if path.is_dir():
+        raise RuntimeError(
+            f"'{path}' is a directory, not a file — this is a Docker bind-mount artifact.\n"
+            f"Fix: on the host run:  rm -rf {path} && mkdir -p {path.parent}"
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(state, f, indent=2)
@@ -1897,7 +1907,7 @@ Examples:
             logger.warning(f"No window configured for slot {args.slot}, sending immediately")
 
     # Load state
-    state_file = settings.get("state_file", "state.json")
+    state_file = settings.get("state_file", "state/state.json")
     state = load_state(state_file)
 
     # Check if this is a collage day

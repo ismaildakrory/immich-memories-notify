@@ -18,7 +18,7 @@ from .routers import settings, state, test, secrets, restart
 
 # App configuration
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "/app/config.yaml")
-STATE_PATH = os.environ.get("STATE_PATH", "/app/state.json")
+STATE_PATH = os.environ.get("STATE_PATH", "/app/state/state.json")
 DASHBOARD_TOKEN = os.environ.get("DASHBOARD_TOKEN", "")
 DASHBOARD_USER = os.environ.get("DASHBOARD_USER", "admin")
 

@@ -21,7 +21,7 @@ settings:
   retry:
     max_attempts: 3
     delay_seconds: 5
-  state_file: state.json
+  state_file: state/state.json
   log_level: INFO
   memory_notifications: 3
   person_notifications: 2

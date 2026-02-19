@@ -1,8 +1,8 @@
 # Local overrides (keep your real secrets here)
 .env.local
 
-# State file
-state.json
+# State directory
+state/
 
 # Python cache
 __pycache__/

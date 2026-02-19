@@ -58,7 +58,7 @@ async def get_settings(request: Request):
     settings_data = config.get("settings", {})
     settings = Settings(
         retry=settings_data.get("retry", {}),
-        state_file=settings_data.get("state_file", "state.json"),
+        state_file=settings_data.get("state_file", "state/state.json"),
         log_level=settings_data.get("log_level", "INFO"),
         memory_notifications=settings_data.get("memory_notifications", 3),
         person_notifications=settings_data.get("person_notifications", 2),

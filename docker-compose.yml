@@ -34,7 +34,7 @@ services:
     volumes:
       - ./notify.py:/app/notify.py:ro
       - ./config.yaml:/app/config.yaml:ro
-      - ./state.json:/app/state.json
+      - ./state:/app/state
       - ./custom_templates:/app/custom_templates
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
@@ -52,7 +52,7 @@ services:
     volumes:
       - ./notify.py:/app/notify.py:ro
       - ./config.yaml:/app/config.yaml:ro
-      - ./state.json:/app/state.json
+      - ./state:/app/state
       - ./custom_templates:/app/custom_templates
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
@@ -106,7 +106,7 @@ services:
       - "5000:5000"
     volumes:
       - ./config.yaml:/app/config.yaml
-      - ./state.json:/app/state.json
+      - ./state:/app/state
       - ./notify.py:/app/notify.py:ro
       - ./.env:/app/.env
       - /var/run/docker.sock:/var/run/docker.sock
@@ -116,7 +116,7 @@ services:
     environment:
       - TZ=${TZ:-UTC}
       - CONFIG_PATH=/app/config.yaml
-      - STATE_PATH=/app/state.json
+      - STATE_PATH=/app/state/state.json
       - ENV_PATH=/app/.env
       - PROJECT_DIR=/app/project
       - DASHBOARD_USER=${DASHBOARD_USER:-admin}
