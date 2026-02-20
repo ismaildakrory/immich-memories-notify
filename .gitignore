@@ -1,0 +1,24 @@
+# Local overrides (keep your real secrets here)
+.env.local
+
+# State directory
+state/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Claude Code context (local only)
+CLAUDE.md
