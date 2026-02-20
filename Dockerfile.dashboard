@@ -11,7 +11,8 @@ RUN pip install --no-cache-dir \
     fastapi \
     uvicorn[standard] \
     pyyaml \
-    requests
+    requests \
+    Pillow
 
 # Create app directory
 WORKDIR /app
