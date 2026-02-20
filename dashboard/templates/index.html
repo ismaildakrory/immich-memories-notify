@@ -665,7 +665,7 @@
                 <h2>Server URLs</h2>
                 <div id="secrets-alert"></div>
                 <p style="color: var(--text-muted); margin-bottom: 16px;">
-                    Server connection URLs. Changes require container restart.
+                    Server connection URLs. Include the port number (e.g. :2283 for Immich, :80 or :8090 for ntfy). Changes require container restart.
                 </p>
                 <div class="grid grid-2">
                     <div class="form-group">
@@ -792,20 +792,29 @@
         // State functions
         async function refreshState() {
             try {
-                const data = await api('/state/today');
+                const [data, settings] = await Promise.all([
+                    api('/state/today'),
+                    api('/settings/')
+                ]);
                 const container = document.getElementById('state-summary');
 
-                if (Object.keys(data.users).length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-muted)">No users configured</p>';
+                // Get configured users from settings
+                const configuredUsers = (settings.users || []).filter(u => u.enabled).map(u => u.name);
+
+                if (configuredUsers.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted)">No users configured. Add users in the Settings tab.</p>';
                     return;
                 }
 
-                container.innerHTML = Object.entries(data.users).map(([name, state]) => `
+                // Show all configured users, merging with state data
+                container.innerHTML = configuredUsers.map(name => {
+                    const state = data.users[name] || { slots_sent: [], notification_count: 0, last_sent: null };
+                    return `
                     <div class="state-user">
                         <h4>
                             ${name}
                             <span class="status-badge ${state.notification_count > 0 ? 'success' : 'pending'}">
-                                ${state.notification_count} sent
+                                ${state.notification_count} sent today
                             </span>
                         </h4>
                         <div class="slots-display">
@@ -815,7 +824,8 @@
                         </div>
                         ${state.last_sent ? `<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">Last: ${new Date(state.last_sent).toLocaleTimeString()}</p>` : ''}
                     </div>
-                `).join('');
+                `;
+                }).join('');
             } catch (e) {
                 showAlert('state-alert', e.message, 'error');
             }
@@ -1154,7 +1164,7 @@
                                 <div class="form-group">
                                     <label>ntfy Password <small style="color: var(--text-muted)">(${user.ntfy_password_var})</small></label>
                                     <input type="password" id="secret_${safeId}_ntfy_password" placeholder="Enter new password...">
-                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${user.ntfy_password}` : 'Not set'}</small>
+                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${user.ntfy_password}` : 'Not set'} · Leave blank if your ntfy server has no authentication</small>
                                 </div>
                             </div>
                         `;
