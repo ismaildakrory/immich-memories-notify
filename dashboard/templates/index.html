@@ -432,6 +432,10 @@
     </header>
 
     <main class="container">
+        <div id="setup-checklist" class="card" style="display: none; margin-bottom: 20px; border-left: 3px solid var(--accent);">
+            <h2 style="font-size: 1.1rem;">Getting Started</h2>
+            <div id="setup-items"></div>
+        </div>
         <div class="tabs">
             <button class="tab-btn active" data-tab="state">Today's Status</button>
             <button class="tab-btn" data-tab="settings">Settings</button>
@@ -758,13 +762,15 @@
 
     <script>
         // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+            if (btn) btn.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
-            });
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
 
         // API helpers
@@ -1249,12 +1255,60 @@
             }
         }
 
+        // Setup checklist
+        async function checkSetup() {
+            try {
+                const [settings, secrets] = await Promise.all([
+                    api('/settings/'),
+                    api('/secrets/')
+                ]);
+
+                const checks = [];
+                const immichSet = !!(secrets.urls && secrets.urls.immich_url);
+                const ntfySet = !!(secrets.urls && secrets.urls.ntfy_url);
+                const enabledUsers = (settings.users || []).filter(u => u.enabled);
+                const hasUsers = enabledUsers.length > 0;
+
+                checks.push({ ok: immichSet, text: 'Immich URL configured', tab: 'secrets' });
+                checks.push({ ok: ntfySet, text: 'ntfy URL configured', tab: 'secrets' });
+                checks.push({ ok: hasUsers, text: 'At least one user added', tab: 'settings' });
+
+                if (hasUsers) {
+                    enabledUsers.forEach(u => {
+                        const userSecrets = (secrets.users || {})[u.name];
+                        const hasKey = userSecrets && userSecrets.api_key_set;
+                        checks.push({ ok: hasKey, text: `${u.name}: Immich API key set`, tab: 'secrets' });
+                    });
+                }
+
+                const allDone = checks.every(c => c.ok);
+                const banner = document.getElementById('setup-checklist');
+
+                if (allDone) {
+                    banner.style.display = 'none';
+                    return;
+                }
+
+                banner.style.display = 'block';
+                document.getElementById('setup-items').innerHTML = checks.map(c => `
+                    <div style="padding: 4px 0; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: ${c.ok ? '#4ade80' : '#f87171'};">${c.ok ? '\u2713' : '\u2717'}</span>
+                        <span style="color: ${c.ok ? 'var(--text-muted)' : 'var(--text)'};">${c.text}</span>
+                        ${!c.ok ? `<a href="#" onclick="switchTab('${c.tab}'); return false;" style="color: var(--accent); font-size: 0.85rem;">Fix</a>` : ''}
+                    </div>
+                `).join('');
+            } catch (e) {
+                // Silently skip if APIs aren't ready
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             refreshState();
             loadSettings();
             loadSecrets();
             initTestSlots();
+            checkSetup();
         });
 
         // Collage preview function
