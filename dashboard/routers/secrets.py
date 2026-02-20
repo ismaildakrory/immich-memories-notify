@@ -311,7 +311,32 @@ async def test_ntfy_connection(req: ConnectionTestRequest):
         resp = http_requests.get(test_url, timeout=5)
         latency_ms = int((time.time() - start) * 1000)
         if resp.status_code == 200:
-            return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms)", "detail": f"GET {test_url} returned 200"}
+            # Also test attachment support by attempting a small upload
+            attach_warning = None
+            try:
+                test_topic = f"attach-test-{int(time.time())}"
+                attach_resp = http_requests.put(
+                    f"{url}/{test_topic}",
+                    headers={"Filename": "test.txt"},
+                    data=b"test",
+                    timeout=5,
+                )
+                if attach_resp.status_code != 200:
+                    body = attach_resp.text[:200].lower()
+                    if "attachments not allowed" in body:
+                        attach_warning = (
+                            "Attachments not allowed — thumbnail previews won't work. "
+                            "Set auth-file in server.yaml, create a user with 'ntfy user add <name>', "
+                            "then run 'ntfy access <name> \"*\" read-write'"
+                        )
+                    else:
+                        attach_warning = f"Attachment upload returned HTTP {attach_resp.status_code}"
+            except Exception:
+                attach_warning = "Could not test attachment support"
+
+            if attach_warning:
+                return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms) — but: {attach_warning}", "detail": f"GET {test_url} returned 200. Warning: {attach_warning}"}
+            return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms) — attachments OK", "detail": f"GET {test_url} returned 200, attachment upload works"}
         # Some ntfy setups may not expose /v1/health, try root
         resp2 = http_requests.get(f"{url}/", timeout=5)
         latency_ms = int((time.time() - start) * 1000)

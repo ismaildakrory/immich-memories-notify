@@ -746,7 +746,17 @@ def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, t
             logger.warning("ntfy upload returned 200 but no attachment URL — check that NTFY_BASE_URL and NTFY_ATTACHMENT_CACHE_SIZE are set on your ntfy server")
         return attachment_url
 
-    logger.warning(f"ntfy upload failed: {response.status_code} — {response.text[:200]}")
+    body = response.text[:200]
+    if "attachments not allowed" in body.lower():
+        logger.warning(
+            "ntfy rejected attachment upload: attachments not allowed. "
+            "Fix: set auth-file in your ntfy server.yaml, create a user with "
+            "'ntfy user add <username>', then grant access with "
+            "'ntfy access <username> \"*\" read-write'. "
+            "See: https://docs.ntfy.sh/config/#attachments"
+        )
+    else:
+        logger.warning(f"ntfy upload failed: {response.status_code} — {body}")
     return None
 
 
@@ -1380,6 +1390,20 @@ def load_custom_templates(templates_dir: str = "custom_templates"):
 load_custom_templates()
 
 
+def get_template_photo_count(template_name: str, logger: logging.Logger) -> Optional[int]:
+    """Get the number of photos a collage template needs from its layout JSON."""
+    # Layout files use base name without _custom suffix (e.g. mosaic_layout.json, not mosaic_custom_layout.json)
+    base_name = template_name.removesuffix("_custom")
+    layout_path = os.path.join(os.path.dirname(__file__), "custom_templates", f"{base_name}_layout.json")
+    try:
+        with open(layout_path, "r") as f:
+            layout = json.load(f)
+        positions = layout.get("positions") or layout.get("photo_positions") or []
+        return len(positions) if positions else None
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
 def generate_weekly_collage(
     user: dict,
     config: dict,
@@ -1430,8 +1454,48 @@ def generate_weekly_collage(
             logger.info(f"No photos found for top people for user {user['name']}")
             return None
 
-        # Create collage with high quality settings (portrait for mobile)
+        # Resolve template name early so we know how many photos are needed
         template_name = settings.get("collage_template", "grid")
+        if template_name == "random":
+            template_name = random.choice(list(COLLAGE_TEMPLATES.keys()))
+            logger.debug(f"Random template selected: {template_name}")
+
+        # Fill additional slots if the template needs more photos than people
+        needed = get_template_photo_count(template_name, logger)
+        if needed and len(image_data_list) < needed:
+            logger.info(
+                f"Template '{template_name}' needs {needed} photos, have {len(image_data_list)}. "
+                f"Fetching {needed - len(image_data_list)} more from same people."
+            )
+            used_asset_ids = set(asset_ids)
+            person_index = 0
+            max_attempts = needed * 3  # avoid infinite loop if photos exhausted
+            attempts = 0
+            while len(image_data_list) < needed and attempts < max_attempts:
+                person = top_persons[person_index % len(top_persons)]
+                person_index += 1
+                attempts += 1
+                result = get_random_person_photo(
+                    immich_url=immich_url,
+                    api_key=api_key,
+                    top_persons=[person],
+                    exclude_days=exclude_days,
+                    exclude_asset_ids=used_asset_ids,
+                    logger=logger,
+                )
+                if result:
+                    asset_id = result["asset"].get("id")
+                    if asset_id and asset_id not in used_asset_ids:
+                        try:
+                            thumb_bytes = fetch_thumbnail(immich_url, api_key, asset_id, size="preview")
+                            image_data_list.append(thumb_bytes)
+                            asset_ids.append(asset_id)
+                            person_names.append(result["person_name"])
+                            used_asset_ids.add(asset_id)
+                        except Exception as e:
+                            logger.warning(f"Could not fetch fill image for {result['person_name']}: {e}")
+
+        # Create collage with high quality settings (portrait for mobile)
         collage_bytes = create_collage_image(
             image_data_list=image_data_list,
             asset_ids=asset_ids,
