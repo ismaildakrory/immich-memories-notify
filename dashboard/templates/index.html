@@ -674,7 +674,10 @@
                 <div class="grid grid-2">
                     <div class="form-group">
                         <label>Immich URL (internal)</label>
-                        <input type="text" id="immich_url" placeholder="http://192.168.1.100:2283">
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="immich_url" placeholder="http://192.168.1.100:2283" style="flex: 1;">
+                            <button class="secondary" onclick="testConnection('immich')" id="test-immich-btn" style="white-space: nowrap; padding: 10px 14px;">Test</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Immich External URL</label>
@@ -682,7 +685,10 @@
                     </div>
                     <div class="form-group">
                         <label>ntfy URL (internal)</label>
-                        <input type="text" id="ntfy_url" placeholder="http://192.168.1.100:8080">
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="ntfy_url" placeholder="http://192.168.1.100:8080" style="flex: 1;">
+                            <button class="secondary" onclick="testConnection('ntfy')" id="test-ntfy-btn" style="white-space: nowrap; padding: 10px 14px;">Test</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>ntfy External URL</label>
@@ -1252,6 +1258,34 @@
 
             } catch (e) {
                 showAlert('secrets-alert', e.message, 'error');
+            }
+        }
+
+        // Connection test
+        async function testConnection(service) {
+            const urlInput = document.getElementById(service === 'immich' ? 'immich_url' : 'ntfy_url');
+            const btn = document.getElementById(`test-${service}-btn`);
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showAlert('secrets-alert', `Enter a ${service} URL first`, 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '...';
+
+            try {
+                const data = await api(`/secrets/test/${service}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ url }),
+                });
+                showAlert('secrets-alert', `${data.message}${data.detail ? ' — ' + data.detail : ''}`, data.success ? 'success' : 'error');
+            } catch (e) {
+                showAlert('secrets-alert', e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Test';
             }
         }
 

@@ -2,9 +2,11 @@
 
 import os
 import re
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
+import requests as http_requests
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -16,6 +18,11 @@ router = APIRouter()
 # Paths
 ENV_PATH = os.environ.get("ENV_PATH", "/app/.env")
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "/app/config.yaml")
+
+
+class ConnectionTestRequest(BaseModel):
+    """Request body for connection test endpoints."""
+    url: str
 
 
 class SecretsUpdate(BaseModel):
@@ -266,3 +273,54 @@ async def update_user_secrets(user_name: str, update: UserSecretUpdate):
         "updated_fields": updated,
         "restart_required": bool(updated),
     }
+
+
+@router.post("/test/immich")
+async def test_immich_connection(req: ConnectionTestRequest):
+    """Test connectivity to the Immich server."""
+    url = req.url.strip().rstrip("/")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    test_url = f"{url}/api/server/ping"
+    start = time.time()
+    try:
+        resp = http_requests.get(test_url, timeout=5)
+        latency_ms = int((time.time() - start) * 1000)
+        if resp.status_code == 200:
+            return {"success": True, "message": f"Immich is reachable ({latency_ms}ms)", "detail": f"GET {test_url} returned 200"}
+        return {"success": False, "message": f"Immich returned HTTP {resp.status_code}", "detail": resp.text[:200]}
+    except http_requests.exceptions.ConnectionError:
+        return {"success": False, "message": "Connection refused — is Immich running at this address?", "detail": f"Could not connect to {url}"}
+    except http_requests.exceptions.Timeout:
+        return {"success": False, "message": "Connection timed out (5s) — check the host and port", "detail": f"Timeout connecting to {url}"}
+    except Exception as e:
+        return {"success": False, "message": f"Connection failed: {e}", "detail": str(e)}
+
+
+@router.post("/test/ntfy")
+async def test_ntfy_connection(req: ConnectionTestRequest):
+    """Test connectivity to the ntfy server."""
+    url = req.url.strip().rstrip("/")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    test_url = f"{url}/v1/health"
+    start = time.time()
+    try:
+        resp = http_requests.get(test_url, timeout=5)
+        latency_ms = int((time.time() - start) * 1000)
+        if resp.status_code == 200:
+            return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms)", "detail": f"GET {test_url} returned 200"}
+        # Some ntfy setups may not expose /v1/health, try root
+        resp2 = http_requests.get(f"{url}/", timeout=5)
+        latency_ms = int((time.time() - start) * 1000)
+        if resp2.status_code == 200:
+            return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms)", "detail": f"Health endpoint returned {resp.status_code}, but root is OK"}
+        return {"success": False, "message": f"ntfy returned HTTP {resp.status_code}", "detail": resp.text[:200]}
+    except http_requests.exceptions.ConnectionError:
+        return {"success": False, "message": "Connection refused — is ntfy running at this address?", "detail": f"Could not connect to {url}"}
+    except http_requests.exceptions.Timeout:
+        return {"success": False, "message": "Connection timed out (5s) — check the host and port", "detail": f"Timeout connecting to {url}"}
+    except Exception as e:
+        return {"success": False, "message": f"Connection failed: {e}", "detail": str(e)}
