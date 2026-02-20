@@ -755,6 +755,12 @@ def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, t
             "'ntfy access <username> \"*\" read-write'. "
             "See: https://docs.ntfy.sh/config/#attachments"
         )
+    elif response.status_code in (401, 403):
+        logger.warning(
+            f"ntfy rejected upload ({response.status_code}): check that NTFY_USER and "
+            "NTFY_PASSWORD in your .env match a valid ntfy user, and that the user has "
+            "read-write access: ntfy access <username> '*' read-write"
+        )
     else:
         logger.warning(f"ntfy upload failed: {response.status_code} — {body}")
     return None
