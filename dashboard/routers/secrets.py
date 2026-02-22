@@ -275,6 +275,23 @@ async def update_user_secrets(user_name: str, update: UserSecretUpdate):
     }
 
 
+@router.get("/setup-complete")
+async def get_setup_complete():
+    """Check whether the initial setup wizard has been completed."""
+    env_vars = load_env_file(ENV_PATH)
+    value = env_vars.get("SETUP_COMPLETE", "").lower()
+    return {"setup_complete": value == "true"}
+
+
+@router.post("/setup-complete")
+async def mark_setup_complete():
+    """Mark the setup wizard as completed (sets SETUP_COMPLETE=true in .env)."""
+    env_vars = load_env_file(ENV_PATH)
+    env_vars["SETUP_COMPLETE"] = "true"
+    save_env_file(ENV_PATH, env_vars)
+    return {"setup_complete": True}
+
+
 @router.post("/test/immich")
 async def test_immich_connection(req: ConnectionTestRequest):
     """Test connectivity to the Immich server."""

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 
 from .models import HealthResponse
-from .routers import settings, state, test, secrets, restart
+from .routers import settings, state, test, secrets, restart, ntfy
 
 # App configuration
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "/app/config.yaml")
@@ -95,6 +95,12 @@ app.include_router(
     restart.router,
     prefix="/api/restart",
     tags=["restart"],
+    dependencies=[Depends(verify_credentials)],
+)
+app.include_router(
+    ntfy.router,
+    prefix="/api/ntfy",
+    tags=["ntfy"],
     dependencies=[Depends(verify_credentials)],
 )
 

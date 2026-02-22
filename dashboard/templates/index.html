@@ -421,9 +421,334 @@
                 font-size: 0.9rem;
             }
         }
+
+        /* ---- Setup Wizard ---- */
+        .wizard-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 20, 0.92);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .wizard-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px;
+            max-width: 560px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .wizard-card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 6px;
+        }
+
+        .wizard-card .wizard-subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 28px;
+        }
+
+        .wizard-progress-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 32px;
+        }
+
+        .wizard-progress-step {
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border);
+            transition: background 0.3s;
+        }
+
+        .wizard-progress-step.active {
+            background: var(--accent);
+        }
+
+        .wizard-progress-step.done {
+            background: var(--success);
+        }
+
+        .wizard-step-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .wizard-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 28px;
+        }
+
+        .wizard-skip {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .wizard-skip:hover {
+            color: var(--text);
+            background: none;
+        }
+
+        .wizard-result {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            padding: 10px 14px;
+            border-radius: 6px;
+        }
+
+        .wizard-result.success {
+            background: rgba(74, 222, 128, 0.12);
+            color: var(--success);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+
+        .wizard-result.error {
+            background: rgba(248, 113, 113, 0.12);
+            color: var(--error);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+
+        .wizard-result.info {
+            background: rgba(74, 144, 217, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(74, 144, 217, 0.3);
+        }
+
+        .wizard-commands {
+            background: #0d1117;
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            white-space: pre-wrap;
+        }
+
+        .wizard-done-icon {
+            font-size: 3.5rem;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .wizard-done-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .wizard-done-list li {
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .wizard-done-list li:last-child {
+            border-bottom: none;
+        }
+
+        .wizard-ntfy-auto {
+            background: rgba(74, 144, 217, 0.08);
+            border: 1px solid rgba(74, 144, 217, 0.25);
+            border-radius: 8px;
+            padding: 14px;
+            margin-top: 16px;
+        }
+
+        .wizard-ntfy-auto label {
+            color: var(--text) !important;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
+
+    <!-- ============================================================ -->
+    <!-- Setup Wizard Overlay                                          -->
+    <!-- Shown on first visit when SETUP_COMPLETE != true             -->
+    <!-- ============================================================ -->
+    <div id="wizard-overlay" class="wizard-overlay" style="display:none;">
+        <div class="wizard-card">
+
+            <!-- Progress bar -->
+            <div class="wizard-progress-bar">
+                <div class="wizard-progress-step active" id="wz-prog-1"></div>
+                <div class="wizard-progress-step" id="wz-prog-2"></div>
+                <div class="wizard-progress-step" id="wz-prog-3"></div>
+                <div class="wizard-progress-step" id="wz-prog-4"></div>
+            </div>
+
+            <!-- ---- Step 1: Immich ---- -->
+            <div id="wizard-step-1">
+                <p class="wizard-step-label">Step 1 of 4</p>
+                <h2>Connect to Immich</h2>
+                <p class="wizard-subtitle">Where is your Immich server running?</p>
+
+                <div class="form-group">
+                    <label>Immich internal URL <span style="color:var(--error)">*</span></label>
+                    <input type="text" id="wz-immich-url" placeholder="http://192.168.1.10:2283"
+                           style="width:100%">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+                        The URL Docker uses to reach Immich (usually on your local network).
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>Immich external URL <span style="color:var(--text-muted)">(optional)</span></label>
+                    <input type="text" id="wz-immich-ext-url" placeholder="https://immich.example.com"
+                           style="width:100%">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+                        Used for deep links in notifications — what your phone opens.
+                    </p>
+                </div>
+                <div id="wz-immich-result"></div>
+                <div class="wizard-nav">
+                    <button class="secondary" onclick="wizardTestImmich()" id="wz-test-immich-btn">Test connection</button>
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <button class="wizard-skip" onclick="wizardSkip()">Skip / set up manually</button>
+                        <button onclick="wizardStep1Next()" id="wz-step1-next">Next &rarr;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- Step 2: ntfy ---- -->
+            <div id="wizard-step-2" style="display:none;">
+                <p class="wizard-step-label">Step 2 of 4</p>
+                <h2>Connect to ntfy</h2>
+                <p class="wizard-subtitle">ntfy delivers notifications to your phone.</p>
+
+                <div id="wz-ntfy-bundled-banner" style="display:none; margin-bottom:16px;" class="wizard-result info">
+                    Bundled ntfy detected at <code>http://localhost:8090</code> — fields pre-filled.
+                </div>
+
+                <div class="form-group">
+                    <label>ntfy internal URL <span style="color:var(--error)">*</span></label>
+                    <input type="text" id="wz-ntfy-url" placeholder="http://localhost:8090"
+                           style="width:100%">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+                        The URL Docker uses to reach ntfy.
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>ntfy external URL <span style="color:var(--text-muted)">(optional)</span></label>
+                    <input type="text" id="wz-ntfy-ext-url" placeholder="https://ntfy.example.com"
+                           style="width:100%">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+                        Used for deep links in notifications — what your phone opens.
+                    </p>
+                </div>
+                <div id="wz-ntfy-result"></div>
+                <div class="wizard-nav">
+                    <button class="secondary" onclick="wizardTestNtfy()" id="wz-test-ntfy-btn">Test connection</button>
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <button class="secondary" onclick="wizardGoToStep(1)">&larr; Back</button>
+                        <button onclick="wizardStep2Next()">Next &rarr;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- Step 3: First user ---- -->
+            <div id="wizard-step-3" style="display:none;">
+                <p class="wizard-step-label">Step 3 of 4</p>
+                <h2>Add your first user</h2>
+                <p class="wizard-subtitle">Each person who receives notifications needs their own entry.</p>
+
+                <div class="form-group">
+                    <label>Display name <span style="color:var(--error)">*</span></label>
+                    <input type="text" id="wz-user-name" placeholder="e.g., Alice" style="width:100%">
+                </div>
+                <div class="form-group">
+                    <label>ntfy topic <span style="color:var(--error)">*</span></label>
+                    <input type="text" id="wz-user-topic" placeholder="e.g., immich-alice" style="width:100%">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+                        Subscribe to this topic in the ntfy app on your phone.
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>Immich API key <span style="color:var(--error)">*</span></label>
+                    <input type="text" id="wz-user-api-key" placeholder="Paste API key from Immich → Account → API Keys"
+                           style="width:100%">
+                </div>
+
+                <div id="wz-ntfy-auto-section" style="display:none;" class="wizard-ntfy-auto">
+                    <div class="toggle" style="margin-bottom:12px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="wz-auto-ntfy-toggle" onchange="wizardToggleNtfyAuto()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <label for="wz-auto-ntfy-toggle">Create ntfy user automatically (bundled ntfy)</label>
+                    </div>
+                    <div id="wz-ntfy-auto-fields" style="display:none;">
+                        <div class="form-group" style="margin-bottom:10px;">
+                            <label>ntfy username</label>
+                            <input type="text" id="wz-user-ntfy-username" placeholder="e.g., alice" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>ntfy password</label>
+                            <input type="password" id="wz-user-ntfy-password" placeholder="Choose a password" style="width:100%">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="wz-ntfy-password-manual" style="margin-top:16px;">
+                    <label>ntfy password <span style="color:var(--text-muted)">(if your ntfy requires auth)</span></label>
+                    <input type="password" id="wz-user-ntfy-password-manual" placeholder="Leave blank if ntfy is open" style="width:100%">
+                </div>
+
+                <div id="wz-user-result"></div>
+                <div class="wizard-nav">
+                    <div></div>
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <button class="secondary" onclick="wizardGoToStep(2)">&larr; Back</button>
+                        <button onclick="wizardStep3AddUser()" id="wz-add-user-btn">Add User &rarr;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- Step 4: Done ---- -->
+            <div id="wizard-step-4" style="display:none;">
+                <p class="wizard-step-label">All done!</p>
+                <div class="wizard-done-icon">&#127881;</div>
+                <h2 style="text-align:center; margin-bottom:8px;">You're all set!</h2>
+                <p class="wizard-subtitle" style="text-align:center;">Here's what was configured:</p>
+                <ul class="wizard-done-list" id="wz-done-list"></ul>
+                <p style="margin-top:20px; font-size:0.85rem; color:var(--text-muted); text-align:center;">
+                    Start the scheduler to begin receiving daily memory notifications:
+                </p>
+                <code style="display:block; text-align:center; margin-top:8px; font-size:0.85rem; color:var(--accent);">
+                    docker compose up -d scheduler
+                </code>
+                <div class="wizard-nav" style="justify-content:center; margin-top:28px;">
+                    <button onclick="wizardDone()" style="padding: 12px 32px; font-size: 1rem;">
+                        Go to Dashboard
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <!-- ============================================================ -->
+
     <header>
         <div class="container">
             <h1>Immich Memories Notify</h1>
@@ -1343,7 +1668,266 @@
             loadSecrets();
             initTestSlots();
             checkSetup();
+            initWizard();
         });
+
+        // ============================================================
+        // Setup Wizard
+        // ============================================================
+
+        let wizardCurrentStep = 1;
+        let wizardSummary = [];
+        let wizardBundledNtfy = false;
+
+        async function initWizard() {
+            try {
+                const resp = await fetch('/api/secrets/setup-complete');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!data.setup_complete) {
+                    showWizard();
+                }
+            } catch (e) {
+                // If API fails, don't block user
+            }
+        }
+
+        function showWizard() {
+            document.getElementById('wizard-overlay').style.display = 'flex';
+            wizardGoToStep(1);
+            // Pre-fill existing values from .env if available
+            fetch('/api/secrets/')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.urls) {
+                        if (data.urls.immich_url) document.getElementById('wz-immich-url').value = data.urls.immich_url;
+                        if (data.urls.immich_external_url) document.getElementById('wz-immich-ext-url').value = data.urls.immich_external_url;
+                        if (data.urls.ntfy_url) document.getElementById('wz-ntfy-url').value = data.urls.ntfy_url;
+                        if (data.urls.ntfy_external_url) document.getElementById('wz-ntfy-ext-url').value = data.urls.ntfy_external_url;
+                    }
+                }).catch(() => {});
+            // Check for bundled ntfy
+            checkBundledNtfy();
+        }
+
+        async function checkBundledNtfy() {
+            try {
+                const resp = await fetch('/api/ntfy/status');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                wizardBundledNtfy = data.running === true;
+                if (wizardBundledNtfy) {
+                    document.getElementById('wz-ntfy-bundled-banner').style.display = 'block';
+                    const urlInput = document.getElementById('wz-ntfy-url');
+                    if (!urlInput.value) urlInput.value = 'http://localhost:8090';
+                    document.getElementById('wz-ntfy-auto-section').style.display = 'block';
+                    document.getElementById('wz-ntfy-password-manual').style.display = 'none';
+                }
+            } catch (e) {}
+        }
+
+        function wizardGoToStep(step) {
+            wizardCurrentStep = step;
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById('wizard-step-' + i);
+                if (el) el.style.display = i === step ? 'block' : 'none';
+                const prog = document.getElementById('wz-prog-' + i);
+                if (prog) {
+                    prog.classList.remove('active', 'done');
+                    if (i < step) prog.classList.add('done');
+                    else if (i === step) prog.classList.add('active');
+                }
+            }
+        }
+
+        function wizardShowResult(containerId, type, message, extra) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            el.innerHTML = `<div class="wizard-result ${type}">${message}${extra ? `<div class="wizard-commands">${extra}</div>` : ''}</div>`;
+        }
+
+        async function wizardTestImmich() {
+            const url = document.getElementById('wz-immich-url').value.trim();
+            if (!url) { wizardShowResult('wz-immich-result', 'error', 'Please enter an Immich URL first.'); return; }
+            const btn = document.getElementById('wz-test-immich-btn');
+            btn.disabled = true; btn.textContent = 'Testing...';
+            try {
+                const resp = await fetch('/api/secrets/test/immich', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                const data = await resp.json();
+                wizardShowResult('wz-immich-result', data.success ? 'success' : 'error', data.message);
+            } catch (e) {
+                wizardShowResult('wz-immich-result', 'error', 'Request failed: ' + e);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Test connection';
+            }
+        }
+
+        async function wizardStep1Next() {
+            const url = document.getElementById('wz-immich-url').value.trim();
+            if (!url) { wizardShowResult('wz-immich-result', 'error', 'Immich URL is required.'); return; }
+            // Save to .env
+            try {
+                const extUrl = document.getElementById('wz-immich-ext-url').value.trim();
+                await fetch('/api/secrets/', {
+                    method: 'PUT', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({immich_url: url, immich_external_url: extUrl || null})
+                });
+                wizardSummary = wizardSummary.filter(s => !s.startsWith('Immich'));
+                wizardSummary.push('Immich URL: ' + url);
+                if (extUrl) wizardSummary.push('Immich external URL: ' + extUrl);
+            } catch (e) {}
+            wizardGoToStep(2);
+        }
+
+        async function wizardTestNtfy() {
+            const url = document.getElementById('wz-ntfy-url').value.trim();
+            if (!url) { wizardShowResult('wz-ntfy-result', 'error', 'Please enter an ntfy URL first.'); return; }
+            const btn = document.getElementById('wz-test-ntfy-btn');
+            btn.disabled = true; btn.textContent = 'Testing...';
+            try {
+                const resp = await fetch('/api/secrets/test/ntfy', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                const data = await resp.json();
+                wizardShowResult('wz-ntfy-result', data.success ? 'success' : 'error', data.message);
+            } catch (e) {
+                wizardShowResult('wz-ntfy-result', 'error', 'Request failed: ' + e);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Test connection';
+            }
+        }
+
+        async function wizardStep2Next() {
+            const url = document.getElementById('wz-ntfy-url').value.trim();
+            if (!url) { wizardShowResult('wz-ntfy-result', 'error', 'ntfy URL is required.'); return; }
+            try {
+                const extUrl = document.getElementById('wz-ntfy-ext-url').value.trim();
+                await fetch('/api/secrets/', {
+                    method: 'PUT', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ntfy_url: url, ntfy_external_url: extUrl || null})
+                });
+                wizardSummary = wizardSummary.filter(s => !s.startsWith('ntfy'));
+                wizardSummary.push('ntfy URL: ' + url);
+                if (extUrl) wizardSummary.push('ntfy external URL: ' + extUrl);
+            } catch (e) {}
+            wizardGoToStep(3);
+        }
+
+        function wizardToggleNtfyAuto() {
+            const checked = document.getElementById('wz-auto-ntfy-toggle').checked;
+            document.getElementById('wz-ntfy-auto-fields').style.display = checked ? 'block' : 'none';
+            document.getElementById('wz-ntfy-password-manual').style.display = checked ? 'none' : 'block';
+        }
+
+        async function wizardStep3AddUser() {
+            const name = document.getElementById('wz-user-name').value.trim();
+            const topic = document.getElementById('wz-user-topic').value.trim();
+            const apiKey = document.getElementById('wz-user-api-key').value.trim();
+            if (!name) { wizardShowResult('wz-user-result', 'error', 'Display name is required.'); return; }
+            if (!topic) { wizardShowResult('wz-user-result', 'error', 'ntfy topic is required.'); return; }
+            if (!apiKey) { wizardShowResult('wz-user-result', 'error', 'Immich API key is required.'); return; }
+
+            const btn = document.getElementById('wz-add-user-btn');
+            btn.disabled = true; btn.textContent = 'Adding...';
+
+            const autoNtfy = wizardBundledNtfy && document.getElementById('wz-auto-ntfy-toggle').checked;
+            const ntfyUsername = autoNtfy ? document.getElementById('wz-user-ntfy-username').value.trim() : '';
+            const ntfyPassword = autoNtfy
+                ? document.getElementById('wz-user-ntfy-password').value
+                : document.getElementById('wz-user-ntfy-password-manual').value;
+
+            if (autoNtfy && !ntfyUsername) {
+                wizardShowResult('wz-user-result', 'error', 'ntfy username is required when creating automatically.');
+                btn.disabled = false; btn.textContent = 'Add User →';
+                return;
+            }
+            if (autoNtfy && !ntfyPassword) {
+                wizardShowResult('wz-user-result', 'error', 'ntfy password is required when creating automatically.');
+                btn.disabled = false; btn.textContent = 'Add User →';
+                return;
+            }
+
+            try {
+                // Step 1: Add user to config.yaml
+                const addResp = await fetch('/api/settings/users', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, ntfy_topic: topic, ntfy_username: ntfyUsername || name.toLowerCase()})
+                });
+                if (!addResp.ok) {
+                    const err = await addResp.json();
+                    wizardShowResult('wz-user-result', 'error', 'Failed to add user: ' + (err.detail || addResp.status));
+                    btn.disabled = false; btn.textContent = 'Add User →';
+                    return;
+                }
+
+                // Step 2: Save API key
+                const safeVarName = name.toUpperCase().replace(/\s+/g, '_');
+                const secretsBody = {users: {}};
+                secretsBody.users[name] = {api_key: apiKey};
+                if (ntfyPassword) secretsBody.users[name].ntfy_password = ntfyPassword;
+                await fetch('/api/secrets/', {
+                    method: 'PUT', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(secretsBody)
+                });
+
+                // Step 3: Optionally create ntfy user
+                let ntfyCommands = null;
+                if (autoNtfy) {
+                    const ntfyResp = await fetch('/api/ntfy/create-user', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({username: ntfyUsername, password: ntfyPassword, topic: '*'})
+                    });
+                    const ntfyData = await ntfyResp.json();
+                    if (!ntfyData.success) {
+                        wizardShowResult('wz-user-result', 'error',
+                            'User added but ntfy user creation failed: ' + ntfyData.message,
+                            ntfyData.commands_run ? ntfyData.commands_run.join('\n') : '');
+                        btn.disabled = false; btn.textContent = 'Add User →';
+                        return;
+                    }
+                    ntfyCommands = ntfyData.commands_run;
+                }
+
+                wizardSummary.push('User added: ' + name);
+                if (autoNtfy) wizardSummary.push('ntfy user created: ' + ntfyUsername);
+
+                // Build done list
+                const doneItems = wizardSummary.map(s =>
+                    `<li><span style="color:var(--success)">&#10003;</span> ${s}</li>`
+                ).join('');
+                document.getElementById('wz-done-list').innerHTML = doneItems;
+
+                if (ntfyCommands) {
+                    document.getElementById('wz-done-list').innerHTML +=
+                        `<li><span style="color:var(--accent)">&#x2139;</span> Commands run:<div class="wizard-commands" style="margin-top:6px;">${ntfyCommands.join('\n')}</div></li>`;
+                }
+
+                wizardGoToStep(4);
+            } catch (e) {
+                wizardShowResult('wz-user-result', 'error', 'Unexpected error: ' + e);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Add User →';
+            }
+        }
+
+        async function wizardDone() {
+            await fetch('/api/secrets/setup-complete', {method: 'POST'});
+            document.getElementById('wizard-overlay').style.display = 'none';
+            // Reload to reflect new config
+            refreshState();
+            loadSettings();
+            loadSecrets();
+            checkSetup();
+        }
+
+        async function wizardSkip() {
+            await fetch('/api/secrets/setup-complete', {method: 'POST'}).catch(() => {});
+            document.getElementById('wizard-overlay').style.display = 'none';
+        }
 
         // Collage preview function
         function updateCollagePreview() {
