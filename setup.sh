@@ -369,8 +369,8 @@ if [ "$START_NOW" = "y" ]; then
         echo ""
     fi
 
-    echo -e "  ${BOLD}docker compose up -d dashboard${NC}"
-    docker compose up -d dashboard
+    echo -e "  ${BOLD}docker compose up -d --build dashboard${NC}"
+    docker compose up -d --build dashboard
     echo ""
 
     # Detect host IP for dashboard URL
