@@ -4,19 +4,7 @@ immich:
 ntfy:
   url: ${NTFY_URL}
   external_url: ${NTFY_EXTERNAL_URL}
-users:
-- name: User1
-  immich_api_key: ${IMMICH_API_KEY_USER1}
-  ntfy_topic: immich-memories-user1
-  ntfy_username: user1
-  ntfy_password: ${NTFY_PASSWORD_USER1}
-  enabled: true
-- name: User2
-  immich_api_key: ${IMMICH_API_KEY_USER2}
-  ntfy_topic: immich-memories-user2
-  ntfy_username: user2
-  ntfy_password: ${NTFY_PASSWORD_USER2}
-  enabled: true
+users: []
 settings:
   retry:
     max_attempts: 3
@@ -34,7 +22,7 @@ settings:
   prefer_group_photos: true
   min_group_size: 2
   weekly_collage_enabled: true
-  weekly_collage_day: 4
+  weekly_collage_day: 6
   weekly_collage_slots: 2
   collage_person_limit: 5
   collage_year_range: 20
@@ -43,14 +31,14 @@ settings:
   notification_windows:
   - start: 08:00
     end: 09:00
-  - start: '10:30'
+  - start: '10:00'
     end: '12:00'
-  - start: '14:00'
-    end: '16:00'
+  - start: '13:00'
+    end: '15:00'
   - start: '17:00'
     end: '19:00'
-  - start: '21:00'
-    end: '23:00'
+  - start: '20:00'
+    end: '22:00'
 messages:
 - A little trip back to {year}...
 - Remember this day {years_ago} years ago?
