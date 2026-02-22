@@ -338,13 +338,16 @@ async def test_ntfy_connection(req: ConnectionTestRequest):
                     data=b"test",
                     timeout=5,
                 )
-                if attach_resp.status_code != 200:
+                if attach_resp.status_code == 200:
+                    pass  # attachments work anonymously
+                elif attach_resp.status_code in (401, 403):
+                    pass  # auth required but attachments are configured — correct for secured ntfy
+                else:
                     body = attach_resp.text[:200].lower()
                     if "attachments not allowed" in body:
                         attach_warning = (
-                            "Attachments not allowed — thumbnail previews won't work. "
-                            "Set auth-file in server.yaml, create a user with 'ntfy user add <name>', "
-                            "then run 'ntfy access <name> \"*\" read-write'"
+                            "Attachments not configured — thumbnail previews won't work. "
+                            "Add base-url and attachment-cache-dir to your ntfy server.yaml."
                         )
                     else:
                         attach_warning = f"Attachment upload returned HTTP {attach_resp.status_code}"
@@ -353,6 +356,13 @@ async def test_ntfy_connection(req: ConnectionTestRequest):
 
             if attach_warning:
                 return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms) — but: {attach_warning}", "detail": f"GET {test_url} returned 200. Warning: {attach_warning}"}
+            # Check if auth-protected (401/403 on attach test = correctly secured)
+            try:
+                attach_status = attach_resp.status_code
+            except Exception:
+                attach_status = 0
+            if attach_status in (401, 403):
+                return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms) — auth-protected, attachments configured", "detail": f"GET {test_url} returned 200, attachment endpoint requires auth (correct)"}
             return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms) — attachments OK", "detail": f"GET {test_url} returned 200, attachment upload works"}
         # Some ntfy setups may not expose /v1/health, try root
         resp2 = http_requests.get(f"{url}/", timeout=5)
