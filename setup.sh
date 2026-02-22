@@ -352,27 +352,51 @@ fi
 print_ok "Timezone:            ${TZ}"
 echo ""
 
-if [ "$USE_BUNDLED_NTFY" = "y" ]; then
-    echo -e "  ${YELLOW}Important — ntfy user setup:${NC}"
-    echo "  After starting the containers, you'll need to create a ntfy user"
-    echo "  for each person who should receive notifications."
-    echo "  The dashboard wizard will walk you through this automatically."
-    echo ""
-fi
+# ============================================================
+# Offer to start services
+# ============================================================
+echo ""
+prompt_yn START_NOW "Start services now (dashboard$([ "$USE_BUNDLED_NTFY" = "y" ] && echo " + ntfy"))" "y"
 
-echo "  Next steps:"
-echo ""
-echo "  1. Start the services:"
-echo -e "     ${BOLD}docker compose up -d dashboard${NC}"
-if [ "$USE_BUNDLED_NTFY" = "y" ]; then
-    echo -e "     ${BOLD}docker compose up -d ntfy${NC}"
+if [ "$START_NOW" = "y" ]; then
+    echo ""
+    print_step "Starting services..."
+    echo ""
+
+    if [ "$USE_BUNDLED_NTFY" = "y" ]; then
+        echo -e "  ${BOLD}docker compose up -d ntfy${NC}"
+        docker compose up -d ntfy
+        echo ""
+    fi
+
+    echo -e "  ${BOLD}docker compose up -d dashboard${NC}"
+    docker compose up -d dashboard
+    echo ""
+
+    # Detect host IP for dashboard URL
+    HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    DASHBOARD_URL="http://${HOST_IP:-localhost}:5000"
+
+    print_ok "Services started!"
+    echo ""
+    echo -e "  Open the dashboard: ${BOLD}${CYAN}${DASHBOARD_URL}${NC}"
+    echo ""
+    echo "  The setup wizard will appear automatically."
+    echo "  After completing it, start the scheduler:"
+    echo -e "  ${BOLD}docker compose up -d scheduler${NC}"
+else
+    echo ""
+    echo "  When ready, start the services:"
+    echo ""
+    if [ "$USE_BUNDLED_NTFY" = "y" ]; then
+        echo -e "    ${BOLD}docker compose up -d ntfy${NC}"
+    fi
+    echo -e "    ${BOLD}docker compose up -d dashboard${NC}"
+    echo ""
+    echo "  Then open: ${BOLD}http://localhost:5000${NC}"
+    echo "  The setup wizard will appear automatically."
+    echo ""
+    echo "  After the wizard, start the scheduler:"
+    echo -e "    ${BOLD}docker compose up -d scheduler${NC}"
 fi
-echo ""
-echo "  2. Open the dashboard:"
-echo -e "     ${BOLD}http://localhost:5000${NC}"
-echo ""
-echo "  3. Follow the setup wizard to add your users and API keys."
-echo ""
-echo "  4. Start the scheduler:"
-echo -e "     ${BOLD}docker compose up -d scheduler${NC}"
 echo ""
