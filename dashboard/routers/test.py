@@ -1,5 +1,6 @@
 """Test notification trigger API endpoints."""
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -7,6 +8,27 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, Query
 
 from ..models import TestTriggerResponse
+
+ENV_PATH = os.environ.get("ENV_PATH", "/app/.env")
+
+
+def load_env_for_subprocess() -> dict:
+    """Load .env file and merge with current environment.
+
+    The dashboard container's os.environ is frozen at startup, so secrets
+    added after startup (e.g. via the wizard) won't be present. This reads
+    the .env file fresh every time so notify.py gets up-to-date values.
+    """
+    env = os.environ.copy()
+    env_file = Path(ENV_PATH)
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, _, value = line.partition('=')
+                    env[key.strip()] = value.strip().strip('"').strip("'")
+    return env
 
 router = APIRouter()
 
@@ -56,6 +78,7 @@ async def trigger_test_notification(
             text=True,
             timeout=120,  # 2 minute timeout
             cwd="/app",
+            env=load_env_for_subprocess(),
         )
 
         success = result.returncode == 0
