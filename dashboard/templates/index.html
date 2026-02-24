@@ -1790,7 +1790,7 @@
             try {
                 const resp = await fetch('/api/secrets/test/ntfy', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url})
+                    body: JSON.stringify({url, skip_attach_test: wizardBundledNtfy})
                 });
                 const data = await resp.json();
                 wizardShowResult('wz-ntfy-result', data.success ? 'success' : 'error', data.message);

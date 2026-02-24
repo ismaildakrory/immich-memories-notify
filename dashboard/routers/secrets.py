@@ -23,6 +23,7 @@ CONFIG_PATH = os.environ.get("CONFIG_PATH", "/app/config.yaml")
 class ConnectionTestRequest(BaseModel):
     """Request body for connection test endpoints."""
     url: str
+    skip_attach_test: bool = False
 
 
 class SecretsUpdate(BaseModel):
@@ -328,6 +329,10 @@ async def test_ntfy_connection(req: ConnectionTestRequest):
         resp = http_requests.get(test_url, timeout=5)
         latency_ms = int((time.time() - start) * 1000)
         if resp.status_code == 200:
+            # Skip attachment test if caller knows server is auth-protected (e.g. bundled ntfy)
+            if req.skip_attach_test:
+                return {"success": True, "message": f"ntfy is reachable ({latency_ms}ms) — auth-protected, attachments configured", "detail": f"GET {test_url} returned 200 (attachment test skipped — server uses auth)"}
+
             # Also test attachment support by attempting a small upload
             attach_warning = None
             try:
