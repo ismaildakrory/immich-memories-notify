@@ -85,6 +85,23 @@ prompt_yn() {
 # ============================================================
 print_header
 
+# --- Check Docker access ------------------------------------
+if ! docker info > /dev/null 2>&1; then
+    echo -e "${RED}${BOLD}Error: cannot connect to the Docker daemon.${NC}"
+    echo ""
+    echo "  This is usually a permissions issue. Fix it by running:"
+    echo ""
+    echo -e "    ${BOLD}sudo usermod -aG docker \$USER${NC}"
+    echo -e "    ${BOLD}newgrp docker${NC}"
+    echo ""
+    echo "  Then re-run: bash setup.sh"
+    echo ""
+    echo "  Alternatively, run setup with sudo:"
+    echo -e "    ${BOLD}sudo bash setup.sh${NC}"
+    echo ""
+    exit 1
+fi
+
 echo "This script will help you configure Immich Memories Notify."
 echo "It will generate your .env file and optionally set up a"
 echo "bundled ntfy notification server."
