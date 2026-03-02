@@ -21,6 +21,8 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 - **Multi-User Support** - Each user gets their own top people and personalized notifications
 - **Rich Notifications** - Includes thumbnail preview with person names
 - **Click to Open** - Tap notification to open photo directly in Immich
+- **Guided Setup** - Interactive `setup.sh` script and first-run dashboard wizard
+- **Bundled ntfy** - Optionally spin up a pre-configured ntfy server automatically
 - **Self-Hosted** - Works with your self-hosted Immich and ntfy instances
 - **Docker Ready** - Easy deployment with Docker Compose
 - **Privacy First** - Your photos never leave your network
@@ -149,37 +151,53 @@ Built this mostly vibe coding! Been running smoothly on my setup. PRs and feedba
 ## Quick Start
 
 ```bash
-# 1. Clone and build
 git clone https://github.com/ismaildakrory/immich-memories-notify.git
 cd immich-memories-notify
-docker compose build
-docker compose up -d dashboard
-
-# Important Note for Updating:
-# Rebuild after updates (must recreate container for volume mounts)
-docker compose down dashboard && docker compose up -d --build dashboard
-
-# 2. Open dashboard and configure
-# http://localhost:5000
+bash setup.sh
 ```
 
-### Configure via Dashboard
+The setup script asks a few questions, generates your config files, and starts the services. Then open the dashboard — a guided wizard walks you through the rest.
 
-1. **Secrets tab** → Add your server URLs and API keys
-   - Get Immich API key from: Account Settings → API Keys
+### What `setup.sh` does
 
-2. **Settings tab** → Add/edit users and notification times
+1. Asks for your **Immich URL** and **timezone**
+2. Asks whether to use **bundled ntfy** (spins up a pre-configured ntfy container automatically) or your own
+3. Generates your **`.env`** file with all URLs pre-filled
+4. If bundled ntfy: generates **`docker-compose.override.yml`** and **`ntfy_config/server.yaml`** with attachment support enabled
+5. Offers to **start the services immediately**
 
-3. **Test tab** → Send a test notification
+### First-run wizard
 
-4. **Start the scheduler:**
+On first visit to the dashboard (`http://your-server:5000`), a setup wizard guides you through:
+
+| Step | What it does |
+|------|-------------|
+| 1 — Immich | Enter internal/external URLs, test connection |
+| 2 — ntfy | Enter ntfy URLs, test connection |
+| 3 — Add user | Name, ntfy topic, Immich API key — plus optional auto-create of ntfy user if using bundled ntfy |
+| 4 — Done | Summary + scheduler start command |
+
+The wizard only appears once. After completion it won't show again.
+
+### Get your Immich API key
+
+In Immich → **Account Settings** → **API Keys** → create a new key.
+
+### Subscribe to ntfy
+
+Open the ntfy app on your phone and subscribe to the topic you chose in Step 3 (e.g. `immich-alice`) on your ntfy server.
+
+### Start the scheduler
+
 ```bash
 docker compose up -d scheduler
 ```
 
-### Subscribe to ntfy
+### Rebuilding after updates
 
-Open the ntfy app on your phone and subscribe to your topic (e.g., `immich-memories-user1`) on your ntfy server.
+```bash
+docker compose down dashboard && docker compose up -d --build dashboard
+```
 
 ## Web Dashboard
 
@@ -367,60 +385,58 @@ video_person_messages:
 
 Each user gets personalized notifications based on their own Immich library.
 
-**Via Dashboard (recommended):**
-1. Go to **Settings tab** → Click **Add User**
-2. Go to **Secrets tab** → Add the user's API key and ntfy password
-3. Scheduler auto-restarts with new user
+**First user:** handled by the setup wizard (Step 3).
 
-**Manually:** Edit `config.yaml` and `.env` files, then restart scheduler.
+**Additional users via Dashboard:**
+1. **Settings tab** → **Add User** → enter name and ntfy topic
+2. **Secrets tab** → add the user's Immich API key and ntfy password
+
+**Additional users manually:** edit `config.yaml` and `.env`, then restart the scheduler.
 
 Each user subscribes to their own ntfy topic in the app.
 
 ## Self-Hosting ntfy
 
-If you don't have ntfy yet, here's a quick setup:
+### Option A — Bundled ntfy (easiest)
 
-```yaml
-# docker-compose.yml for ntfy
-version: "3"
-services:
-  ntfy:
-    image: binwiederhier/ntfy
-    container_name: ntfy
-    command: serve
-    ports:
-      - "8090:80"
-    volumes:
-      - ./ntfy-cache:/var/cache/ntfy
-      - ./ntfy-config:/etc/ntfy
-    restart: unless-stopped
+When `setup.sh` asks *"Use bundled ntfy?"*, say **yes**. It will:
+- Add a ntfy service to your Docker Compose automatically
+- Generate `ntfy_config/server.yaml` with attachment support pre-configured
+- The dashboard wizard (Step 3) creates ntfy users and grants access for you
+
+```bash
+# After setup.sh, start ntfy:
+docker compose up -d ntfy
 ```
 
-Create a `ntfy-config/server.yaml` next to your docker-compose file. The `base-url` and attachment settings are **required** for thumbnail previews to work:
+### Option B — Bring your own ntfy
+
+If you already have ntfy running elsewhere, say **no** in setup.sh and enter your server URLs.
+
+For thumbnail previews to work, your ntfy `server.yaml` needs:
 
 ```yaml
-# ntfy-config/server.yaml
-
 # Must be your externally reachable URL — not localhost
 base-url: "https://notify.yourdomain.com"
 
-# Required for thumbnail previews in notifications
-attachment-cache-dir: "/var/cache/ntfy/attachments"
-attachment-total-size-limit: "1G"
-attachment-file-size-limit: "15M"
-attachment-expiry-duration: "3h"
+# Auth (required for attachment uploads on most setups)
+auth-file: /var/lib/ntfy/user.db
+auth-default-access: deny-all
+
+# Attachment storage
+attachment-cache-dir: /var/lib/ntfy/attachments
+attachment-total-size: 5G
+attachment-file-size: 15M
+attachment-expiry-duration: 3h
 ```
 
-If you use authentication, make sure your users have upload permissions:
+Create a user and grant read-write access:
 ```bash
-ntfy access <username> --upload
+ntfy user add --password <password> <username>
+ntfy access <username> '*' read-write
 ```
 
-```bash
-docker compose up -d
-```
-
-Then install the ntfy app and add your server.
+Then install the ntfy app on your phone and add your server.
 
 ## Troubleshooting
 
@@ -494,6 +510,7 @@ Source files are mounted as volumes, so you can edit them without rebuilding:
 
 ```
 .
+├── setup.sh               # First-run interactive setup script
 ├── notify.py              # Main notification script
 ├── config.yaml            # Configuration (users, schedules, settings)
 ├── .env                   # Secrets only (API keys, passwords, URLs)
@@ -502,6 +519,9 @@ Source files are mounted as volumes, so you can edit them without rebuilding:
 ├── Dockerfile             # Main container definition
 ├── Dockerfile.dashboard   # Dashboard container
 ├── docker-compose.yml     # Service definitions
+├── docker-compose.override.yml  # Generated by setup.sh (bundled ntfy)
+├── ntfy_config/           # Generated by setup.sh (bundled ntfy)
+│   └── server.yaml        # ntfy server configuration
 └── dashboard/             # Web dashboard
     ├── main.py            # FastAPI app
     ├── models.py          # Pydantic models
