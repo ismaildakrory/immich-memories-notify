@@ -101,9 +101,9 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
             commands_run=[],
         )
 
-    # Step 1: Create user (pass --config so ntfy finds the auth-file)
-    add_cmd = ["ntfy", "--config", NTFY_CONFIG_PATH, "user", "add", "--password", req.password, safe_username]
-    cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy --config {NTFY_CONFIG_PATH} user add --password ***** {safe_username}"
+    # Step 1: Create user (--config is a subcommand flag, not a global flag)
+    add_cmd = ["ntfy", "user", "add", "--config", NTFY_CONFIG_PATH, "--password", req.password, safe_username]
+    cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy user add --config {NTFY_CONFIG_PATH} --password ***** {safe_username}"
     commands_run.append(cmd_display)
 
     rc, stdout, stderr = _run_docker_exec(NTFY_CONTAINER_NAME, add_cmd)
@@ -123,9 +123,9 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
             )
         output_lines.append(f"(User '{safe_username}' already exists — updating access)")
 
-    # Step 2: Grant access (pass --config so ntfy finds the auth-file)
-    access_cmd = ["ntfy", "--config", NTFY_CONFIG_PATH, "access", safe_username, safe_topic, "read-write"]
-    access_cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy --config {NTFY_CONFIG_PATH} access {safe_username} {safe_topic} read-write"
+    # Step 2: Grant access (--config is a subcommand flag, not a global flag)
+    access_cmd = ["ntfy", "access", "--config", NTFY_CONFIG_PATH, safe_username, safe_topic, "read-write"]
+    access_cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy access --config {NTFY_CONFIG_PATH} {safe_username} {safe_topic} read-write"
     commands_run.append(access_cmd_display)
 
     rc2, stdout2, stderr2 = _run_docker_exec(NTFY_CONTAINER_NAME, access_cmd)
