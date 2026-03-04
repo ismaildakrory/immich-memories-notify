@@ -102,6 +102,15 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
+# --- Fix Docker client/server API version mismatch ----------
+# Some systems have a newer Docker CLI than daemon (e.g. API 1.52 vs 1.41).
+# Setting DOCKER_API_VERSION to the server's version prevents "client version
+# is too new" errors when running docker compose.
+_SERVER_API=$(docker version --format '{{.Server.APIVersion}}' 2>/dev/null || true)
+if [ -n "$_SERVER_API" ]; then
+    export DOCKER_API_VERSION="$_SERVER_API"
+fi
+
 echo "This script will help you configure Immich Memories Notify."
 echo "It will generate your .env file and optionally set up a"
 echo "bundled ntfy notification server."
