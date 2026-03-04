@@ -337,7 +337,7 @@ services:
   ntfy:
     image: binwiederhier/ntfy
     container_name: ${NTFY_CONTAINER_NAME}
-    command: serve
+    command: serve --config /etc/ntfy/server.yaml
     environment:
       - TZ=\${TZ:-UTC}
     volumes:
