@@ -711,8 +711,14 @@
                 </div>
 
                 <div class="form-group" id="wz-ntfy-password-manual" style="margin-top:16px;">
-                    <label>ntfy password <span style="color:var(--text-muted)">(if your ntfy requires auth)</span></label>
-                    <input type="password" id="wz-user-ntfy-password-manual" placeholder="Leave blank if ntfy is open" style="width:100%">
+                    <label>ntfy password <span style="color:var(--error)">*</span></label>
+                    <input type="password" id="wz-user-ntfy-password-manual" placeholder="Password for your ntfy account" style="width:100%">
+                    <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="wz-ntfy-no-auth" style="margin:0;">
+                        <label for="wz-ntfy-no-auth" style="font-size:0.85rem; color:var(--text-muted); margin:0; cursor:pointer;">
+                            My ntfy doesn't require authentication (open server)
+                        </label>
+                    </div>
                 </div>
 
                 <div id="wz-user-result"></div>
@@ -1856,9 +1862,10 @@
                 btn.disabled = false; btn.textContent = 'Add User →';
                 return;
             }
-            // Bundled ntfy with auth requires a password even without auto-create
-            if (!autoNtfy && wizardBundledNtfy && !ntfyPassword) {
-                wizardShowResult('wz-user-result', 'error', 'Your bundled ntfy requires auth. Enter a password or enable "Create ntfy user automatically".');
+            // Manual path: require password unless user explicitly opts out
+            const ntfyNoAuth = !autoNtfy && document.getElementById('wz-ntfy-no-auth').checked;
+            if (!autoNtfy && !ntfyPassword && !ntfyNoAuth) {
+                wizardShowResult('wz-user-result', 'error', 'Enter your ntfy password, or check "My ntfy doesn\'t require authentication" if your server is open.');
                 btn.disabled = false; btn.textContent = 'Add User →';
                 return;
             }

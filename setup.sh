@@ -293,6 +293,11 @@ DASHBOARD_USER=admin
 # --- ntfy Auth (if using password-protected ntfy) ----------
 # Example: NTFY_PASSWORD_USER1=your-ntfy-password
 
+# --- Docker API Version ------------------------------------
+# Auto-detected by setup.sh to fix client/server API version mismatch.
+# Required by dashboard container when docker-cli version > daemon version.
+DOCKER_API_VERSION=${_SERVER_API}
+
 # --- Setup Status ------------------------------------------
 # Set to true once initial setup is complete (wizard won't reappear)
 SETUP_COMPLETE=false

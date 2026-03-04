@@ -121,5 +121,6 @@ services:
       - PROJECT_DIR=/app/project
       - DASHBOARD_USER=${DASHBOARD_USER:-admin}
       - DASHBOARD_TOKEN=${DASHBOARD_TOKEN:-}
+      - DOCKER_API_VERSION=${DOCKER_API_VERSION:-}
     network_mode: host
     restart: unless-stopped
