@@ -101,9 +101,9 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
             commands_run=[],
         )
 
-    # Step 1: Create user (--config is a subcommand flag, not a global flag)
-    add_cmd = ["ntfy", "user", "add", "--config", NTFY_CONFIG_PATH, "--password", req.password, safe_username]
-    cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy user add --config {NTFY_CONFIG_PATH} --password ***** {safe_username}"
+    # Step 1: Create user (--config is a flag on 'user', not on 'user add')
+    add_cmd = ["ntfy", "user", "--config", NTFY_CONFIG_PATH, "add", "--password", req.password, safe_username]
+    cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy user --config {NTFY_CONFIG_PATH} add --password ***** {safe_username}"
     commands_run.append(cmd_display)
 
     rc, stdout, stderr = _run_docker_exec(NTFY_CONTAINER_NAME, add_cmd)
