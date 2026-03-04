@@ -1722,6 +1722,10 @@
                     if (!urlInput.value) urlInput.value = 'http://localhost:8090';
                     document.getElementById('wz-ntfy-auto-section').style.display = 'block';
                     document.getElementById('wz-ntfy-password-manual').style.display = 'none';
+                    // Default auto-create toggle to ON — bundled ntfy requires credentials
+                    const toggle = document.getElementById('wz-auto-ntfy-toggle');
+                    toggle.checked = true;
+                    wizardToggleNtfyAuto();
                 }
             } catch (e) {}
         }
@@ -1847,6 +1851,12 @@
             }
             if (autoNtfy && !ntfyPassword) {
                 wizardShowResult('wz-user-result', 'error', 'ntfy password is required when creating automatically.');
+                btn.disabled = false; btn.textContent = 'Add User →';
+                return;
+            }
+            // Bundled ntfy with auth requires a password even without auto-create
+            if (!autoNtfy && wizardBundledNtfy && !ntfyPassword) {
+                wizardShowResult('wz-user-result', 'error', 'Your bundled ntfy requires auth. Enter a password or enable "Create ntfy user automatically".');
                 btn.disabled = false; btn.textContent = 'Add User →';
                 return;
             }
