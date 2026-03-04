@@ -1818,6 +1818,8 @@
                 wizardSummary.push('ntfy URL: ' + url);
                 if (extUrl) wizardSummary.push('ntfy external URL: ' + extUrl);
             } catch (e) {}
+            // Re-check bundled ntfy status in case the initial check ran before the container was ready
+            await checkBundledNtfy();
             wizardGoToStep(3);
         }
 
