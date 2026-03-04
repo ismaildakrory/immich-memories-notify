@@ -9,6 +9,7 @@ from pydantic import BaseModel
 router = APIRouter()
 
 NTFY_CONTAINER_NAME = "immich-memories-ntfy"
+NTFY_CONFIG_PATH = "/etc/ntfy/server.yaml"
 
 
 class NtfyCreateUserRequest(BaseModel):
@@ -100,9 +101,9 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
             commands_run=[],
         )
 
-    # Step 1: Create user
-    add_cmd = ["ntfy", "user", "add", "--password", req.password, safe_username]
-    cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy user add --password ***** {safe_username}"
+    # Step 1: Create user (pass --config so ntfy finds the auth-file)
+    add_cmd = ["ntfy", "--config", NTFY_CONFIG_PATH, "user", "add", "--password", req.password, safe_username]
+    cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy --config {NTFY_CONFIG_PATH} user add --password ***** {safe_username}"
     commands_run.append(cmd_display)
 
     rc, stdout, stderr = _run_docker_exec(NTFY_CONTAINER_NAME, add_cmd)
@@ -122,9 +123,9 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
             )
         output_lines.append(f"(User '{safe_username}' already exists — updating access)")
 
-    # Step 2: Grant access
-    access_cmd = ["ntfy", "access", safe_username, safe_topic, "read-write"]
-    access_cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy access {safe_username} {safe_topic} read-write"
+    # Step 2: Grant access (pass --config so ntfy finds the auth-file)
+    access_cmd = ["ntfy", "--config", NTFY_CONFIG_PATH, "access", safe_username, safe_topic, "read-write"]
+    access_cmd_display = f"docker exec {NTFY_CONTAINER_NAME} ntfy --config {NTFY_CONFIG_PATH} access {safe_username} {safe_topic} read-write"
     commands_run.append(access_cmd_display)
 
     rc2, stdout2, stderr2 = _run_docker_exec(NTFY_CONTAINER_NAME, access_cmd)
