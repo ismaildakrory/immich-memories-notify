@@ -107,12 +107,31 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
 
     ntfy_env = {"NTFY_AUTH_FILE": NTFY_AUTH_FILE}
 
-    # Step 1: Create user (use NTFY_AUTH_FILE env var to bypass --config flag ambiguity)
-    add_cmd = ["ntfy", "user", "add", "--password", req.password, safe_username]
-    cmd_display = f"docker exec -e NTFY_AUTH_FILE={NTFY_AUTH_FILE} {NTFY_CONTAINER_NAME} ntfy user add --password ***** {safe_username}"
+    # Step 1: Create user — ntfy user add reads password from stdin (no --password flag in v2)
+    # Send "password\npassword\n" for the password + confirmation prompts
+    add_cmd = ["docker", "exec", "-i",
+               "-e", f"NTFY_AUTH_FILE={NTFY_AUTH_FILE}",
+               NTFY_CONTAINER_NAME,
+               "ntfy", "user", "add", safe_username]
+    cmd_display = f"docker exec -i -e NTFY_AUTH_FILE={NTFY_AUTH_FILE} {NTFY_CONTAINER_NAME} ntfy user add {safe_username}"
     commands_run.append(cmd_display)
 
-    rc, stdout, stderr = _run_docker_exec(NTFY_CONTAINER_NAME, add_cmd, env=ntfy_env)
+    try:
+        add_result = subprocess.run(
+            add_cmd,
+            input=f"{req.password}\n{req.password}\n",
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        rc = add_result.returncode
+        stdout = add_result.stdout
+        stderr = add_result.stderr
+    except subprocess.TimeoutExpired:
+        rc, stdout, stderr = 1, "", "Command timed out after 15 seconds"
+    except Exception as e:
+        rc, stdout, stderr = 1, "", str(e)
+
     combined = (stdout + stderr).strip()
     if combined:
         output_lines.append(combined)
