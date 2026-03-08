@@ -129,6 +129,10 @@ async def create_ntfy_user(req: NtfyCreateUserRequest):
             )
         output_lines.append(f"(User '{safe_username}' already exists — updating access)")
 
+    # Diagnostic: verify user is actually in the DB before running access
+    list_rc, list_out, list_err = _run_docker_exec(NTFY_CONTAINER_NAME, ["ntfy", "user", "list"], env=ntfy_env)
+    output_lines.append(f"[user list] rc={list_rc}: {(list_out + list_err).strip()}")
+
     # Step 2: Grant access (same NTFY_AUTH_FILE env var)
     access_cmd = ["ntfy", "access", safe_username, safe_topic, "read-write"]
     access_cmd_display = f"docker exec -e NTFY_AUTH_FILE={NTFY_AUTH_FILE} {NTFY_CONTAINER_NAME} ntfy access {safe_username} {safe_topic} read-write"
