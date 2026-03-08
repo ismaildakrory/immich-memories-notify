@@ -4,7 +4,19 @@ immich:
 ntfy:
   url: ${NTFY_URL}
   external_url: ${NTFY_EXTERNAL_URL}
-users: []
+users:
+- name: Ismail
+  immich_api_key: ${IMMICH_API_KEY_USER1}
+  ntfy_topic: immich-memories-ismail
+  ntfy_username: ismail
+  ntfy_password: ${NTFY_PASSWORD_ISMAIL}
+  enabled: true
+- name: Ranya
+  immich_api_key: ${IMMICH_API_KEY_USER2}
+  ntfy_topic: immich-memories-ranya
+  ntfy_username: ranya
+  ntfy_password: ${NTFY_PASSWORD_RANYA}
+  enabled: true
 settings:
   retry:
     max_attempts: 3
@@ -28,6 +40,9 @@ settings:
   collage_year_range: 20
   collage_template: random
   collage_album_name: Weekly Highlights
+  then_and_now_enabled: true
+  then_and_now_min_gap: 3
+  then_and_now_slot: 0
   notification_windows:
   - start: 08:00
     end: 09:00
@@ -70,3 +85,9 @@ video_person_messages:
 - A video featuring {person_name}
 - Press play on this memory with {person_name}
 - Relive this moment with {person_name}
+then_and_now_messages:
+- Look how much {person_name} has changed! {then_year} vs {now_year}
+- '{gap} years between these moments with {person_name}'
+- Then and now — {person_name}, {gap} years apart
+- Time flies... {person_name} in {then_year} and {now_year}
+- From {then_year} to {now_year} with {person_name}

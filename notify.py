@@ -105,6 +105,9 @@ def load_config(config_path: str = "config.yaml") -> dict:
     settings.setdefault("retry", {"max_attempts": 3, "delay_seconds": 5})
     settings.setdefault("state_file", "state/state.json")
     settings.setdefault("log_level", "INFO")
+    settings.setdefault("then_and_now_enabled", True)
+    settings.setdefault("then_and_now_min_gap", 3)
+    settings.setdefault("then_and_now_slot", 0)  # 0 = auto (last memory slot)
 
     return config
 
@@ -940,20 +943,55 @@ def process_user_slot(
         total_slots = memory_notifications + person_notifications
 
         if slot <= memory_notifications:
-            # Send a memory notification
-            notification = prepare_memory_notification(
-                parsed=parsed,
-                slot=slot,
-                assets_sent=assets_sent,
-                top_person_ids=top_person_ids,
-                immich_url=immich_url,
-                api_key=api_key,
-                messages=messages,
-                test_mode=test_mode,
-                logger=logger,
-                settings=settings,
-                video_messages=video_messages,
+            # Check if Then & Now should fire for this slot
+            tan_enabled = settings.get("then_and_now_enabled", True)
+            tan_slot_cfg = settings.get("then_and_now_slot", 0)
+            tan_min_gap = settings.get("then_and_now_min_gap", 3)
+            tan_messages = config.get("then_and_now_messages", [])
+
+            # Slot matches: explicit config match, or auto (0) = last memory slot
+            is_tan_slot = tan_enabled and (
+                tan_slot_cfg == slot or (tan_slot_cfg == 0 and slot == memory_notifications)
             )
+
+            if is_tan_slot:
+                try:
+                    candidate = find_then_and_now_candidate(
+                        parsed=parsed,
+                        immich_url=immich_url,
+                        api_key=api_key,
+                        min_gap=tan_min_gap,
+                        logger=logger,
+                    )
+                    if candidate:
+                        notification = prepare_then_and_now_notification(
+                            candidate=candidate,
+                            immich_url=immich_url,
+                            api_key=api_key,
+                            messages=tan_messages,
+                            test_mode=test_mode,
+                            logger=logger,
+                        )
+                        if notification:
+                            logger.info(f"  [{name}] Sending Then & Now ({candidate['then_year']} → {candidate['now_year']})")
+                except Exception as e:
+                    logger.warning(f"  [{name}] Then & Now lookup failed, falling back to memory: {e}")
+
+            if not notification:
+                # Normal memory notification (fallback or non-TaN slot)
+                notification = prepare_memory_notification(
+                    parsed=parsed,
+                    slot=slot,
+                    assets_sent=assets_sent,
+                    top_person_ids=top_person_ids,
+                    immich_url=immich_url,
+                    api_key=api_key,
+                    messages=messages,
+                    test_mode=test_mode,
+                    logger=logger,
+                    settings=settings,
+                    video_messages=video_messages,
+                )
         elif slot <= total_slots:
             # Send a person photo notification
             notification = prepare_person_notification(
@@ -1006,12 +1044,15 @@ def process_user_slot(
         return result
 
     # Send the notification
+    # For Then & Now, pass composite image as thumbnail (no Immich asset to fetch)
+    thumbnail_override = notification.get("composite_image") if notification.get("is_then_and_now") else None
     success = send_single_notification(
         user=user,
         notification=notification,
         config=config,
         ntfy_auth=ntfy_auth,
         logger=logger,
+        thumbnail_override=thumbnail_override,
     )
 
     if success:
@@ -1351,6 +1392,231 @@ def cover_crop_image(img: Image.Image, target_w: int, target_h: int, faces: list
     return cropped
 
 
+
+
+# =============================================================================
+# Then & Now Feature
+# =============================================================================
+
+def find_then_and_now_candidate(
+    parsed: dict,
+    immich_url: str,
+    api_key: str,
+    min_gap: int = 3,
+    logger=None,
+) -> Optional[dict]:
+    """
+    Scan today's memory assets for the same named person appearing in multiple years.
+    Returns the best candidate (largest year gap) or None.
+    """
+    from collections import defaultdict
+
+    # Build: person_name -> year -> [(asset_id, face_area, asset_details)]
+    person_years = defaultdict(lambda: defaultdict(list))
+
+    for year, year_data in parsed.get("by_year", {}).items():
+        for asset in year_data.get("assets", []):
+            asset_id = asset.get("id")
+            if not asset_id or asset.get("type") == "VIDEO":
+                continue
+            try:
+                details = fetch_asset_details(immich_url, api_key, asset_id)
+                for person in details.get("people", []):
+                    pname = person.get("name")
+                    if not pname:
+                        continue
+                    x1 = person.get("boundingBoxX1", 0)
+                    y1 = person.get("boundingBoxY1", 0)
+                    x2 = person.get("boundingBoxX2", 1)
+                    y2 = person.get("boundingBoxY2", 1)
+                    area = (x2 - x1) * (y2 - y1)
+                    person_years[pname][year].append((asset_id, area, details))
+            except Exception as e:
+                if logger:
+                    logger.debug(f"Could not fetch details for asset {asset_id}: {e}")
+
+    # Find person with largest year gap meeting min_gap threshold
+    best = None
+    best_gap = 0
+
+    for pname, years_dict in person_years.items():
+        years = sorted(years_dict.keys())
+        if len(years) < 2:
+            continue
+        gap = max(years) - min(years)
+        if gap < min_gap or gap <= best_gap:
+            continue
+
+        then_year = min(years)
+        now_year = max(years)
+
+        # Best asset per year = largest face bounding box area for this person
+        then_entry = max(years_dict[then_year], key=lambda x: x[1])
+        now_entry = max(years_dict[now_year], key=lambda x: x[1])
+
+        then_asset_id, _, then_details = then_entry
+        now_asset_id, _, now_details = now_entry
+
+        then_faces = [p for p in then_details.get("people", []) if p.get("name") == pname]
+        now_faces = [p for p in now_details.get("people", []) if p.get("name") == pname]
+
+        best_gap = gap
+        best = {
+            "person_name": pname,
+            "then_year": then_year,
+            "now_year": now_year,
+            "gap": gap,
+            "then_asset_id": then_asset_id,
+            "now_asset_id": now_asset_id,
+            "then_faces": then_faces,
+            "now_faces": now_faces,
+        }
+
+    if best and logger:
+        logger.info(f"  Then & Now candidate: {best['person_name']} ({best['then_year']} → {best['now_year']}, {best['gap']} years)")
+    elif logger:
+        logger.debug("  No Then & Now candidate found (need same person in 2+ years with sufficient gap)")
+
+    return best
+
+
+def _load_font(size: int = 36):
+    """Load a TrueType font at the given size, falling back to Pillow's default."""
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]
+    for path in font_paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except (OSError, IOError):
+            continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def create_then_and_now_image(
+    then_bytes: bytes,
+    now_bytes: bytes,
+    then_faces: list,
+    now_faces: list,
+    then_year: int,
+    now_year: int,
+    width: int = 1080,
+    height: int = 540,
+    logger=None,
+) -> Optional[bytes]:
+    """
+    Compose a side-by-side Then & Now image from two photo thumbnails.
+    Left panel = then (oldest year), right panel = now (most recent year).
+    Face bounding boxes are used to center the crop on the person.
+    """
+    try:
+        panel_w = width // 2
+
+        then_img = Image.open(BytesIO(then_bytes)).convert("RGB")
+        now_img = Image.open(BytesIO(now_bytes)).convert("RGB")
+
+        then_panel = cover_crop_image(then_img, panel_w, height, faces=then_faces)
+        now_panel = cover_crop_image(now_img, panel_w, height, faces=now_faces)
+
+        canvas = Image.new("RGB", (width, height), (0, 0, 0))
+        canvas.paste(then_panel, (0, 0))
+        canvas.paste(now_panel, (panel_w, 0))
+
+        draw = ImageDraw.Draw(canvas, "RGBA")
+
+        # White divider line at center
+        draw.line([(panel_w - 2, 0), (panel_w - 2, height)], fill=(255, 255, 255, 220), width=4)
+
+        # Year labels — semi-transparent pill at bottom of each panel
+        font = _load_font(40)
+        padding = 10
+
+        for label, x_origin in [(str(then_year), 0), (str(now_year), panel_w)]:
+            bbox = draw.textbbox((0, 0), label, font=font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            lx = x_origin + 20
+            ly = height - th - 20 - padding * 2
+            draw.rectangle(
+                [lx - padding, ly - padding, lx + tw + padding, ly + th + padding],
+                fill=(0, 0, 0, 160),
+            )
+            draw.text((lx, ly), label, font=font, fill=(255, 255, 255, 255))
+
+        buf = BytesIO()
+        canvas.save(buf, format="JPEG", quality=90)
+        buf.seek(0)
+        return buf.getvalue()
+
+    except Exception as e:
+        if logger:
+            logger.error(f"Error creating Then & Now image: {e}")
+        return None
+
+
+def prepare_then_and_now_notification(
+    candidate: dict,
+    immich_url: str,
+    api_key: str,
+    messages: list,
+    test_mode: bool,
+    logger=None,
+) -> Optional[dict]:
+    """Fetch thumbnails, compose the split image, and build the notification dict."""
+    try:
+        then_bytes = fetch_thumbnail(immich_url, api_key, candidate["then_asset_id"], size="preview")
+        now_bytes = fetch_thumbnail(immich_url, api_key, candidate["now_asset_id"], size="preview")
+    except Exception as e:
+        if logger:
+            logger.warning(f"  Could not fetch Then & Now thumbnails: {e}")
+        return None
+
+    composite = create_then_and_now_image(
+        then_bytes=then_bytes,
+        now_bytes=now_bytes,
+        then_faces=candidate["then_faces"],
+        now_faces=candidate["now_faces"],
+        then_year=candidate["then_year"],
+        now_year=candidate["now_year"],
+        logger=logger,
+    )
+    if not composite:
+        return None
+
+    person_name = candidate["person_name"]
+    gap = candidate["gap"]
+    then_year = candidate["then_year"]
+    now_year = candidate["now_year"]
+
+    if messages:
+        template = random.choice(messages)
+        try:
+            message = template.format(person_name=person_name, then_year=then_year, now_year=now_year, gap=gap)
+        except KeyError:
+            message = f"{gap} years between these moments with {person_name}"
+    else:
+        message = f"{gap} years between these moments with {person_name}"
+
+    title = f"Then & Now — {person_name}"
+    if test_mode:
+        title = "[TEST] " + title
+
+    return {
+        "title": title,
+        "message": message,
+        "has_content": True,
+        "asset_id": None,  # composite replaces thumbnail; click URL built from now_asset_id
+        "click_url": f"https://my.immich.app/photos/{candidate['now_asset_id']}",
+        "is_then_and_now": True,
+        "is_video": False,
+        "composite_image": composite,
+    }
 
 
 COLLAGE_TEMPLATES = {
@@ -1799,8 +2065,13 @@ def send_single_notification(
     api_key = user["immich_api_key"]
 
     # Fetch thumbnail with retry
+    # If a thumbnail_override is provided and preferred (e.g. Then & Now composite), use it directly.
+    # Otherwise fetch from Immich and fall back to override on failure.
     thumbnail_data = None
-    if asset_id:
+    if thumbnail_override and not asset_id:
+        # No asset to fetch — use override directly (Then & Now, failed collage upload, etc.)
+        thumbnail_data = thumbnail_override
+    elif asset_id:
         try:
             thumbnail_data = with_retry(
                 lambda: fetch_thumbnail(immich_url, api_key, asset_id),
@@ -1811,21 +2082,22 @@ def send_single_notification(
             logger.debug(f"  [{name}] Thumbnail: {len(thumbnail_data):,} bytes")
         except Exception as e:
             logger.warning(f"  [{name}] Could not fetch thumbnail: {e}")
-            # Fall back to override if fetch failed
             if thumbnail_override:
                 thumbnail_data = thumbnail_override
                 logger.debug(f"  [{name}] Using fallback thumbnail: {len(thumbnail_data):,} bytes")
     elif thumbnail_override:
-        # No asset_id, use override directly
         thumbnail_data = thumbnail_override
 
     # Send notification with retry
     try:
-        # Deep link using my.immich.app for mobile app compatibility
-        if asset_id:
-            click_url = f"https://my.immich.app/photos/{asset_id}"
-        else:
-            click_url = "https://my.immich.app/"
+        # Use pre-built click_url from notification (e.g. Then & Now links to "now" photo)
+        # or build from asset_id
+        click_url = notification.get("click_url")
+        if not click_url:
+            if asset_id:
+                click_url = f"https://my.immich.app/photos/{asset_id}"
+            else:
+                click_url = "https://my.immich.app/"
         is_video = notification.get("is_video", False)
         success = with_retry(
             lambda: send_notification(
