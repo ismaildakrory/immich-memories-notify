@@ -4,7 +4,20 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 
 **⭐ NEW in v2.1:** Beautiful weekly collages with 12 template combinations! [Jump to Collage Feature →](#-weekly-collage-feature-v21)
 
-![Notification Example](https://via.placeholder.com/400x200?text=Memory+Notification+Preview)
+## Contents
+
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Web Dashboard](#web-dashboard)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Multi-User Setup](#multi-user-setup)
+- [Self-Hosting ntfy](#self-hosting-ntfy)
+- [Weekly Collage Feature](#-weekly-collage-feature-v21)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Contributing](#contributing)
 
 ## Features
 
@@ -432,7 +445,7 @@ attachment-expiry-duration: 3h
 
 Create a user and grant read-write access:
 ```bash
-ntfy user add --password <password> <username>
+ntfy user add <username>          # prompts for password
 ntfy access <username> '*' read-write
 ```
 
