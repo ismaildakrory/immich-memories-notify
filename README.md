@@ -39,7 +39,12 @@ Get daily push notifications when you have photo memories in [Immich](https://im
 - **Self-Hosted** - Works with your self-hosted Immich and ntfy instances
 - **Docker Ready** - Easy deployment with Docker Compose
 - **Privacy First** - Your photos never leave your network
-- **Weekly Collages (NEW v2.1)** - Beautiful collages with 12 professional template combinations
+- **Then & Now (NEW v2.2)** - Side-by-side comparison of the same person across years
+- **Trip Highlights (NEW v2.2)** - Collage from a past trip to the same city, same month
+  - Fuzzy home city matching (handles EXIF transliteration variants)
+  - 5-day date clustering (only groups photos taken close together)
+  - City picker from Immich photo EXIF data
+- **Weekly Collages (v2.1)** - Beautiful collages with 12 professional template combinations
   - 4 templates: Grid, Mosaic, Polaroid, Strip
   - 3 unique overlays per template
   - Face-based smart cropping
@@ -121,7 +126,7 @@ settings:
   weekly_collage_day: 4              # Thursday (0=Sunday, 6=Saturday)
   weekly_collage_slots: 2            # Number of slots for collages
   collage_person_limit: 7            # Max people in collage (for mosaic)
-  collage_year_range: 20             # Look back 20 years
+  year_range: 20                     # Look back 20 years (used by collage, trip highlights, then & now)
   collage_template: random           # or: grid_custom, mosaic_custom, polaroid_custom, strip_custom
   collage_album_name: Weekly Highlights
 ```
@@ -232,6 +237,9 @@ Access the dashboard at `http://localhost:5000` to manage your setup through a b
 <img width="1257" height="1115" alt="Messages" src="https://github.com/user-attachments/assets/94df34a8-17d9-47c3-a865-ea3286fd5516" />
 <img width="1242" height="1196" alt="Secrets" src="https://github.com/user-attachments/assets/732ace52-0ea0-4ab7-bb42-82c543beaae2" />
 <img width="1250" height="1115" alt="Test" src="https://github.com/user-attachments/assets/2ea0e52e-4854-4268-8b79-a14905428e71" />
+<img alt="Then &amp; Now and Trip Highlights settings" src="screenshots/TaN.png" />
+<img alt="Home City picker from Immich EXIF data" src="screenshots/City.png" />
+
 ### Authentication
 
 Set `DASHBOARD_TOKEN` in `.env` to enable authentication:

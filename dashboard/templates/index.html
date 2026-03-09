@@ -864,6 +864,10 @@
                         <label>Min Group Size</label>
                         <input type="number" id="min_group_size" min="2" max="10">
                     </div>
+                    <div class="form-group">
+                        <label>Year Range</label>
+                        <input type="number" id="year_range" min="1" max="30" value="5">
+                    </div>
                 </div>
 
                 <h3>Feature Toggles</h3>
@@ -928,10 +932,6 @@
                         <input type="number" id="collage_person_limit" min="1" max="10" value="5">
                     </div>
                     <div class="form-group">
-                        <label>Year Range</label>
-                        <input type="number" id="collage_year_range" min="1" max="10" value="5">
-                    </div>
-                    <div class="form-group">
                         <label>Album Name</label>
                         <input type="text" id="collage_album_name" value="Weekly Highlights">
                     </div>
@@ -951,6 +951,44 @@
                     <h3>Collage Preview</h3>
                     <div id="collage-preview" style="background: #2a3f5f; padding: 20px; border-radius: 8px; text-align: center;">
                         <p style="color: #8899a6;">Collage preview will appear here</p>
+                    </div>
+                </div>
+
+                <h3>Then &amp; Now Settings</h3>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Enabled</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="then_and_now_enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency (days)</label>
+                        <input type="number" id="then_and_now_cooldown_days" min="1" value="7">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Year Gap</label>
+                        <input type="number" id="then_and_now_min_gap" min="1" value="3">
+                    </div>
+                </div>
+
+                <h3>Trip Highlights Settings</h3>
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label>Enabled</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="trip_highlights_enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency (days)</label>
+                        <input type="number" id="trip_highlights_cooldown_days" min="1" value="7">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Photos</label>
+                        <input type="number" id="trip_highlights_min_photos" min="1" value="5">
                     </div>
                 </div>
 
@@ -1192,6 +1230,21 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <div style="position: relative; margin-top: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">Home City:</label>
+                                <input type="text" placeholder="Select from photos or type manually"
+                                    id="home-city-input-${user.name.replace(/\s+/g,'-')}"
+                                    value="${user.home_city || ''}"
+                                    style="flex: 1; padding: 3px 7px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text);"
+                                    onchange="setHomeCity('${user.name}', this.value)"
+                                    onkeydown="if(event.key==='Enter'){this.blur();}">
+                                <button class="secondary" style="padding: 3px 8px; font-size: 0.75rem; white-space: nowrap;"
+                                    onclick="toggleCityDropdown('${user.name}', this)">&#9660;</button>
+                                <span id="home-city-saved-${user.name.replace(/\s+/g,'-')}" style="font-size: 0.75rem; color: #4caf50; display: none;">&#10003;</span>
+                            </div>
+                            <div id="city-dropdown-${user.name.replace(/\s+/g,'-')}" class="city-dropdown" style="display:none; position:absolute; left:70px; right:40px; top:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg-secondary); border:1px solid var(--border); border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
+                        </div>
                         <div class="btn-group" style="justify-content: flex-end;">
                             <button class="secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="renameUser('${user.name}')">Rename</button>
                             <button class="danger" style="padding: 4px 10px; font-size: 0.8rem;" onclick="deleteUser('${user.name}')">Delete</button>
@@ -1213,16 +1266,25 @@
                 document.getElementById('include_album').checked = data.settings.include_album;
                 document.getElementById('video_emoji').checked = data.settings.video_emoji;
                 document.getElementById('prefer_group_photos').checked = data.settings.prefer_group_photos;
+                document.getElementById('year_range').value = data.settings.year_range;
 
                 // Collage settings
                 document.getElementById('weekly_collage_enabled').checked = data.settings.weekly_collage_enabled;
                 document.getElementById('weekly_collage_day').value = data.settings.weekly_collage_day;
                 document.getElementById('weekly_collage_slots').value = data.settings.weekly_collage_slots;
                 document.getElementById('collage_person_limit').value = data.settings.collage_person_limit;
-                document.getElementById('collage_year_range').value = data.settings.collage_year_range;
                 document.getElementById('collage_album_name').value = data.settings.collage_album_name;
                 document.getElementById('collage_template').value = data.settings.collage_template || 'grid';
                 updateCollagePreview();
+
+                // Then & Now settings
+                document.getElementById('then_and_now_enabled').checked = data.settings.then_and_now_enabled;
+                document.getElementById('then_and_now_cooldown_days').value = data.settings.then_and_now_cooldown_days;
+                document.getElementById('then_and_now_min_gap').value = data.settings.then_and_now_min_gap;
+                // Trip Highlights settings
+                document.getElementById('trip_highlights_enabled').checked = data.settings.trip_highlights_enabled;
+                document.getElementById('trip_highlights_cooldown_days').value = data.settings.trip_highlights_cooldown_days;
+                document.getElementById('trip_highlights_min_photos').value = data.settings.trip_highlights_min_photos;
 
                 // Messages
                 document.getElementById('messages').value = data.messages.join('\n');
@@ -1314,9 +1376,15 @@
                 weekly_collage_day: parseInt(document.getElementById('weekly_collage_day').value),
                 weekly_collage_slots: parseInt(document.getElementById('weekly_collage_slots').value),
                 collage_person_limit: parseInt(document.getElementById('collage_person_limit').value),
-                collage_year_range: parseInt(document.getElementById('collage_year_range').value),
+                year_range: parseInt(document.getElementById('year_range').value),
                 collage_album_name: document.getElementById('collage_album_name').value,
                 collage_template: document.getElementById('collage_template').value,
+                then_and_now_enabled: document.getElementById('then_and_now_enabled').checked,
+                then_and_now_cooldown_days: parseInt(document.getElementById('then_and_now_cooldown_days').value),
+                then_and_now_min_gap: parseInt(document.getElementById('then_and_now_min_gap').value),
+                trip_highlights_enabled: document.getElementById('trip_highlights_enabled').checked,
+                trip_highlights_cooldown_days: parseInt(document.getElementById('trip_highlights_cooldown_days').value),
+                trip_highlights_min_photos: parseInt(document.getElementById('trip_highlights_min_photos').value),
             };
 
             try {
@@ -1396,6 +1464,78 @@
                 showAlert('settings-alert', e.message, 'error');
             }
         }
+
+        async function setHomeCity(userName, city) {
+            try {
+                await api(`/settings/users/${encodeURIComponent(userName)}/home_city`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ home_city: city }),
+                });
+                const indicator = document.getElementById(`home-city-saved-${userName.replace(/\s+/g, '-')}`);
+                if (indicator) {
+                    indicator.style.display = 'inline';
+                    setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+                }
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
+            }
+        }
+
+        const _citiesCache = {};
+
+        async function toggleCityDropdown(userName, btn) {
+            const slug = userName.replace(/\s+/g, '-');
+            const dropdown = document.getElementById(`city-dropdown-${slug}`);
+            if (!dropdown) return;
+
+            // Toggle off if already open
+            if (dropdown.style.display !== 'none') {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            // Close any other open dropdowns
+            document.querySelectorAll('.city-dropdown').forEach(d => d.style.display = 'none');
+
+            btn.disabled = true;
+            btn.textContent = '...';
+            try {
+                if (!_citiesCache[userName]) {
+                    const data = await api(`/settings/users/${encodeURIComponent(userName)}/cities`);
+                    _citiesCache[userName] = data.cities;
+                }
+                dropdown.innerHTML = _citiesCache[userName].map(c =>
+                    `<div style="padding:5px 10px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid var(--border);"
+                          onmouseover="this.style.background='var(--accent)'; this.style.color='white';"
+                          onmouseout="this.style.background=''; this.style.color='';"
+                          onclick="selectCity('${userName}', this.textContent)">${c}</div>`
+                ).join('');
+                dropdown.style.display = 'block';
+            } catch (e) {
+                showAlert('settings-alert', `Failed to load cities: ${e.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '&#9660;';
+            }
+        }
+
+        function selectCity(userName, city) {
+            const slug = userName.replace(/\s+/g, '-');
+            const input = document.getElementById(`home-city-input-${slug}`);
+            const dropdown = document.getElementById(`city-dropdown-${slug}`);
+            if (input) {
+                input.value = city;
+                setHomeCity(userName, city);
+            }
+            if (dropdown) dropdown.style.display = 'none';
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.city-dropdown') && !e.target.closest('button')) {
+                document.querySelectorAll('.city-dropdown').forEach(d => d.style.display = 'none');
+            }
+        });
 
         async function deleteUser(name) {
             if (!confirm(`Are you sure you want to delete user '${name}'?`)) return;
@@ -1954,7 +2094,7 @@
             const enabled = document.getElementById('weekly_collage_enabled').checked;
             const template = document.getElementById('collage_template')?.value || 'grid';
             const people = document.getElementById('collage_person_limit')?.value || '5';
-            const years = document.getElementById('collage_year_range')?.value || '5';
+            const years = document.getElementById('year_range')?.value || '5';
             const album = document.getElementById('collage_album_name')?.value || 'Weekly Highlights';
             const daySelect = document.getElementById('weekly_collage_day');
             const dayName = daySelect?.options[daySelect.selectedIndex]?.text || 'Saturday';
@@ -1989,7 +2129,7 @@
                 'weekly_collage_day',
                 'weekly_collage_slots',
                 'collage_person_limit',
-                'collage_year_range',
+                'year_range',
                 'collage_album_name',
                 'collage_template'
             ];

@@ -1,9 +1,12 @@
 """Settings management API endpoints."""
 
 import json
+import os
+import re
 from pathlib import Path
 from typing import List
 
+import requests as http_requests
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -77,9 +80,16 @@ async def get_settings(request: Request):
         weekly_collage_day=settings_data.get("weekly_collage_day", 6),
         weekly_collage_slots=settings_data.get("weekly_collage_slots", 1),
         collage_person_limit=settings_data.get("collage_person_limit", 5),
-        collage_year_range=settings_data.get("collage_year_range", 5),
+        year_range=settings_data.get("year_range",
+                   settings_data.get("collage_year_range", 5)),
         collage_template=settings_data.get("collage_template", "grid"),
         collage_album_name=settings_data.get("collage_album_name", "Weekly Highlights"),
+        then_and_now_enabled=settings_data.get("then_and_now_enabled", True),
+        then_and_now_cooldown_days=settings_data.get("then_and_now_cooldown_days", 7),
+        then_and_now_min_gap=settings_data.get("then_and_now_min_gap", 3),
+        trip_highlights_enabled=settings_data.get("trip_highlights_enabled", True),
+        trip_highlights_cooldown_days=settings_data.get("trip_highlights_cooldown_days", 7),
+        trip_highlights_min_photos=settings_data.get("trip_highlights_min_photos", 5),
     )
 
     # Redact sensitive user info
@@ -88,6 +98,7 @@ async def get_settings(request: Request):
             name=u.get("name", ""),
             ntfy_topic=u.get("ntfy_topic", ""),
             enabled=u.get("enabled", True),
+            home_city=u.get("home_city", ""),
         )
         for u in config.get("users", [])
     ]
@@ -216,6 +227,7 @@ async def get_users(request: Request):
             name=u.get("name", ""),
             ntfy_topic=u.get("ntfy_topic", ""),
             enabled=u.get("enabled", True),
+            home_city=u.get("home_city", ""),
         )
         for u in config.get("users", [])
     ]
@@ -321,6 +333,85 @@ async def delete_user(request: Request, name: str):
     save_config(config_path, config)
 
     return {"message": f"User '{name}' deleted"}
+
+
+@router.put("/users/{name}/home_city")
+async def set_user_home_city(request: Request, name: str, body: dict):
+    """Set the home city for a user (used to exclude local photos from Trip Highlights)."""
+    config_path = get_config_path(request)
+
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    users = config.get("users", [])
+    user_found = False
+
+    for user in users:
+        if user.get("name") == name:
+            user["home_city"] = body.get("home_city", "")
+            user_found = True
+            break
+
+    if not user_found:
+        raise HTTPException(status_code=404, detail=f"User '{name}' not found")
+
+    save_config(config_path, config)
+    return {"message": f"User '{name}' home_city updated"}
+
+
+def _resolve_user_api_key(user: dict) -> str:
+    """Resolve a user's Immich API key from env var reference."""
+    from .secrets import load_env_file, ENV_PATH
+    ref = user.get("immich_api_key", "")
+    match = re.match(r'\$\{(\w+)\}', ref)
+    if match:
+        env_vars = load_env_file(ENV_PATH)
+        return env_vars.get(match.group(1), "")
+    return ref
+
+
+@router.get("/users/{name}/cities")
+async def get_user_cities(request: Request, name: str):
+    """Fetch unique cities from a user's photos in Immich."""
+    config_path = get_config_path(request)
+
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    user = next((u for u in config.get("users", []) if u.get("name") == name), None)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{name}' not found")
+
+    api_key = _resolve_user_api_key(user)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="User has no API key configured")
+
+    immich_url = os.environ.get("IMMICH_URL", "").rstrip("/")
+    if not immich_url:
+        raise HTTPException(status_code=400, detail="IMMICH_URL not configured")
+
+    cities = set()
+    try:
+        headers = {"Accept": "application/json", "x-api-key": api_key}
+        resp = http_requests.get(
+            f"{immich_url}/api/search/cities",
+            headers=headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        for asset in resp.json():
+            exif = asset.get("exifInfo") or {}
+            city = (exif.get("city") or "").strip()
+            if city:
+                cities.add(city)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch from Immich: {e}")
+
+    return {"cities": sorted(cities)}
 
 
 @router.put("/users/{name}/rename")
