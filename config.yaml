@@ -25,9 +25,16 @@ settings:
   weekly_collage_day: 6
   weekly_collage_slots: 2
   collage_person_limit: 5
-  collage_year_range: 20
+  year_range: 20
   collage_template: random
   collage_album_name: Weekly Highlights
+  then_and_now_enabled: true
+  then_and_now_min_gap: 3
+  then_and_now_slot: 0
+  then_and_now_cooldown_days: 7
+  trip_highlights_enabled: true
+  trip_highlights_cooldown_days: 7
+  trip_highlights_min_photos: 5
   notification_windows:
   - start: 08:00
     end: 09:00
@@ -70,3 +77,15 @@ video_person_messages:
 - A video featuring {person_name}
 - Press play on this memory with {person_name}
 - Relive this moment with {person_name}
+then_and_now_messages:
+- Look how much {person_name} has changed! {then_year} vs {now_year}
+- '{gap} years between these moments with {person_name}'
+- Then and now — {person_name}, {gap} years apart
+- Time flies... {person_name} in {then_year} and {now_year}
+- From {then_year} to {now_year} with {person_name}
+trip_highlights_messages:
+- '{gap} years ago in {city}, {country}! \U0001f30d'
+- Remember this trip to {city}? Back in {year}!
+- '{city}, {country} — {gap} years have passed'
+- Flashback to {city}, {year} \u2708\ufe0f
+- What a trip! {city}, {country} — {year}

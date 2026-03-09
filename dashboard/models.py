@@ -29,14 +29,20 @@ class Settings(BaseModel):
     video_emoji: bool = True
     prefer_group_photos: bool = True
     min_group_size: int = 2
+    year_range: int = 5
     notification_windows: List[NotificationWindow] = Field(default_factory=list)
     weekly_collage_enabled: bool = False
     weekly_collage_day: int = 6  # Saturday (0=Sunday, 6=Saturday)
     weekly_collage_slots: int = 1
     collage_person_limit: int = 5
-    collage_year_range: int = 5
     collage_template: str = "grid"
     collage_album_name: str = "Weekly Highlights"
+    then_and_now_enabled: bool = True
+    then_and_now_cooldown_days: int = 7
+    then_and_now_min_gap: int = 3
+    trip_highlights_enabled: bool = True
+    trip_highlights_cooldown_days: int = 7
+    trip_highlights_min_photos: int = 5
 
 
 class UserInfo(BaseModel):
@@ -44,6 +50,7 @@ class UserInfo(BaseModel):
     name: str
     ntfy_topic: str
     enabled: bool = True
+    home_city: str = ""
 
 
 class FullConfig(BaseModel):
@@ -80,13 +87,19 @@ class SettingsUpdate(BaseModel):
     video_emoji: Optional[bool] = None
     prefer_group_photos: Optional[bool] = None
     min_group_size: Optional[int] = None
+    year_range: Optional[int] = None
     weekly_collage_enabled: Optional[bool] = None
     weekly_collage_day: Optional[int] = None
     weekly_collage_slots: Optional[int] = None
     collage_person_limit: Optional[int] = None
-    collage_year_range: Optional[int] = None
     collage_template: Optional[str] = None
     collage_album_name: Optional[str] = None
+    then_and_now_enabled: Optional[bool] = None
+    then_and_now_cooldown_days: Optional[int] = None
+    then_and_now_min_gap: Optional[int] = None
+    trip_highlights_enabled: Optional[bool] = None
+    trip_highlights_cooldown_days: Optional[int] = None
+    trip_highlights_min_photos: Optional[int] = None
 
 
 class UserEnabledUpdate(BaseModel):

@@ -105,6 +105,16 @@ def load_config(config_path: str = "config.yaml") -> dict:
     settings.setdefault("retry", {"max_attempts": 3, "delay_seconds": 5})
     settings.setdefault("state_file", "state/state.json")
     settings.setdefault("log_level", "INFO")
+    settings.setdefault("then_and_now_enabled", True)
+    settings.setdefault("then_and_now_min_gap", 3)
+    settings.setdefault("then_and_now_slot", 0)  # 0 = auto (last memory slot)
+    settings.setdefault("trip_highlights_enabled", True)
+    settings.setdefault("then_and_now_cooldown_days", 7)
+    settings.setdefault("trip_highlights_cooldown_days", 7)
+    # Migrate old collage_year_range → year_range
+    if "collage_year_range" in settings and "year_range" not in settings:
+        settings["year_range"] = settings.pop("collage_year_range")
+    settings.setdefault("year_range", 5)
 
     return config
 
@@ -204,6 +214,28 @@ def get_assets_sent_today(state: dict, user_name: str, target_date: date) -> set
     if user_state.get("slots_date") != date_str:
         return set()
     return set(user_state.get("assets_sent_today", []))
+
+
+def is_feature_ready(state: dict, user_name: str, feature_key: str, cooldown_days: int, target_date: date) -> bool:
+    """Check if enough days have passed since last fire of a feature."""
+    user_state = state.get("users", {}).get(user_name, {})
+    last_date_str = user_state.get(feature_key)
+    if not last_date_str:
+        return True
+    try:
+        last_date = date.fromisoformat(last_date_str)
+        return (target_date - last_date).days >= cooldown_days
+    except ValueError:
+        return True
+
+
+def mark_feature_fired(state: dict, user_name: str, feature_key: str, target_date: date):
+    """Record that a feature fired today."""
+    if "users" not in state:
+        state["users"] = {}
+    if user_name not in state["users"]:
+        state["users"][user_name] = {}
+    state["users"][user_name][feature_key] = target_date.isoformat()
 
 
 # =============================================================================
@@ -794,7 +826,7 @@ def send_notification(
         encoded_title = f"=?UTF-8?B?{base64.b64encode(title.encode('utf-8')).decode('ascii')}?="
 
     headers = {
-        "Title": title,
+        "Title": encoded_title,
         "Tags": tags,
         "Priority": "default",
     }
@@ -940,20 +972,125 @@ def process_user_slot(
         total_slots = memory_notifications + person_notifications
 
         if slot <= memory_notifications:
-            # Send a memory notification
-            notification = prepare_memory_notification(
-                parsed=parsed,
-                slot=slot,
-                assets_sent=assets_sent,
-                top_person_ids=top_person_ids,
-                immich_url=immich_url,
-                api_key=api_key,
-                messages=messages,
-                test_mode=test_mode,
-                logger=logger,
-                settings=settings,
-                video_messages=video_messages,
+            # Check if this is the special slot for Then & Now / Trip Highlights
+            tan_enabled = settings.get("then_and_now_enabled", True)
+            trip_enabled = settings.get("trip_highlights_enabled", True)
+            tan_slot_cfg = settings.get("then_and_now_slot", 0)
+            tan_min_gap = settings.get("then_and_now_min_gap", 3)
+            tan_messages = config.get("then_and_now_messages", [])
+            trip_messages = config.get("trip_highlights_messages", [])
+            home_city = user.get("home_city", "")
+            trip_min_photos = settings.get("trip_highlights_min_photos", 5)
+            year_range = settings.get("year_range", 5)
+
+            is_special_slot = (tan_enabled or trip_enabled) and (
+                tan_slot_cfg == slot or (tan_slot_cfg == 0 and slot == memory_notifications)
             )
+
+            if is_special_slot:
+                tan_cooldown = settings.get("then_and_now_cooldown_days", 7)
+                trip_cooldown = settings.get("trip_highlights_cooldown_days", 7)
+                tan_ready = tan_enabled and (test_mode or is_feature_ready(state, name, "last_tan_date", tan_cooldown, target_date))
+                trip_ready = trip_enabled and (test_mode or is_feature_ready(state, name, "last_trip_date", trip_cooldown, target_date))
+
+                if tan_ready:
+                    days_info = "never" if not state.get("users", {}).get(name, {}).get("last_tan_date") else f"{state['users'][name]['last_tan_date']}"
+                    logger.info(f"  [{name}] Then & Now ready (last: {days_info}, cooldown: {tan_cooldown} days)")
+                else:
+                    last = state.get("users", {}).get(name, {}).get("last_tan_date", "?")
+                    days_ago = (target_date - date.fromisoformat(last)).days if last != "?" else "?"
+                    logger.info(f"  [{name}] Then & Now on cooldown (last: {last}, {days_ago} days ago)")
+
+                if trip_ready:
+                    days_info = "never" if not state.get("users", {}).get(name, {}).get("last_trip_date") else f"{state['users'][name]['last_trip_date']}"
+                    logger.info(f"  [{name}] Trip Highlights ready (last: {days_info}, cooldown: {trip_cooldown} days)")
+                else:
+                    last = state.get("users", {}).get(name, {}).get("last_trip_date", "?")
+                    days_ago = (target_date - date.fromisoformat(last)).days if last != "?" else "?"
+                    logger.info(f"  [{name}] Trip Highlights on cooldown (last: {last}, {days_ago} days ago)")
+
+                # Priority: Trip first, TaN fallback (when both ready)
+                if trip_ready:
+                    try:
+                        trip = find_trip_candidate(
+                            immich_url=immich_url,
+                            api_key=api_key,
+                            target_date=target_date,
+                            home_city=home_city,
+                            min_photos=trip_min_photos,
+                            year_range=year_range,
+                            logger=logger,
+                        )
+                        if trip:
+                            notification = prepare_trip_notification(
+                                trip=trip,
+                                immich_url=immich_url,
+                                api_key=api_key,
+                                messages=trip_messages,
+                                test_mode=test_mode,
+                                logger=logger,
+                            )
+                            if notification:
+                                logger.info(f"  [{name}] Sending Trip Highlights "
+                                            f"({trip['city']}, {trip['year']})")
+                                if not test_mode:
+                                    mark_feature_fired(state, name, "last_trip_date", target_date)
+                    except Exception as e:
+                        logger.warning(f"  [{name}] Trip Highlights failed: {e}")
+
+                if not notification and tan_ready:
+                    try:
+                        used_persons = state.get("users", {}).get(name, {}).get("tan_persons_used", [])
+                        candidate = find_then_and_now_candidate(
+                            immich_url=immich_url,
+                            api_key=api_key,
+                            top_persons=top_persons,
+                            target_date=target_date,
+                            min_gap=tan_min_gap,
+                            year_range=year_range,
+                            logger=logger,
+                            used_person_ids=used_persons,
+                        )
+                        if candidate:
+                            notification = prepare_then_and_now_notification(
+                                candidate=candidate,
+                                immich_url=immich_url,
+                                api_key=api_key,
+                                messages=tan_messages,
+                                test_mode=test_mode,
+                                logger=logger,
+                            )
+                            if notification:
+                                logger.info(f"  [{name}] Sending Then & Now ({candidate['then_year']} → {candidate['now_year']})")
+                                if not test_mode:
+                                    mark_feature_fired(state, name, "last_tan_date", target_date)
+                                    # Track person freshness
+                                    user_state = state.setdefault("users", {}).setdefault(name, {})
+                                    used = user_state.setdefault("tan_persons_used", [])
+                                    person_id = candidate.get("person_id", "")
+                                    if person_id:
+                                        used.append(person_id)
+                                    # Reset if all top persons used
+                                    if len(used) >= len(top_persons):
+                                        user_state["tan_persons_used"] = []
+                    except Exception as e:
+                        logger.warning(f"  [{name}] Then & Now lookup failed: {e}")
+
+            if not notification:
+                # Normal memory notification (fallback or non-special slot)
+                notification = prepare_memory_notification(
+                    parsed=parsed,
+                    slot=slot,
+                    assets_sent=assets_sent,
+                    top_person_ids=top_person_ids,
+                    immich_url=immich_url,
+                    api_key=api_key,
+                    messages=messages,
+                    test_mode=test_mode,
+                    logger=logger,
+                    settings=settings,
+                    video_messages=video_messages,
+                )
         elif slot <= total_slots:
             # Send a person photo notification
             notification = prepare_person_notification(
@@ -1006,12 +1143,19 @@ def process_user_slot(
         return result
 
     # Send the notification
+    # For Then & Now, pass composite image as thumbnail (no Immich asset to fetch)
+    thumbnail_override = (
+        notification.get("composite_image") if notification.get("is_then_and_now")
+        else notification.get("collage_data") if notification.get("is_trip")
+        else None
+    )
     success = send_single_notification(
         user=user,
         notification=notification,
         config=config,
         ntfy_auth=ntfy_auth,
         logger=logger,
+        thumbnail_override=thumbnail_override,
     )
 
     if success:
@@ -1351,6 +1495,528 @@ def cover_crop_image(img: Image.Image, target_w: int, target_h: int, faces: list
     return cropped
 
 
+
+
+# =============================================================================
+# Trip Highlights Feature
+# =============================================================================
+
+def fetch_month_assets(immich_url: str, api_key: str, year: int, month: int, timeout: int = 30, size: int = 500) -> list:
+    """Fetch IMAGE assets for a specific year+month using the search API."""
+    import calendar
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    last_day = calendar.monthrange(year, month)[1]
+    payload = {
+        "takenAfter":  f"{year}-{month:02d}-01T00:00:00.000Z",
+        "takenBefore": f"{year}-{month:02d}-{last_day:02d}T23:59:59.999Z",
+        "type": "IMAGE",
+        "size": size,
+    }
+    response = requests.post(
+        f"{immich_url}/api/search/metadata",
+        headers=headers,
+        json=payload,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    assets = data.get("assets", [])
+    return assets.get("items", []) if isinstance(assets, dict) else assets
+
+
+def _normalize_city(name: str) -> str:
+    """Normalize city name: lowercase, strip diacritics, collapse whitespace."""
+    import unicodedata
+    nfkd = unicodedata.normalize("NFKD", name.lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).strip()
+
+
+def _is_home_city(city: str, home_city: str) -> bool:
+    """Check if city matches home_city using containment + fuzzy matching."""
+    if not home_city:
+        return False
+    c = _normalize_city(city)
+    h = _normalize_city(home_city)
+    # Containment: "al fintas" contains "fintas", or "fintas" contains "fintas"
+    if h in c or c in h:
+        return True
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, c, h).ratio() >= 0.8
+
+
+def _cluster_trip_dates(assets_with_dates: list, max_gap_days: int = 5) -> list:
+    """
+    Given [(asset_id, date), ...] sorted by date, find the largest cluster
+    where consecutive photos are within max_gap_days of each other.
+    Returns list of asset_ids from the best cluster.
+    """
+    if not assets_with_dates:
+        return []
+    assets_with_dates.sort(key=lambda x: x[1])
+
+    clusters = []
+    current = [assets_with_dates[0]]
+    for i in range(1, len(assets_with_dates)):
+        prev_date = current[-1][1]
+        curr_date = assets_with_dates[i][1]
+        if (curr_date - prev_date).days <= max_gap_days:
+            current.append(assets_with_dates[i])
+        else:
+            clusters.append(current)
+            current = [assets_with_dates[i]]
+    clusters.append(current)
+
+    best = max(clusters, key=len)
+    return [aid for aid, _ in best]
+
+
+def find_trip_candidate(
+    immich_url: str,
+    api_key: str,
+    target_date: date,
+    home_city: str = "",
+    min_photos: int = 5,
+    year_range: int = 5,
+    logger=None,
+) -> Optional[dict]:
+    """
+    Scan past years (limited by year_range) for the same calendar month.
+    Groups IMAGE assets by (city, country, year) using exifInfo.
+    Photos must be taken within 5 days of each other to count as a trip.
+    Returns the group with the most photos that meets the minimum threshold.
+    """
+    target_month = target_date.month
+    current_year = target_date.year
+    # (city, country, year) -> [(asset_id, date), ...]
+    city_year_assets = {}
+
+    for year in range(current_year - 1, current_year - year_range - 1, -1):
+        try:
+            assets = fetch_month_assets(immich_url, api_key, year, target_month)
+            for asset in assets:
+                exif = asset.get("exifInfo") or {}
+                city = (exif.get("city") or "").strip()
+                country = (exif.get("country") or "").strip()
+                if not city:
+                    continue
+                if _is_home_city(city, home_city):
+                    continue
+                # Extract date for clustering
+                raw_date = asset.get("localDateTime") or asset.get("fileCreatedAt") or asset.get("createdAt")
+                try:
+                    asset_date = datetime.fromisoformat(raw_date.replace("Z", "+00:00")).date()
+                except (ValueError, TypeError):
+                    asset_date = date(year, target_month, 1)
+                key = (city, country, year)
+                city_year_assets.setdefault(key, []).append((asset["id"], asset_date))
+        except Exception as e:
+            if logger:
+                logger.debug(f"  Trip search {year}-{target_month:02d}: {e}")
+
+    # Cluster each group by date proximity, then pick best
+    best = None
+    best_count = 0
+    for (city, country, year), assets_dates in city_year_assets.items():
+        cluster_ids = _cluster_trip_dates(assets_dates, max_gap_days=5)
+        if len(cluster_ids) < min_photos:
+            continue
+        if len(cluster_ids) > best_count or (len(cluster_ids) == best_count and best and year < best["year"]):
+            best_count = len(cluster_ids)
+            best = {"city": city, "country": country, "year": year,
+                    "gap": current_year - year, "asset_ids": cluster_ids}
+
+    if best and logger:
+        logger.info(f"  Trip candidate: {best['city']}, {best['country']} "
+                    f"({best['year']}, {best_count} photos)")
+    elif logger:
+        logger.debug(f"  No trip candidate (need {min_photos}+ photos in same city within 5 days, past {year_range} years)")
+    return best
+
+
+def prepare_trip_notification(
+    trip: dict,
+    immich_url: str,
+    api_key: str,
+    messages: list,
+    test_mode: bool,
+    logger=None,
+) -> Optional[dict]:
+    """
+    Build a collage from up to 4 trip photos, upload to a per-trip album, and
+    return a notification dict that deep-links to a random original photo.
+    """
+    _logger = logger or logging.getLogger()
+    city = trip["city"]
+    country = trip["country"]
+    year = trip["year"]
+    gap = trip["gap"]
+    asset_ids = trip["asset_ids"]
+
+    selected_ids = asset_ids[:4]
+
+    # Fetch thumbnails for collage
+    thumbnails = []
+    valid_ids = []
+    for aid in selected_ids:
+        try:
+            data = fetch_thumbnail(immich_url, api_key, aid, size="preview")
+            thumbnails.append(data)
+            valid_ids.append(aid)
+        except Exception as e:
+            _logger.debug(f"  Could not fetch thumbnail for {aid}: {e}")
+
+    if not thumbnails:
+        _logger.warning("  No thumbnails fetched for Trip Highlights collage")
+        return None
+
+    # Build collage — use first available custom template or a simple grid
+    from PIL import Image as PILImage
+    from io import BytesIO as _BytesIO
+
+    def _simple_grid(images, names, w, h, faces=None):
+        """Simple 2×2 (or fewer) grid collage."""
+        n = len(images)
+        cols = min(n, 2)
+        rows = (n + cols - 1) // cols
+        cell_w = w // cols
+        cell_h = h // rows
+        canvas = PILImage.new("RGB", (w, h), (30, 30, 30))
+        for i, img in enumerate(images):
+            col = i % cols
+            row = i // cols
+            img_resized = img.resize((cell_w, cell_h), PILImage.LANCZOS)
+            canvas.paste(img_resized, (col * cell_w, row * cell_h))
+        return canvas
+
+    try:
+        pil_images = [PILImage.open(_BytesIO(d)).convert("RGB") for d in thumbnails]
+        canvas = _simple_grid(pil_images, [], 1080, 1080)
+        buf = _BytesIO()
+        canvas.save(buf, format="JPEG", quality=95)
+        collage = buf.getvalue()
+    except Exception as e:
+        _logger.warning(f"  Could not create Trip Highlights collage: {e}")
+        return None
+
+    # Build message
+    if messages:
+        template = random.choice(messages)
+        try:
+            message = template.format(city=city, country=country, year=year, gap=gap)
+        except KeyError:
+            message = f"{gap} years ago in {city}, {country}!"
+    else:
+        message = f"{gap} years ago in {city}, {country}!"
+
+    title = f"Trip to {city} \U0001f30d"
+    if test_mode:
+        title = "[TEST] " + title
+
+    # Create/find per-trip album and add original photos
+    album_name = f"Trip to {city}, {country} ({year})"
+    uploaded_asset_id = None
+    try:
+        album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
+        if album_id:
+            # Add original photos to album
+            headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
+            requests.put(
+                f"{immich_url}/api/albums/{album_id}/assets",
+                headers=headers,
+                json={"ids": valid_ids},
+                timeout=30,
+            )
+            # Upload collage to album
+            uploaded_asset_id = upload_collage_to_album(immich_url, api_key, collage, album_id, _logger)
+    except Exception as e:
+        _logger.warning(f"  Could not upload Trip Highlights to album: {e}")
+
+    click_asset = random.choice(valid_ids)
+
+    return {
+        "title": title,
+        "message": message,
+        "has_content": True,
+        "asset_id": uploaded_asset_id,
+        "click_url": f"https://my.immich.app/photos/{click_asset}",
+        "is_trip": True,
+        "is_video": False,
+        "collage_data": collage,
+    }
+
+
+# =============================================================================
+# Then & Now Feature
+# =============================================================================
+
+def find_then_and_now_candidate(
+    immich_url: str,
+    api_key: str,
+    top_persons: list,
+    target_date,
+    min_gap: int = 3,
+    year_range: int = 5,
+    logger=None,
+    used_person_ids: list = None,
+) -> Optional[dict]:
+    """
+    Search top persons for the same person appearing in the same calendar month
+    across multiple years with at least min_gap years between them.
+    Only considers years within year_range of current year.
+    Prefers persons not recently used (freshness), then largest year gap.
+    Returns the best candidate or None.
+    """
+    from collections import defaultdict
+
+    target_month = target_date.month
+    target_year = target_date.year
+    min_year = target_year - year_range
+    used = set(used_person_ids or [])
+
+    candidates = []
+
+    for person in top_persons:
+        person_id = person.get("id")
+        pname = person.get("name", "").strip()
+        if not person_id or not pname:
+            continue
+
+        try:
+            assets = fetch_person_assets(immich_url, api_key, person_id)
+        except Exception as e:
+            if logger:
+                logger.debug(f"  Then & Now: could not fetch assets for {pname}: {e}")
+            continue
+
+        # Group IMAGE assets by year
+        year_assets: dict[int, list] = defaultdict(list)
+        for asset in assets:
+            if asset.get("type") == "VIDEO":
+                continue
+            asset_id = asset.get("id")
+            if not asset_id:
+                continue
+            raw_date = asset.get("localDateTime") or asset.get("fileCreatedAt") or asset.get("createdAt")
+            if not raw_date:
+                continue
+            try:
+                dt = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                if dt.month != target_month:
+                    continue
+                year = dt.year
+                if year >= target_year or year < min_year:
+                    continue
+                year_assets[year].append(asset_id)
+            except (ValueError, TypeError):
+                continue
+
+        if len(year_assets) < 2:
+            continue
+
+        years = sorted(year_assets.keys())
+        gap = max(years) - min(years)
+        if gap < min_gap:
+            continue
+
+        then_year = min(years)
+        now_year = max(years)
+
+        then_asset_id = year_assets[then_year][0]
+        now_asset_id = year_assets[now_year][-1]
+
+        try:
+            then_details = fetch_asset_details(immich_url, api_key, then_asset_id)
+            now_details = fetch_asset_details(immich_url, api_key, now_asset_id)
+        except Exception as e:
+            if logger:
+                logger.debug(f"  Then & Now: could not fetch details for {pname}: {e}")
+            continue
+
+        then_faces = [p for p in then_details.get("people", []) if p.get("name") == pname]
+        now_faces = [p for p in now_details.get("people", []) if p.get("name") == pname]
+
+        candidates.append({
+            "person_name": pname,
+            "person_id": person_id,
+            "then_year": then_year,
+            "now_year": now_year,
+            "gap": gap,
+            "then_asset_id": then_asset_id,
+            "now_asset_id": now_asset_id,
+            "then_faces": then_faces,
+            "now_faces": now_faces,
+        })
+
+    if not candidates:
+        if logger:
+            logger.debug(f"  No Then & Now candidate found (need same person in same month across {min_gap}+ years)")
+        return None
+
+    # Sort: prefer unused persons first, then largest gap
+    candidates.sort(key=lambda c: (c["person_id"] not in used, c["gap"]), reverse=True)
+    best = candidates[0]
+
+    if logger:
+        logger.info(f"  Then & Now candidate: {best['person_name']} ({best['then_year']} → {best['now_year']}, {best['gap']} years)")
+
+    return best
+
+
+def _load_font(size: int = 36):
+    """Load a TrueType font at the given size, falling back to Pillow's default."""
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]
+    for path in font_paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except (OSError, IOError):
+            continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def create_then_and_now_image(
+    then_bytes: bytes,
+    now_bytes: bytes,
+    then_faces: list,
+    now_faces: list,
+    then_year: int,
+    now_year: int,
+    width: int = 1080,
+    height: int = 540,
+    logger=None,
+) -> Optional[bytes]:
+    """
+    Compose a side-by-side Then & Now image from two photo thumbnails.
+    Left panel = then (oldest year), right panel = now (most recent year).
+    Face bounding boxes are used to center the crop on the person.
+    """
+    try:
+        panel_w = width // 2
+
+        then_img = Image.open(BytesIO(then_bytes)).convert("RGB")
+        now_img = Image.open(BytesIO(now_bytes)).convert("RGB")
+
+        then_panel = cover_crop_image(then_img, panel_w, height, faces=then_faces)
+        now_panel = cover_crop_image(now_img, panel_w, height, faces=now_faces)
+
+        canvas = Image.new("RGB", (width, height), (0, 0, 0))
+        canvas.paste(then_panel, (0, 0))
+        canvas.paste(now_panel, (panel_w, 0))
+
+        draw = ImageDraw.Draw(canvas, "RGBA")
+
+        # White divider line at center
+        draw.line([(panel_w - 2, 0), (panel_w - 2, height)], fill=(255, 255, 255, 220), width=4)
+
+        # Year labels — semi-transparent pill at bottom of each panel
+        font = _load_font(40)
+        padding = 10
+
+        for label, x_origin in [(str(then_year), 0), (str(now_year), panel_w)]:
+            bbox = draw.textbbox((0, 0), label, font=font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            lx = x_origin + 20
+            ly = height - th - 20 - padding * 2
+            draw.rectangle(
+                [lx - padding, ly - padding, lx + tw + padding, ly + th + padding],
+                fill=(0, 0, 0, 160),
+            )
+            draw.text((lx, ly), label, font=font, fill=(255, 255, 255, 255))
+
+        buf = BytesIO()
+        canvas.save(buf, format="JPEG", quality=90)
+        buf.seek(0)
+        return buf.getvalue()
+
+    except Exception as e:
+        if logger:
+            logger.error(f"Error creating Then & Now image: {e}")
+        return None
+
+
+def prepare_then_and_now_notification(
+    candidate: dict,
+    immich_url: str,
+    api_key: str,
+    messages: list,
+    test_mode: bool,
+    logger=None,
+) -> Optional[dict]:
+    """
+    Fetch preview thumbnails, compose a high-res split image, upload it to the
+    'Then & Now' album in Immich, and return a notification dict that deep-links
+    directly to the uploaded composite.
+    """
+    try:
+        then_bytes = fetch_thumbnail(immich_url, api_key, candidate["then_asset_id"], size="preview")
+        now_bytes = fetch_thumbnail(immich_url, api_key, candidate["now_asset_id"], size="preview")
+    except Exception as e:
+        if logger:
+            logger.warning(f"  Could not fetch Then & Now thumbnails: {e}")
+        return None
+
+    composite = create_then_and_now_image(
+        then_bytes=then_bytes,
+        now_bytes=now_bytes,
+        then_faces=candidate["then_faces"],
+        now_faces=candidate["now_faces"],
+        then_year=candidate["then_year"],
+        now_year=candidate["now_year"],
+        width=1920,
+        height=960,
+        logger=logger,
+    )
+    if not composite:
+        return None
+
+    person_name = candidate["person_name"]
+    gap = candidate["gap"]
+    then_year = candidate["then_year"]
+    now_year = candidate["now_year"]
+
+    if messages:
+        template = random.choice(messages)
+        try:
+            message = template.format(person_name=person_name, then_year=then_year, now_year=now_year, gap=gap)
+        except KeyError:
+            message = f"{gap} years between these moments with {person_name}"
+    else:
+        message = f"{gap} years between these moments with {person_name}"
+
+    title = f"Then & Now — {person_name}"
+    if test_mode:
+        title = "[TEST] " + title
+
+    # Upload composite to "Then & Now" album; click_url left unset so
+    # send_single_notification builds the my.immich.app deep link automatically
+    uploaded_asset_id = None
+    if logger:
+        logger.info(f"  Uploading Then & Now composite to Immich…")
+    try:
+        album_id = get_or_create_album(immich_url, api_key, "Then & Now", logger or logging.getLogger())
+        if album_id:
+            uploaded_asset_id = upload_collage_to_album(immich_url, api_key, composite, album_id, logger or logging.getLogger())
+    except Exception as e:
+        if logger:
+            logger.warning(f"  Could not upload Then & Now composite: {e}")
+
+    return {
+        "title": title,
+        "message": message,
+        "has_content": True,
+        "asset_id": uploaded_asset_id,
+        "is_then_and_now": True,
+        "is_video": False,
+        "composite_image": composite,  # fallback thumbnail while Immich processes the upload
+    }
 
 
 COLLAGE_TEMPLATES = {
@@ -1799,8 +2465,13 @@ def send_single_notification(
     api_key = user["immich_api_key"]
 
     # Fetch thumbnail with retry
+    # If a thumbnail_override is provided and preferred (e.g. Then & Now composite), use it directly.
+    # Otherwise fetch from Immich and fall back to override on failure.
     thumbnail_data = None
-    if asset_id:
+    if thumbnail_override and not asset_id:
+        # No asset to fetch — use override directly (Then & Now, failed collage upload, etc.)
+        thumbnail_data = thumbnail_override
+    elif asset_id:
         try:
             thumbnail_data = with_retry(
                 lambda: fetch_thumbnail(immich_url, api_key, asset_id),
@@ -1811,21 +2482,22 @@ def send_single_notification(
             logger.debug(f"  [{name}] Thumbnail: {len(thumbnail_data):,} bytes")
         except Exception as e:
             logger.warning(f"  [{name}] Could not fetch thumbnail: {e}")
-            # Fall back to override if fetch failed
             if thumbnail_override:
                 thumbnail_data = thumbnail_override
                 logger.debug(f"  [{name}] Using fallback thumbnail: {len(thumbnail_data):,} bytes")
     elif thumbnail_override:
-        # No asset_id, use override directly
         thumbnail_data = thumbnail_override
 
     # Send notification with retry
     try:
-        # Deep link using my.immich.app for mobile app compatibility
-        if asset_id:
-            click_url = f"https://my.immich.app/photos/{asset_id}"
-        else:
-            click_url = "https://my.immich.app/"
+        # Use pre-built click_url from notification (e.g. Then & Now links to "now" photo)
+        # or build from asset_id
+        click_url = notification.get("click_url")
+        if not click_url:
+            if asset_id:
+                click_url = f"https://my.immich.app/photos/{asset_id}"
+            else:
+                click_url = "https://my.immich.app/"
         is_video = notification.get("is_video", False)
         success = with_retry(
             lambda: send_notification(
