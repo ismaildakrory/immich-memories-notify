@@ -2,7 +2,9 @@
 
 Get daily push notifications when you have photo memories in [Immich](https://immich.app/) - just like Google Photos!
 
-**⭐ NEW in v2.1:** Beautiful weekly collages with 12 template combinations! [Jump to Collage Feature →](#-weekly-collage-feature-v21)
+**⭐ NEW in v2.2:**
+- **Then & Now** - Side-by-side comparison of the same person across years
+- **Trip Highlights** - Collage from a past trip to the same city, same month
 
 ## Contents
 
@@ -237,6 +239,8 @@ Access the dashboard at `http://localhost:5000` to manage your setup through a b
 <img width="1257" height="1115" alt="Messages" src="https://github.com/user-attachments/assets/94df34a8-17d9-47c3-a865-ea3286fd5516" />
 <img width="1242" height="1196" alt="Secrets" src="https://github.com/user-attachments/assets/732ace52-0ea0-4ab7-bb42-82c543beaae2" />
 <img width="1250" height="1115" alt="Test" src="https://github.com/user-attachments/assets/2ea0e52e-4854-4268-8b79-a14905428e71" />
+<img width="1148" height="292" alt="City" src="https://github.com/user-attachments/assets/9d625ed5-7962-44c5-8e22-00cf88bc8f87" />
+<img width="1148" height="285" alt="TaN" src="https://github.com/user-attachments/assets/10127da5-35ee-4057-b2c0-230e5fc53dc4" />
 
 ### Authentication
 
