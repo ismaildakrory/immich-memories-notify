@@ -43,7 +43,6 @@ async def trigger_test_notification(
     request: Request,
     slot: int,
     dry_run: bool = Query(False, description="Preview without sending"),
-    user: str = Query(None, description="Specific user to notify (optional)"),
 ):
     """
     Trigger a test notification for a specific slot.
@@ -51,7 +50,6 @@ async def trigger_test_notification(
     Args:
         slot: The notification slot number (1-5)
         dry_run: If true, preview what would be sent without actually sending
-        user: Optionally target a specific user
     """
     if slot < 1 or slot > 10:
         raise HTTPException(status_code=400, detail="Slot must be between 1 and 10")
@@ -105,15 +103,33 @@ async def trigger_test_notification(
 
 @router.get("/slots")
 async def get_available_slots(request: Request):
-    """Get information about available notification slots."""
-    # This could be enhanced to read from config
+    """Get information about available notification slots from config."""
+    import yaml
+    config_path = get_config_path(request)
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+    except Exception:
+        config = {}
+
+    settings = config.get("settings", {})
+    windows = settings.get("notification_windows", [])
+    mem = settings.get("memory_notifications", 3)
+    person = settings.get("person_notifications", 2)
+    total = mem + person
+
+    slots = []
+    for i, w in enumerate(windows, 1):
+        slot_type = "memory" if i <= mem else "person"
+        slots.append({
+            "number": i,
+            "window": f"{w.get('start', '?')} – {w.get('end', '?')}",
+            "type": slot_type,
+        })
+
     return {
-        "slots": [
-            {"number": 1, "description": "Morning notification"},
-            {"number": 2, "description": "Late morning notification"},
-            {"number": 3, "description": "Afternoon notification"},
-            {"number": 4, "description": "Evening notification"},
-            {"number": 5, "description": "Night notification"},
-        ],
-        "note": "Slots 1-3 typically send memories, slots 4-5 send person photos (configurable)",
+        "slots": slots,
+        "memory_slots": mem,
+        "person_slots": person,
+        "total_slots": total,
     }

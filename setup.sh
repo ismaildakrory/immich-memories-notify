@@ -127,7 +127,7 @@ echo "  This is used by the notification script to fetch memories."
 echo "  Example: http://192.168.1.10:2283"
 echo ""
 
-prompt IMMICH_URL "Immich internal URL" "http://192.168.8.30:2283"
+prompt IMMICH_URL "Immich internal URL" "http://localhost:2283"
 
 echo ""
 echo "  Enter the external URL (optional, used for deep links in notifications)."

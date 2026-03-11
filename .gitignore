@@ -1,4 +1,5 @@
-# Local overrides (keep your real secrets here)
+# Secrets (API keys, passwords, URLs)
+.env
 .env.local
 
 # State directory

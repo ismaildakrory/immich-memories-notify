@@ -102,12 +102,13 @@ services:
       context: .
       dockerfile: Dockerfile.dashboard
     container_name: immich-memories-dashboard
-    ports:
-      - "5000:5000"
+    # Note: ports directive is ignored with network_mode: host
+    # Dashboard binds directly on host port 5000
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./state:/app/state
       - ./notify.py:/app/notify.py:ro
+      - ./custom_templates:/app/custom_templates:ro
       - ./.env:/app/.env
       - /var/run/docker.sock:/var/run/docker.sock
       - .:/app/project:ro

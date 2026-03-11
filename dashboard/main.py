@@ -5,7 +5,7 @@ FastAPI web dashboard for managing notifications.
 """
 
 import os
-import secrets
+import secrets as stdlib_secrets
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
@@ -47,11 +47,11 @@ def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)) ->
             headers={"WWW-Authenticate": "Basic"},
         )
 
-    is_username_correct = secrets.compare_digest(
+    is_username_correct = stdlib_secrets.compare_digest(
         credentials.username.encode("utf8"),
         DASHBOARD_USER.encode("utf8"),
     )
-    is_password_correct = secrets.compare_digest(
+    is_password_correct = stdlib_secrets.compare_digest(
         credentials.password.encode("utf8"),
         DASHBOARD_TOKEN.encode("utf8"),
     )

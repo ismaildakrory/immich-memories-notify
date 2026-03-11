@@ -36,8 +36,8 @@ settings:
   trip_highlights_cooldown_days: 7
   trip_highlights_min_photos: 5
   notification_windows:
-  - start: 08:00
-    end: 09:00
+  - start: '08:00'
+    end: '09:00'
   - start: '10:00'
     end: '12:00'
   - start: '13:00'

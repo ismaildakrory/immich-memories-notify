@@ -141,7 +141,7 @@ def load_state(state_file: str) -> dict:
 
 
 def save_state(state_file: str, state: dict):
-    """Save state to JSON file."""
+    """Save state to JSON file (atomic write via temp file + rename)."""
     path = Path(state_file)
     if path.is_dir():
         raise RuntimeError(
@@ -149,8 +149,10 @@ def save_state(state_file: str, state: dict):
             f"Fix: on the host run:  rm -rf {path} && mkdir -p {path.parent}"
         )
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+    tmp_path = path.with_suffix(".tmp")
+    with open(tmp_path, "w") as f:
         json.dump(state, f, indent=2)
+    tmp_path.replace(path)
 
 
 def was_sent_today(state: dict, user_name: str, target_date: date) -> bool:
@@ -320,12 +322,14 @@ def format_notification_for_year(
     year_data: dict,
     messages: List[str],
     test_mode: bool = False,
+    target_date: date = None,
 ) -> dict:
     """Format notification for a single year using random message from config."""
     if not year_data.get("assets"):
         return {"title": None, "message": None, "has_content": False, "asset_id": None}
 
-    years_ago = date.today().year - year
+    ref_date = target_date or date.today()
+    years_ago = ref_date.year - year
 
     # Select random message and format it
     if messages:
@@ -565,15 +569,36 @@ def get_random_person_photo(
 
 
 def get_asset_people(immich_url: str, api_key: str, asset_id: str, timeout: int = 10) -> list:
-    """Get people recognized in a specific asset."""
+    """Get people recognized in a specific asset.
+
+    Returns list of face dicts with normalized (0-1) bounding box coordinates.
+    """
     headers = {"Accept": "application/json", "x-api-key": api_key}
     response = requests.get(f"{immich_url}/api/assets/{asset_id}", headers=headers, timeout=timeout)
     response.raise_for_status()
     asset_data = response.json()
-    return asset_data.get("people", [])
+    people = asset_data.get("people", [])
+
+    # Extract face bounding boxes and normalize to 0-1 range
+    faces = []
+    for person in people:
+        for face in person.get("faces", []):
+            img_w = face.get("imageWidth", 1)
+            img_h = face.get("imageHeight", 1)
+            if img_w and img_h:
+                faces.append({
+                    "id": person.get("id", ""),
+                    "name": person.get("name", ""),
+                    "boundingBoxX1": face.get("boundingBoxX1", 0) / img_w,
+                    "boundingBoxY1": face.get("boundingBoxY1", 0) / img_h,
+                    "boundingBoxX2": face.get("boundingBoxX2", 0) / img_w,
+                    "boundingBoxY2": face.get("boundingBoxY2", 0) / img_h,
+                })
+    return faces
 
 
-# Asset details cache (per-session)
+# Asset details cache (per-session, capped at 500 entries)
+_CACHE_MAX = 500
 _asset_details_cache = {}
 
 
@@ -591,6 +616,8 @@ def fetch_asset_details(immich_url: str, api_key: str, asset_id: str, timeout: i
     response.raise_for_status()
     asset_data = response.json()
 
+    if len(_asset_details_cache) >= _CACHE_MAX:
+        _asset_details_cache.clear()
     _asset_details_cache[cache_key] = asset_data
     return asset_data
 
@@ -686,7 +713,14 @@ def select_asset_with_face_preference(
 
         try:
             people = get_asset_people(immich_url, api_key, asset_id)
-            named_people = [p for p in people if p.get("name")]
+            # Deduplicate by person ID (a person may have multiple faces detected)
+            seen_ids = set()
+            named_people = []
+            for p in people:
+                pid = p.get("id")
+                if p.get("name") and pid not in seen_ids:
+                    seen_ids.add(pid)
+                    named_people.append(p)
             top_people = [p for p in named_people if p.get("id") in top_person_ids]
 
             top_count = len(top_people)
@@ -764,7 +798,8 @@ def select_asset_with_face_preference(
 def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, timeout: int = 30) -> Optional[str]:
     """Upload an image to ntfy and return the URL."""
     logger = logging.getLogger("immich-memories-notify")
-    temp_topic = f"upload-{int(time.time())}"
+    import uuid
+    temp_topic = f"upload-{uuid.uuid4().hex[:12]}"
     url = f"{ntfy_url}/{temp_topic}"
 
     headers = {"Filename": "memory.jpg"}
@@ -845,7 +880,8 @@ def send_notification(
             )
 
     response = requests.post(url, headers=headers, data=message.encode("utf-8"), auth=auth, timeout=timeout)
-    return response.status_code == 200
+    response.raise_for_status()
+    return True
 
 
 # =============================================================================
@@ -998,7 +1034,10 @@ def process_user_slot(
                     logger.info(f"  [{name}] Then & Now ready (last: {days_info}, cooldown: {tan_cooldown} days)")
                 else:
                     last = state.get("users", {}).get(name, {}).get("last_tan_date", "?")
-                    days_ago = (target_date - date.fromisoformat(last)).days if last != "?" else "?"
+                    try:
+                        days_ago = (target_date - date.fromisoformat(last)).days if last != "?" else "?"
+                    except ValueError:
+                        days_ago = "?"
                     logger.info(f"  [{name}] Then & Now on cooldown (last: {last}, {days_ago} days ago)")
 
                 if trip_ready:
@@ -1006,7 +1045,10 @@ def process_user_slot(
                     logger.info(f"  [{name}] Trip Highlights ready (last: {days_info}, cooldown: {trip_cooldown} days)")
                 else:
                     last = state.get("users", {}).get(name, {}).get("last_trip_date", "?")
-                    days_ago = (target_date - date.fromisoformat(last)).days if last != "?" else "?"
+                    try:
+                        days_ago = (target_date - date.fromisoformat(last)).days if last != "?" else "?"
+                    except ValueError:
+                        days_ago = "?"
                     logger.info(f"  [{name}] Trip Highlights on cooldown (last: {last}, {days_ago} days ago)")
 
                 # Priority: Trip first, TaN fallback (when both ready)
@@ -1090,6 +1132,7 @@ def process_user_slot(
                     logger=logger,
                     settings=settings,
                     video_messages=video_messages,
+                    target_date=target_date,
                 )
         elif slot <= total_slots:
             # Send a person photo notification
@@ -1183,6 +1226,7 @@ def prepare_memory_notification(
     logger: logging.Logger,
     settings: dict = None,
     video_messages: list = None,
+    target_date: date = None,
 ) -> Optional[dict]:
     """Prepare a memory notification for a specific slot, preferring faces."""
     years = parsed["years"]
@@ -1219,9 +1263,11 @@ def prepare_memory_notification(
     )
 
     if not selected_asset:
-        # Fallback to first available
+        # Fallback to first available, but skip if all already sent
         available = [a for a in assets if a.get("id") not in assets_sent]
-        selected_asset = available[0] if available else assets[0]
+        if not available:
+            return None
+        selected_asset = available[0]
 
     asset_id = selected_asset.get("id")
 
@@ -1248,7 +1294,8 @@ def prepare_memory_notification(
                 logger.debug(f"Could not fetch asset details for {asset_id}: {e}")
 
     # Format notification
-    years_ago = date.today().year - year
+    ref_date = target_date or date.today()
+    years_ago = ref_date.year - year
 
     # Choose message template based on video type
     if is_video and video_messages:
@@ -1537,8 +1584,12 @@ def _is_home_city(city: str, home_city: str) -> bool:
         return False
     c = _normalize_city(city)
     h = _normalize_city(home_city)
-    # Containment: "al fintas" contains "fintas", or "fintas" contains "fintas"
-    if h in c or c in h:
+    # Exact match
+    if c == h:
+        return True
+    # Containment: only when the shorter string is at least 4 chars
+    # to avoid false positives like "Al" matching "Dallas"
+    if len(h) >= 4 and len(c) >= 4 and (h in c or c in h):
         return True
     from difflib import SequenceMatcher
     return SequenceMatcher(None, c, h).ratio() >= 0.8
@@ -1652,7 +1703,7 @@ def prepare_trip_notification(
     gap = trip["gap"]
     asset_ids = trip["asset_ids"]
 
-    selected_ids = asset_ids[:4]
+    selected_ids = random.sample(asset_ids, min(4, len(asset_ids)))
 
     # Fetch thumbnails for collage
     thumbnails = []
@@ -1674,7 +1725,9 @@ def prepare_trip_notification(
     from io import BytesIO as _BytesIO
 
     def _simple_grid(images, names, w, h, faces=None):
-        """Simple 2×2 (or fewer) grid collage."""
+        """Simple 2×2 (or fewer) grid collage with face-aware cropping."""
+        if faces is None:
+            faces = [[] for _ in images]
         n = len(images)
         cols = min(n, 2)
         rows = (n + cols - 1) // cols
@@ -1684,13 +1737,21 @@ def prepare_trip_notification(
         for i, img in enumerate(images):
             col = i % cols
             row = i // cols
-            img_resized = img.resize((cell_w, cell_h), PILImage.LANCZOS)
-            canvas.paste(img_resized, (col * cell_w, row * cell_h))
+            img_cropped = cover_crop_image(img, cell_w, cell_h, faces=faces[i] if i < len(faces) else None)
+            canvas.paste(img_cropped, (col * cell_w, row * cell_h))
         return canvas
+
+    # Fetch face data for smart cropping
+    faces_list = []
+    for aid in valid_ids:
+        try:
+            faces_list.append(get_asset_people(immich_url, api_key, aid))
+        except Exception:
+            faces_list.append([])
 
     try:
         pil_images = [PILImage.open(_BytesIO(d)).convert("RGB") for d in thumbnails]
-        canvas = _simple_grid(pil_images, [], 1080, 1080)
+        canvas = _simple_grid(pil_images, [], 1080, 1080, faces=faces_list)
         buf = _BytesIO()
         canvas.save(buf, format="JPEG", quality=95)
         collage = buf.getvalue()
@@ -1723,7 +1784,7 @@ def prepare_trip_notification(
             requests.put(
                 f"{immich_url}/api/albums/{album_id}/assets",
                 headers=headers,
-                json={"ids": valid_ids},
+                json={"ids": asset_ids},
                 timeout=30,
             )
             # Upload collage to album
@@ -1832,8 +1893,8 @@ def find_then_and_now_candidate(
                 logger.debug(f"  Then & Now: could not fetch details for {pname}: {e}")
             continue
 
-        then_faces = [p for p in then_details.get("people", []) if p.get("name") == pname]
-        now_faces = [p for p in now_details.get("people", []) if p.get("name") == pname]
+        then_faces = [f for f in get_asset_people(immich_url, api_key, then_asset_id) if f.get("name") == pname]
+        now_faces = [f for f in get_asset_people(immich_url, api_key, now_asset_id) if f.get("name") == pname]
 
         candidates.append({
             "person_name": pname,
@@ -2128,6 +2189,9 @@ def generate_weekly_collage(
 
         # Resolve template name early so we know how many photos are needed
         template_name = settings.get("collage_template", "grid")
+        if not COLLAGE_TEMPLATES:
+            logger.error("No collage templates available. Check custom_templates/ directory.")
+            return None
         if template_name == "random":
             template_name = random.choice(list(COLLAGE_TEMPLATES.keys()))
             logger.debug(f"Random template selected: {template_name}")
@@ -2257,6 +2321,10 @@ def create_collage_image(
             faces_list = [[] for _ in pil_images]
 
         # Select template (random if requested)
+        if not COLLAGE_TEMPLATES:
+            logger.error("No collage templates available. Check custom_templates/ directory.")
+            return None
+
         if template_name == "random":
             template_name = random.choice(list(COLLAGE_TEMPLATES.keys()))
             logger.debug(f"Random template selected: {template_name}")
@@ -2538,6 +2606,10 @@ def calculate_random_delay(window_start: str, window_end: str, test_mode: bool =
 
     window_start_time = now.replace(hour=start_hour, minute=start_min, second=0, microsecond=0)
     window_end_time = now.replace(hour=end_hour, minute=end_min, second=0, microsecond=0)
+
+    # Handle overnight windows (e.g., 23:00 to 01:00)
+    if window_end_time <= window_start_time:
+        window_end_time += timedelta(days=1)
 
     # If we're already past window start, random time from now to window end
     if now >= window_start_time:
