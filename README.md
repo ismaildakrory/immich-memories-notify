@@ -197,7 +197,7 @@ If not set, the dashboard is open (fine for local network).
 
 ## Contributing
 
-PRs and feedback welcome! Fork, branch, commit, open a PR.
+Built this mostly vibe coding! Been running smoothly on my setup. PRs and feedback welcome!
 
 ## License
 
