@@ -186,6 +186,7 @@ If not set, the dashboard is open (fine for local network).
 | No person photos | Name your people in Immich, ensure photos older than 30 days exist |
 | Already sent today | Use `--force` flag, or delete `state/state.json` |
 | Dashboard not loading | `docker compose logs dashboard` to check errors |
+| `git pull` fails with local changes | `git stash && git pull && git stash pop` — your `.env` and `config.yaml` are preserved |
 
 ## Requirements
 
