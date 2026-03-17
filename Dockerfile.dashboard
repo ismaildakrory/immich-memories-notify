@@ -3,16 +3,12 @@
 
 FROM python:3.11-alpine
 
-# Install Docker CLI for restart functionality
-RUN apk add --no-cache docker-cli docker-cli-compose
+# Install Docker CLI for restart functionality and apply OS patches
+RUN apk add --no-cache docker-cli docker-cli-compose && apk upgrade --no-cache
 
 # Install Python dependencies
-RUN pip install --no-cache-dir \
-    fastapi \
-    uvicorn[standard] \
-    pyyaml \
-    requests \
-    Pillow
+COPY requirements.txt requirements-dashboard.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements-dashboard.txt && rm /tmp/requirements*.txt
 
 # Create app directory
 WORKDIR /app

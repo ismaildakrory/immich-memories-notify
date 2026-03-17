@@ -1,0 +1,17 @@
+.env
+.env.local
+.env.bak
+.env.example
+state/
+CLAUDE.md
+ntfy_config/
+ntfy_data/
+.git/
+*.log
+__pycache__/
+.vscode/
+.idea/
+*.md
+screenshots/
+.dockerignore
+.gitignore

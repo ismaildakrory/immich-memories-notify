@@ -208,13 +208,14 @@ fi
 # ============================================================
 # Step 4 — Dashboard
 # ============================================================
-print_step "Step 4 — Dashboard Security (optional)"
+print_step "Step 4 — Dashboard Security"
 echo ""
-echo "  You can password-protect the dashboard with HTTP Basic Auth."
-echo "  Leave blank to run without authentication (fine for local use)."
+echo "  The dashboard will be protected with HTTP Basic Auth."
+DEFAULT_TOKEN=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 12)
+echo "  A random password has been generated. Press Enter to accept or type your own."
 echo ""
 
-prompt DASHBOARD_TOKEN "Dashboard password (leave blank for no auth)" ""
+prompt DASHBOARD_TOKEN "Dashboard password" "$DEFAULT_TOKEN"
 
 # ============================================================
 # Generate files

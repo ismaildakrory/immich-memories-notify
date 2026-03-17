@@ -71,11 +71,25 @@ def load_env_file(env_path: str) -> dict:
     return env_vars
 
 
+def _sanitize_env_value(value: str) -> str:
+    """Sanitize a value for safe .env file storage."""
+    # Strip newlines and carriage returns to prevent injection
+    value = value.replace('\n', '').replace('\r', '')
+    # Quote if value contains spaces, #, or quotes
+    if any(c in value for c in (' ', '#', '"', "'")):
+        # Escape existing double quotes and wrap in double quotes
+        value = '"' + value.replace('"', '\\"') + '"'
+    return value
+
+
 def save_env_file(env_path: str, env_vars: dict):
     """Save dictionary to .env file, preserving comments and order."""
     path = Path(env_path)
     lines = []
     updated_keys = set()
+
+    # Sanitize all values
+    sanitized = {k: _sanitize_env_value(str(v)) for k, v in env_vars.items()}
 
     # Read existing file to preserve structure
     if path.exists():
@@ -85,8 +99,8 @@ def save_env_file(env_path: str, env_vars: dict):
                     stripped = line.strip()
                     if stripped and not stripped.startswith('#') and '=' in stripped:
                         key = stripped.split('=')[0].strip()
-                        if key in env_vars:
-                            lines.append(f'{key}={env_vars[key]}\n')
+                        if key in sanitized:
+                            lines.append(f'{key}={sanitized[key]}\n')
                             updated_keys.add(key)
                         else:
                             lines.append(line)
@@ -94,7 +108,7 @@ def save_env_file(env_path: str, env_vars: dict):
                         lines.append(line)
 
     # Add any new keys not in original file
-    for key, value in env_vars.items():
+    for key, value in sanitized.items():
         if key not in updated_keys:
             lines.append(f'{key}={value}\n')
 

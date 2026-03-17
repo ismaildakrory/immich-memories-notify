@@ -141,7 +141,8 @@ def load_state(state_file: str) -> dict:
 
 
 def save_state(state_file: str, state: dict):
-    """Save state to JSON file (atomic write via temp file + rename)."""
+    """Save state to JSON file (atomic write with file lock)."""
+    import fcntl
     path = Path(state_file)
     if path.is_dir():
         raise RuntimeError(
@@ -149,10 +150,16 @@ def save_state(state_file: str, state: dict):
             f"Fix: on the host run:  rm -rf {path} && mkdir -p {path.parent}"
         )
     path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = Path(str(path) + ".lock")
     tmp_path = path.with_suffix(".tmp")
-    with open(tmp_path, "w") as f:
-        json.dump(state, f, indent=2)
-    tmp_path.replace(path)
+    with open(lock_path, "w") as lock_f:
+        fcntl.flock(lock_f, fcntl.LOCK_EX)
+        try:
+            with open(tmp_path, "w") as f:
+                json.dump(state, f, indent=2)
+            tmp_path.replace(path)
+        finally:
+            fcntl.flock(lock_f, fcntl.LOCK_UN)
 
 
 def was_sent_today(state: dict, user_name: str, target_date: date) -> bool:
@@ -1075,8 +1082,6 @@ def process_user_slot(
                             if notification:
                                 logger.info(f"  [{name}] Sending Trip Highlights "
                                             f"({trip['city']}, {trip['year']})")
-                                if not test_mode:
-                                    mark_feature_fired(state, name, "last_trip_date", target_date)
                     except Exception as e:
                         logger.warning(f"  [{name}] Trip Highlights failed: {e}")
 
@@ -1104,17 +1109,6 @@ def process_user_slot(
                             )
                             if notification:
                                 logger.info(f"  [{name}] Sending Then & Now ({candidate['then_year']} → {candidate['now_year']})")
-                                if not test_mode:
-                                    mark_feature_fired(state, name, "last_tan_date", target_date)
-                                    # Track person freshness
-                                    user_state = state.setdefault("users", {}).setdefault(name, {})
-                                    used = user_state.setdefault("tan_persons_used", [])
-                                    person_id = candidate.get("person_id", "")
-                                    if person_id:
-                                        used.append(person_id)
-                                    # Reset if all top persons used
-                                    if len(used) >= len(top_persons):
-                                        user_state["tan_persons_used"] = []
                     except Exception as e:
                         logger.warning(f"  [{name}] Then & Now lookup failed: {e}")
 
@@ -1205,9 +1199,20 @@ def process_user_slot(
         logger.info(f"  [{name}] Notification sent for slot {slot}!")
         result["asset_id"] = notification.get("asset_id")
 
-        # Mark slot as sent
         if not test_mode:
+            # Mark slot as sent
             mark_slot_sent(state, name, target_date, slot, notification.get("asset_id"))
+            # Mark feature cooldowns only after successful send
+            if notification.get("is_trip"):
+                mark_feature_fired(state, name, "last_trip_date", target_date)
+            elif notification.get("is_then_and_now"):
+                mark_feature_fired(state, name, "last_tan_date", target_date)
+                # Track TaN person freshness
+                user_state = state.setdefault("users", {}).setdefault(name, {})
+                used = user_state.setdefault("tan_persons_used", [])
+                person_id = notification.get("person_id", "")
+                if person_id:
+                    used.append(person_id)
     else:
         result["success"] = False
 
@@ -2076,6 +2081,7 @@ def prepare_then_and_now_notification(
         "asset_id": uploaded_asset_id,
         "is_then_and_now": True,
         "is_video": False,
+        "person_id": candidate.get("person_id", ""),
         "composite_image": composite,  # fallback thumbnail while Immich processes the upload
     }
 
@@ -2781,9 +2787,9 @@ Examples:
             if result["success"]:
                 success_count += 1
 
-    # Save state
-    if not args.dry_run:
-        save_state(state_file, state)
+        # Save state after each user to avoid losing progress on crash
+        if not args.dry_run:
+            save_state(state_file, state)
 
     logger.info("=" * 60)
     logger.info(f"Complete: {success_count}/{len(users)} users successful")

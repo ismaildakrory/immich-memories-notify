@@ -1164,9 +1164,16 @@
             return response.json();
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+
         function showAlert(containerId, message, type = 'success') {
             const container = document.getElementById(containerId);
-            container.innerHTML = `<div class="alert ${type}">${message}</div>`;
+            container.innerHTML = `<div class="alert ${type}">${escapeHtml(message)}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
         }
 
@@ -1190,10 +1197,11 @@
                 // Show all configured users, merging with state data
                 container.innerHTML = configuredUsers.map(name => {
                     const state = data.users[name] || { slots_sent: [], notification_count: 0, last_sent: null };
+                    const safeName = escapeHtml(name);
                     return `
                     <div class="state-user">
                         <h4>
-                            ${name}
+                            ${safeName}
                             <span class="status-badge ${state.notification_count > 0 ? 'success' : 'pending'}">
                                 ${state.notification_count} sent today
                             </span>
@@ -1218,15 +1226,21 @@
                 const data = await api('/settings/');
 
                 // Users
-                document.getElementById('users-list').innerHTML = data.users.map(user => `
+                document.getElementById('users-list').innerHTML = data.users.map(user => {
+                    const sn = escapeHtml(user.name);
+                    const st = escapeHtml(user.ntfy_topic);
+                    const sc = escapeHtml(user.home_city || '');
+                    const safeId = user.name.replace(/[^a-zA-Z0-9]/g, '-');
+                    const jsName = user.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    return `
                     <div class="user-card" style="flex-direction: column; align-items: stretch; gap: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div class="user-info">
-                                <h4>${user.name}</h4>
-                                <p>${user.ntfy_topic}</p>
+                                <h4>${sn}</h4>
+                                <p>${st}</p>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" ${user.enabled ? 'checked' : ''} onchange="toggleUser('${user.name}', this.checked)">
+                                <input type="checkbox" ${user.enabled ? 'checked' : ''} onchange="toggleUser('${jsName}', this.checked)">
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -1234,23 +1248,23 @@
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">Home City:</label>
                                 <input type="text" placeholder="Select from photos or type manually"
-                                    id="home-city-input-${user.name.replace(/\s+/g,'-')}"
-                                    value="${user.home_city || ''}"
+                                    id="home-city-input-${safeId}"
+                                    value="${sc}"
                                     style="flex: 1; padding: 3px 7px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text);"
-                                    onchange="setHomeCity('${user.name}', this.value)"
+                                    onchange="setHomeCity('${jsName}', this.value)"
                                     onkeydown="if(event.key==='Enter'){this.blur();}">
                                 <button class="secondary" style="padding: 3px 8px; font-size: 0.75rem; white-space: nowrap;"
-                                    onclick="toggleCityDropdown('${user.name}', this)">&#9660;</button>
-                                <span id="home-city-saved-${user.name.replace(/\s+/g,'-')}" style="font-size: 0.75rem; color: #4caf50; display: none;">&#10003;</span>
+                                    onclick="toggleCityDropdown('${jsName}', this)">&#9660;</button>
+                                <span id="home-city-saved-${safeId}" style="font-size: 0.75rem; color: #4caf50; display: none;">&#10003;</span>
                             </div>
-                            <div id="city-dropdown-${user.name.replace(/\s+/g,'-')}" class="city-dropdown" style="display:none; position:absolute; left:70px; right:40px; top:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg-secondary); border:1px solid var(--border); border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
+                            <div id="city-dropdown-${safeId}" class="city-dropdown" style="display:none; position:absolute; left:70px; right:40px; top:100%; z-index:100; max-height:200px; overflow-y:auto; background:var(--bg-secondary); border:1px solid var(--border); border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
                         </div>
                         <div class="btn-group" style="justify-content: flex-end;">
-                            <button class="secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="renameUser('${user.name}')">Rename</button>
-                            <button class="danger" style="padding: 4px 10px; font-size: 0.8rem;" onclick="deleteUser('${user.name}')">Delete</button>
+                            <button class="secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="renameUser('${jsName}')">Rename</button>
+                            <button class="danger" style="padding: 4px 10px; font-size: 0.8rem;" onclick="deleteUser('${jsName}')">Delete</button>
                         </div>
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
 
                 // Windows
                 renderWindows(data.settings.notification_windows);
@@ -1504,11 +1518,12 @@
                     const data = await api(`/settings/users/${encodeURIComponent(userName)}/cities`);
                     _citiesCache[userName] = data.cities;
                 }
+                const jsUserName = userName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 dropdown.innerHTML = _citiesCache[userName].map(c =>
                     `<div style="padding:5px 10px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid var(--border);"
                           onmouseover="this.style.background='var(--accent)'; this.style.color='white';"
                           onmouseout="this.style.background=''; this.style.color='';"
-                          onclick="selectCity('${userName}', this.textContent)">${c}</div>`
+                          onclick="selectCity('${jsUserName}', this.textContent)">${escapeHtml(c)}</div>`
                 ).join('');
                 dropdown.style.display = 'block';
             } catch (e) {
@@ -1636,18 +1651,19 @@
                     container.innerHTML = currentSecretUsers.map(userName => {
                         const user = data.users[userName];
                         const safeId = userName.replace(/[^a-zA-Z0-9]/g, '_');
+                        const sn = escapeHtml(userName);
                         return `
-                            <h3>${userName}</h3>
+                            <h3>${sn}</h3>
                             <div class="grid grid-2">
                                 <div class="form-group">
-                                    <label>Immich API Key <small style="color: var(--text-muted)">(${user.api_key_var})</small></label>
+                                    <label>Immich API Key <small style="color: var(--text-muted)">(${escapeHtml(user.api_key_var)})</small></label>
                                     <input type="password" id="secret_${safeId}_api_key" placeholder="Enter new API key...">
-                                    <small style="color: var(--text-muted)">${user.api_key_set ? `Current: ${user.api_key}` : 'Not set'}</small>
+                                    <small style="color: var(--text-muted)">${user.api_key_set ? `Current: ${escapeHtml(user.api_key)}` : 'Not set'}</small>
                                 </div>
                                 <div class="form-group">
-                                    <label>ntfy Password <small style="color: var(--text-muted)">(${user.ntfy_password_var})</small></label>
+                                    <label>ntfy Password <small style="color: var(--text-muted)">(${escapeHtml(user.ntfy_password_var)})</small></label>
                                     <input type="password" id="secret_${safeId}_ntfy_password" placeholder="Enter new password...">
-                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${user.ntfy_password}` : 'Not set'} · Leave blank if your ntfy server has no authentication</small>
+                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${escapeHtml(user.ntfy_password)}` : 'Not set'} · Leave blank if your ntfy server has no authentication</small>
                                 </div>
                             </div>
                         `;
@@ -1782,7 +1798,7 @@
                     enabledUsers.forEach(u => {
                         const userSecrets = (secrets.users || {})[u.name];
                         const hasKey = userSecrets && userSecrets.api_key_set;
-                        checks.push({ ok: hasKey, text: `${u.name}: Immich API key set`, tab: 'secrets' });
+                        checks.push({ ok: hasKey, text: `${escapeHtml(u.name)}: Immich API key set`, tab: 'secrets' });
                     });
                 }
 
@@ -1893,7 +1909,7 @@
         function wizardShowResult(containerId, type, message, extra) {
             const el = document.getElementById(containerId);
             if (!el) return;
-            el.innerHTML = `<div class="wizard-result ${type}">${message}${extra ? `<div class="wizard-commands">${extra}</div>` : ''}</div>`;
+            el.innerHTML = `<div class="wizard-result ${type}">${escapeHtml(message)}${extra ? `<div class="wizard-commands">${escapeHtml(extra)}</div>` : ''}</div>`;
         }
 
         async function wizardTestImmich() {
