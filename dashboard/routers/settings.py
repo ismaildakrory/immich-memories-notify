@@ -110,6 +110,8 @@ async def get_settings(request: Request):
         person_messages=config.get("person_messages", []),
         video_messages=config.get("video_messages", []),
         video_person_messages=config.get("video_person_messages", []),
+        then_and_now_messages=config.get("then_and_now_messages", []),
+        trip_highlights_messages=config.get("trip_highlights_messages", []),
     )
 
 
@@ -163,6 +165,8 @@ async def get_messages(request: Request):
         "person_messages": config.get("person_messages", []),
         "video_messages": config.get("video_messages", []),
         "video_person_messages": config.get("video_person_messages", []),
+        "then_and_now_messages": config.get("then_and_now_messages", []),
+        "trip_highlights_messages": config.get("trip_highlights_messages", []),
     }
 
 
@@ -184,6 +188,10 @@ async def update_messages(request: Request, update: MessagesUpdate):
         config["video_messages"] = update.video_messages
     if update.video_person_messages is not None:
         config["video_person_messages"] = update.video_person_messages
+    if update.then_and_now_messages is not None:
+        config["then_and_now_messages"] = update.then_and_now_messages
+    if update.trip_highlights_messages is not None:
+        config["trip_highlights_messages"] = update.trip_highlights_messages
 
     save_config(config_path, config)
     return {"message": "Messages updated"}

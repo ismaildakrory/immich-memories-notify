@@ -61,6 +61,8 @@ class FullConfig(BaseModel):
     person_messages: List[str]
     video_messages: List[str]
     video_person_messages: List[str]
+    then_and_now_messages: List[str]
+    trip_highlights_messages: List[str]
 
 
 # Update Models
@@ -73,6 +75,8 @@ class MessagesUpdate(BaseModel):
     person_messages: Optional[List[str]] = None
     video_messages: Optional[List[str]] = None
     video_person_messages: Optional[List[str]] = None
+    then_and_now_messages: Optional[List[str]] = None
+    trip_highlights_messages: Optional[List[str]] = None
 
 
 class SettingsUpdate(BaseModel):

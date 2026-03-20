@@ -1026,6 +1026,18 @@
                     <textarea id="video_person_messages" placeholder="Watch this moment with {person_name}..."></textarea>
                 </div>
 
+                <div class="form-group">
+                    <label>Then &amp; Now Messages (one per line)</label>
+                    <textarea id="then_and_now_messages" placeholder="Look how much {person_name} has changed! {then_year} vs {now_year}"></textarea>
+                    <small style="color: var(--text-muted)">Placeholders: {person_name}, {then_year}, {now_year}, {gap}</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Trip Highlights Messages (one per line)</label>
+                    <textarea id="trip_highlights_messages" placeholder="{gap} years ago in {city}, {country}!"></textarea>
+                    <small style="color: var(--text-muted)">Placeholders: {city}, {country}, {year}, {gap}</small>
+                </div>
+
                 <div class="btn-group">
                     <button onclick="saveMessages()">Save Messages</button>
                 </div>
@@ -1305,6 +1317,8 @@
                 document.getElementById('person_messages').value = data.person_messages.join('\n');
                 document.getElementById('video_messages').value = data.video_messages.join('\n');
                 document.getElementById('video_person_messages').value = data.video_person_messages.join('\n');
+                document.getElementById('then_and_now_messages').value = data.then_and_now_messages.join('\n');
+                document.getElementById('trip_highlights_messages').value = data.trip_highlights_messages.join('\n');
             } catch (e) {
                 showAlert('settings-alert', e.message, 'error');
             }
@@ -1572,6 +1586,8 @@
                 person_messages: document.getElementById('person_messages').value.split('\n').filter(m => m.trim()),
                 video_messages: document.getElementById('video_messages').value.split('\n').filter(m => m.trim()),
                 video_person_messages: document.getElementById('video_person_messages').value.split('\n').filter(m => m.trim()),
+                then_and_now_messages: document.getElementById('then_and_now_messages').value.split('\n').filter(m => m.trim()),
+                trip_highlights_messages: document.getElementById('trip_highlights_messages').value.split('\n').filter(m => m.trim()),
             };
 
             try {
