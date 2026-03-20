@@ -32,7 +32,7 @@ services:
     build: .
     container_name: immich-memories-notify
     volumes:
-      - ./notify.py:/app/notify.py:ro
+      - ./notify:/app/notify:ro
       - ./config.yaml:/app/config.yaml:ro
       - ./state:/app/state
       - ./custom_templates:/app/custom_templates
@@ -50,7 +50,7 @@ services:
     build: .
     container_name: immich-memories-scheduler
     volumes:
-      - ./notify.py:/app/notify.py:ro
+      - ./notify:/app/notify:ro
       - ./config.yaml:/app/config.yaml:ro
       - ./state:/app/state
       - ./custom_templates:/app/custom_templates
@@ -89,7 +89,7 @@ services:
                 start = w.get('start', '08:00')
                 h, m = start.split(':')
                 cron = f'{int(m)} {int(h)} * * *'
-                f.write(f'{cron} cd /app && python notify.py --slot {i} >> /proc/1/fd/1 2>&1\n')
+                f.write(f'{cron} cd /app && python -m notify --slot {i} >> /proc/1/fd/1 2>&1\n')
         "
         echo "Starting scheduler..."
         crond -f -l 2
@@ -107,7 +107,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./state:/app/state
-      - ./notify.py:/app/notify.py:ro
+      - ./notify:/app/notify:ro
       - ./custom_templates:/app/custom_templates:ro
       - ./.env:/app/.env
       - /var/run/docker.sock:/var/run/docker.sock

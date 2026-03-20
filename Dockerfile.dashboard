@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Copy dashboard code
 COPY dashboard/ /app/dashboard/
-COPY notify.py /app/notify.py
+COPY notify/ /app/notify/
 
 # Expose port
 EXPOSE 5000

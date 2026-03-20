@@ -17,7 +17,7 @@ def load_env_for_subprocess() -> dict:
 
     The dashboard container's os.environ is frozen at startup, so secrets
     added after startup (e.g. via the wizard) won't be present. This reads
-    the .env file fresh every time so notify.py gets up-to-date values.
+    the .env file fresh every time so the notify module gets up-to-date values.
     """
     env = os.environ.copy()
     env_file = Path(ENV_PATH)
@@ -59,7 +59,7 @@ async def trigger_test_notification(
     # Build command
     cmd = [
         sys.executable,
-        "/app/notify.py",
+        "-m", "notify",
         "--config", config_path,
         "--slot", str(slot),
         "--test",

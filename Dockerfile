@@ -14,5 +14,5 @@ WORKDIR /app
 # This allows easy editing without rebuilding
 
 # Use entrypoint so arguments work properly
-ENTRYPOINT ["python", "notify.py"]
+ENTRYPOINT ["python", "-m", "notify"]
 CMD []
