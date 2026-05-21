@@ -803,23 +803,42 @@
 
             <!-- Add User Modal -->
             <div id="add-user-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
-                <div class="card" style="max-width: 400px; margin: 20px;">
+                <div class="card" style="max-width: 450px; margin: 20px; max-height: 90vh; overflow-y: auto;">
                     <h2>Add New User</h2>
                     <div id="add-user-alert"></div>
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" id="new-user-name" placeholder="e.g., John">
+                        <input type="text" id="new-user-name" placeholder="e.g., Ismail">
+                    </div>
+                    <div class="form-group">
+                        <label>Immich API Key</label>
+                        <input type="text" id="new-user-api-key" placeholder="Immich API key for this user">
+                        <small style="color: var(--text-muted)">Get from Immich → User Settings → API Keys</small>
                     </div>
                     <div class="form-group">
                         <label>ntfy Topic</label>
-                        <input type="text" id="new-user-topic" placeholder="e.g., immich-memories-john">
+                        <input type="text" id="new-user-topic" placeholder="e.g., immich-memories-ismail">
                     </div>
                     <div class="form-group">
                         <label>ntfy Username</label>
-                        <input type="text" id="new-user-ntfy-username" placeholder="e.g., john">
+                        <input type="text" id="new-user-ntfy-username" placeholder="e.g., ismail" oninput="updateNtfyCommands()">
+                    </div>
+                    <div class="form-group">
+                        <label>ntfy Password</label>
+                        <input type="password" id="new-user-ntfy-password" placeholder="ntfy password for this user">
+                    </div>
+                    <div id="add-user-bundled-ntfy" style="display: none; margin: 8px 0; padding: 10px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border);">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                            <input type="checkbox" id="new-user-auto-ntfy" checked>
+                            Auto-create ntfy user in bundled server
+                        </label>
+                    </div>
+                    <div id="add-user-external-ntfy-hint" style="display: none; margin: 8px 0; padding: 10px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-muted);">
+                        <strong style="color: var(--warning);">Manual step required:</strong> Create this user on your ntfy server:<br>
+                        <code id="add-user-ntfy-commands" style="display: block; margin-top: 6px; padding: 6px; background: var(--card-bg); border-radius: 4px; font-size: 0.8rem; white-space: pre-line;"></code>
                     </div>
                     <div class="btn-group">
-                        <button onclick="addUser()">Add User</button>
+                        <button onclick="addUser()" id="add-user-btn">Add User</button>
                         <button class="secondary" onclick="hideAddUserModal()">Cancel</button>
                     </div>
                 </div>
@@ -1469,11 +1488,38 @@
         }
 
         // User management functions
-        function showAddUserModal() {
+        let _addUserBundledNtfy = false;
+
+        async function showAddUserModal() {
             document.getElementById('add-user-modal').style.display = 'flex';
             document.getElementById('new-user-name').value = '';
+            document.getElementById('new-user-api-key').value = '';
             document.getElementById('new-user-topic').value = '';
             document.getElementById('new-user-ntfy-username').value = '';
+            document.getElementById('new-user-ntfy-password').value = '';
+            document.getElementById('add-user-alert').innerHTML = '';
+            document.getElementById('add-user-bundled-ntfy').style.display = 'none';
+            document.getElementById('add-user-external-ntfy-hint').style.display = 'none';
+
+            try {
+                const resp = await fetch('/api/ntfy/status');
+                const data = await resp.json();
+                _addUserBundledNtfy = data.running === true;
+            } catch { _addUserBundledNtfy = false; }
+
+            if (_addUserBundledNtfy) {
+                document.getElementById('add-user-bundled-ntfy').style.display = 'block';
+                document.getElementById('new-user-auto-ntfy').checked = true;
+            } else {
+                document.getElementById('add-user-external-ntfy-hint').style.display = 'block';
+            }
+            updateNtfyCommands();
+        }
+
+        function updateNtfyCommands() {
+            const username = document.getElementById('new-user-ntfy-username').value.trim() || '<username>';
+            document.getElementById('add-user-ntfy-commands').textContent =
+                `ntfy user add ${username}\nntfy access ${username} '*' read-write`;
         }
 
         function hideAddUserModal() {
@@ -1482,16 +1528,27 @@
 
         async function addUser() {
             const name = document.getElementById('new-user-name').value.trim();
+            const apiKey = document.getElementById('new-user-api-key').value.trim();
             const topic = document.getElementById('new-user-topic').value.trim();
             const ntfyUsername = document.getElementById('new-user-ntfy-username').value.trim();
+            const ntfyPassword = document.getElementById('new-user-ntfy-password').value;
+            const autoNtfy = _addUserBundledNtfy && document.getElementById('new-user-auto-ntfy').checked;
 
             if (!name || !topic) {
                 showAlert('add-user-alert', 'Name and topic are required', 'error');
                 return;
             }
+            if (!apiKey) {
+                showAlert('add-user-alert', 'Immich API key is required', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('add-user-btn');
+            btn.disabled = true; btn.textContent = 'Adding...';
 
             try {
-                const result = await api('/settings/users', {
+                // Step 1: Add user to config.yaml
+                await api('/settings/users', {
                     method: 'POST',
                     body: JSON.stringify({
                         name: name,
@@ -1499,11 +1556,48 @@
                         ntfy_username: ntfyUsername || name.toLowerCase(),
                     }),
                 });
+
+                // Step 2: Save API key + ntfy password to .env
+                const secretsBody = { users: {} };
+                secretsBody.users[name] = { api_key: apiKey };
+                if (ntfyPassword) secretsBody.users[name].ntfy_password = ntfyPassword;
+                await api('/secrets/', {
+                    method: 'PUT',
+                    body: JSON.stringify(secretsBody),
+                });
+
+                // Step 3: Auto-create ntfy user if bundled
+                if (autoNtfy && ntfyPassword) {
+                    const ntfyResp = await fetch('/api/ntfy/create-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: ntfyUsername || name.toLowerCase(),
+                            password: ntfyPassword,
+                            topic: '*',
+                        }),
+                    });
+                    const ntfyData = await ntfyResp.json();
+                    if (!ntfyData.success) {
+                        hideAddUserModal();
+                        showAlert('settings-alert',
+                            `User '${name}' added but ntfy user creation failed: ${ntfyData.message}. Create it manually on your ntfy server.`,
+                            'warning');
+                        loadSettings();
+                        return;
+                    }
+                }
+
                 hideAddUserModal();
-                showAlert('settings-alert', `User '${name}' added! Add these env vars: ${result.env_vars_needed.join(', ')}`);
+                let msg = `User '${name}' added successfully!`;
+                if (autoNtfy && ntfyPassword) msg += ' ntfy user created automatically.';
+                else if (!_addUserBundledNtfy && ntfyUsername) msg += ` Remember to create the ntfy user on your server.`;
+                showAlert('settings-alert', msg);
                 loadSettings();
             } catch (e) {
                 showAlert('add-user-alert', e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Add User';
             }
         }
 
