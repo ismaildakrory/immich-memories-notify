@@ -10,9 +10,10 @@ from urllib.parse import urlparse
 
 import requests as http_requests
 import yaml
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from ..crontab import dump_env
 from ..utils.filelock import read_lock, write_lock
 
 router = APIRouter()
@@ -238,7 +239,7 @@ async def get_secrets_masked(request: Request):
 
 
 @router.put("/")
-async def update_secrets(update: SecretsUpdate):
+async def update_secrets(update: SecretsUpdate, background_tasks: BackgroundTasks):
     """Update secrets in .env file. Only non-empty values are updated."""
     env_vars = load_env_file(ENV_PATH)
     updated = []
@@ -276,6 +277,7 @@ async def update_secrets(update: SecretsUpdate):
 
     if updated:
         save_env_file(ENV_PATH, env_vars)
+        background_tasks.add_task(dump_env)
 
     return {
         "message": "Secrets updated" if updated else "No changes made",
@@ -286,7 +288,7 @@ async def update_secrets(update: SecretsUpdate):
 
 
 @router.put("/user/{user_name}")
-async def update_user_secrets(user_name: str, update: UserSecretUpdate):
+async def update_user_secrets(user_name: str, update: UserSecretUpdate, background_tasks: BackgroundTasks):
     """Update a single user's secrets."""
     env_vars = load_env_file(ENV_PATH)
     updated = []
@@ -303,6 +305,7 @@ async def update_user_secrets(user_name: str, update: UserSecretUpdate):
 
     if updated:
         save_env_file(ENV_PATH, env_vars)
+        background_tasks.add_task(dump_env)
 
     return {
         "message": f"Secrets for '{user_name}' updated" if updated else "No changes made",
