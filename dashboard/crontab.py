@@ -159,9 +159,30 @@ def ensure_config(config_path: str = "/app/config.yaml"):
 
 
 def dump_env():
-    """Save current environment to a file that cron jobs can source."""
+    """Save current environment to a file that cron jobs can source.
+
+    Merges os.environ with the .env file so that secrets added through the
+    dashboard after container startup are available to cron jobs.
+    """
+    env = dict(os.environ)
+
+    env_path = os.environ.get("ENV_PATH", "/app/.env")
+    try:
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key:
+                    env[key] = value
+    except FileNotFoundError:
+        pass
+
     with open(ENV_FILE, "w") as f:
-        for key, value in os.environ.items():
+        for key, value in env.items():
             if key in ("PWD", "SHLVL", "_", "HOSTNAME"):
                 continue
             value = value.replace("'", "'\\''")
