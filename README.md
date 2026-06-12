@@ -211,7 +211,7 @@ The old `scheduler` container is no longer needed. If you skip `docker compose d
 
 ## Contributing
 
-Built this mostly vibe coding! Been running smoothly on my setup. PRs and feedback welcome!
+Built with AI assistance, manually reviewed and tested. PRs, issues, and feedback welcome!
 
 ## License
 
