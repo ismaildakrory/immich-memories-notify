@@ -90,6 +90,7 @@ def process_user_slot(
         return result
 
     immich_url = config["immich"]["url"]
+    click_base = config["immich"].get("external_url") or "https://my.immich.app"
     retry_config = config["settings"]["retry"]
     messages = config.get("messages", [])
     person_messages = config.get("person_messages", [])
@@ -236,6 +237,7 @@ def process_user_slot(
                                 test_mode=test_mode,
                                 logger=logger,
                                 title_templates=trip_titles,
+                                click_base=click_base,
                             )
                             if notification:
                                 logger.info(f"  [{name}] Sending Trip Highlights "

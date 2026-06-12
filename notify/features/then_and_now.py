@@ -298,7 +298,7 @@ def prepare_then_and_now_notification(
         title = "[TEST] " + title
 
     # Upload composite to "Then & Now" album; click_url left unset so
-    # send_single_notification builds the my.immich.app deep link automatically
+    # send_single_notification builds the deep link automatically
     uploaded_asset_id = None
     if logger:
         logger.info(f"  Uploading Then & Now composite to Immich…")

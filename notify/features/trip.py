@@ -167,6 +167,7 @@ def prepare_trip_notification(
     test_mode: bool,
     logger=None,
     title_templates: list = None,
+    click_base: str = "https://my.immich.app",
 ) -> Optional[dict]:
     """
     Build a collage from up to 4 trip photos, upload to a per-trip album, and
@@ -279,7 +280,7 @@ def prepare_trip_notification(
         "message": message,
         "has_content": True,
         "asset_id": uploaded_asset_id,
-        "click_url": f"https://my.immich.app/photos/{click_asset}",
+        "click_url": f"{click_base}/photos/{click_asset}",
         "is_trip": True,
         "is_video": False,
         "collage_data": collage,
