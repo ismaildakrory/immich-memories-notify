@@ -213,6 +213,8 @@ The old `scheduler` container is no longer needed. If you skip `docker compose d
 
 Built with AI assistance, manually reviewed and tested. PRs, issues, and feedback welcome!
 
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for a list of contributors.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
