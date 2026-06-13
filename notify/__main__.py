@@ -29,6 +29,7 @@ from .config import (
     setup_logging,
 )
 from .features.albums import prepare_album_notification
+from .features.birthday import find_birthday_people, prepare_birthday_notification
 from .features.collage import is_collage_day, process_collage_slot
 from .features.memories import prepare_memory_notification
 from .features.persons import prepare_person_notification
@@ -36,6 +37,7 @@ from .features.then_and_now import find_then_and_now_candidate, prepare_then_and
 from .features.trip import find_trip_candidate, prepare_trip_notification
 from .immich import (
     fetch_memories,
+    fetch_people,
     filter_todays_memories,
     get_top_persons,
     parse_memories,
@@ -149,14 +151,21 @@ def process_user_slot(
     if has_memories:
         logger.debug(f"  [{name}] Memories: {parsed['total_assets']} assets ({parsed['image_count']} images, {parsed['video_count']} videos)")
 
-    # Get top persons for this user
+    # Fetch all people once (shared by birthday check and top persons)
     try:
-        top_persons = with_retry(
-            lambda: get_top_persons(immich_url, api_key, limit=top_persons_limit, logger=logger),
+        all_people = with_retry(
+            lambda: fetch_people(immich_url, api_key),
             max_attempts=retry_config["max_attempts"],
             delay=retry_config["delay_seconds"],
             logger=logger,
         )
+    except Exception as e:
+        logger.warning(f"  [{name}] Could not fetch people: {e}")
+        all_people = []
+
+    # Get top persons for this user
+    try:
+        top_persons = get_top_persons(immich_url, api_key, limit=top_persons_limit, logger=logger, people=all_people)
         top_person_ids = {p["id"] for p in top_persons}
     except Exception as e:
         logger.warning(f"  [{name}] Could not fetch top persons: {e}")
@@ -166,7 +175,38 @@ def process_user_slot(
     # Determine what to send for this slot
     notification = None
 
-    if has_memories:
+    # Birthday check — takes slot 1 priority
+    birthday_enabled = settings.get("birthday_enabled", True)
+    if birthday_enabled and slot == 1:
+        birthday_messages = config.get("birthday_messages", [])
+        birthday_titles = config.get("birthday_titles", [])
+        try:
+            birthday_people = find_birthday_people(
+                immich_url=immich_url,
+                api_key=api_key,
+                target_date=target_date,
+                logger=logger,
+                people=all_people,
+            )
+            if birthday_people:
+                person = random.choice(birthday_people)
+                notification = prepare_birthday_notification(
+                    birthday_person=person,
+                    immich_url=immich_url,
+                    api_key=api_key,
+                    messages=birthday_messages,
+                    test_mode=test_mode,
+                    logger=logger,
+                    title_templates=birthday_titles,
+                    exclude_asset_ids=assets_sent,
+                    exclude_days=exclude_recent_days,
+                )
+                if notification:
+                    logger.info(f"  [{name}] Sending birthday notification for {person['name']}")
+        except Exception as e:
+            logger.warning(f"  [{name}] Birthday check failed: {e}")
+
+    if has_memories and not notification:
         # Has memories: slots 1-memory_notifications send memories, rest send person photos
         total_slots = memory_notifications + person_notifications
 
@@ -326,7 +366,7 @@ def process_user_slot(
         else:
             logger.info(f"  [{name}] Slot {slot} exceeds configured slots ({total_slots}), skipping")
             return result
-    else:
+    elif not notification:
         # No memories: all slots send person photos
         if slot <= fallback_notifications:
             # Person slot — 30% chance of album photo if user has albums configured

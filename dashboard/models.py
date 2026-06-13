@@ -43,6 +43,7 @@ class Settings(BaseModel):
     trip_highlights_enabled: bool = True
     trip_highlights_cooldown_days: int = Field(7, ge=0, le=365)
     trip_highlights_min_photos: int = Field(5, ge=1, le=100)
+    birthday_enabled: bool = True
 
 
 class UserInfo(BaseModel):
@@ -72,6 +73,8 @@ class FullConfig(BaseModel):
     then_and_now_titles: List[str]
     trip_highlights_titles: List[str]
     album_titles: List[str]
+    birthday_messages: List[str]
+    birthday_titles: List[str]
 
 
 # Update Models
@@ -94,6 +97,8 @@ class MessagesUpdate(BaseModel):
     then_and_now_titles: Optional[List[str]] = None
     trip_highlights_titles: Optional[List[str]] = None
     album_titles: Optional[List[str]] = None
+    birthday_messages: Optional[List[str]] = None
+    birthday_titles: Optional[List[str]] = None
 
 
 class SettingsUpdate(BaseModel):
@@ -121,6 +126,7 @@ class SettingsUpdate(BaseModel):
     trip_highlights_enabled: Optional[bool] = None
     trip_highlights_cooldown_days: Optional[int] = Field(None, ge=0, le=365)
     trip_highlights_min_photos: Optional[int] = Field(None, ge=1, le=100)
+    birthday_enabled: Optional[bool] = None
 
 
 class UserEnabledUpdate(BaseModel):

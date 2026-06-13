@@ -198,13 +198,14 @@ def fetch_person_assets(immich_url: str, api_key: str, person_id: str, timeout: 
     return assets
 
 
-def get_top_persons(immich_url: str, api_key: str, limit: int = 5, logger=None) -> list:
+def get_top_persons(immich_url: str, api_key: str, limit: int = 5, logger=None, people: list = None) -> list:
     """
     Get top N persons by photo count, filtered to only those with names.
     Queries asset count for each named person using search API.
     Returns list of dicts with 'id', 'name', and 'asset_count'.
     """
-    people = fetch_people(immich_url, api_key)
+    if people is None:
+        people = fetch_people(immich_url, api_key)
 
     # Filter to only people with names
     named_people = [p for p in people if p.get("name")]

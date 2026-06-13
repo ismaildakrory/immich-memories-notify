@@ -47,6 +47,7 @@ DEFAULT_CONFIG = {
         "trip_highlights_enabled": True,
         "trip_highlights_cooldown_days": 7,
         "trip_highlights_min_photos": 5,
+        "birthday_enabled": True,
         "notification_windows": [
             {"start": "08:00", "end": "09:00"},
             {"start": "10:00", "end": "12:00"},
@@ -131,6 +132,15 @@ DEFAULT_CONFIG = {
     ],
     "album_titles": [
         "{album_name}",
+    ],
+    "birthday_messages": [
+        "Happy Birthday, {person_name}! \U0001f382",
+        "It's {person_name}'s special day! \U0001f389",
+        "Wishing {person_name} a wonderful birthday! \U0001f381",
+        "Cheers to {person_name} on their birthday! \U0001f973",
+    ],
+    "birthday_titles": [
+        "Happy Birthday, {person_name}! \U0001f389",
     ],
 }
 

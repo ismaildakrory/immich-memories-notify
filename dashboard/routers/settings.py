@@ -117,6 +117,7 @@ async def get_settings(request: Request):
         trip_highlights_enabled=settings_data.get("trip_highlights_enabled", True),
         trip_highlights_cooldown_days=settings_data.get("trip_highlights_cooldown_days", 7),
         trip_highlights_min_photos=settings_data.get("trip_highlights_min_photos", 5),
+        birthday_enabled=settings_data.get("birthday_enabled", True),
     )
 
     # Redact sensitive user info
@@ -148,6 +149,8 @@ async def get_settings(request: Request):
         then_and_now_titles=config.get("then_and_now_titles", []),
         trip_highlights_titles=config.get("trip_highlights_titles", []),
         album_titles=config.get("album_titles", []),
+        birthday_messages=config.get("birthday_messages", []),
+        birthday_titles=config.get("birthday_titles", []),
     )
 
 
@@ -212,6 +215,8 @@ async def get_messages(request: Request):
         "then_and_now_titles": config.get("then_and_now_titles", []),
         "trip_highlights_titles": config.get("trip_highlights_titles", []),
         "album_titles": config.get("album_titles", []),
+        "birthday_messages": config.get("birthday_messages", []),
+        "birthday_titles": config.get("birthday_titles", []),
     }
 
 
@@ -251,6 +256,10 @@ async def update_messages(request: Request, update: MessagesUpdate):
                 config["trip_highlights_titles"] = update.trip_highlights_titles
             if update.album_titles is not None:
                 config["album_titles"] = update.album_titles
+            if update.birthday_messages is not None:
+                config["birthday_messages"] = update.birthday_messages
+            if update.birthday_titles is not None:
+                config["birthday_titles"] = update.birthday_titles
             _write_yaml(config_path, config)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Config file not found")
