@@ -6,6 +6,7 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Immich API Key Permissions](#immich-api-key-permissions)
 - [Screenshots](#screenshots)
 - [Common Commands](#common-commands)
 - [Configuration](#configuration)
@@ -36,6 +37,20 @@ bash setup.sh
 ```
 
 The setup script generates your config, optionally starts a bundled ntfy server, and launches the dashboard. A wizard walks you through connecting Immich, ntfy, and adding your first user. The scheduler runs automatically inside the dashboard container.
+
+## Immich API Key Permissions
+
+When creating an API key in Immich, grant these permissions:
+
+| Permission | Access | Used for |
+|---|---|---|
+| **Memories** | Read | On-this-day notifications |
+| **Search** | Read | Finding person photos |
+| **People** | Read | Face recognition features |
+| **Albums** | Read + Write | Album notifications and collage storage |
+| **Assets** | Read + Write | Thumbnails and collage uploads |
+
+If you don't use the weekly collage and Trip features, you don't need write permission for Albums and Assets.
 
 ## Screenshots
 
