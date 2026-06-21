@@ -42,15 +42,18 @@ The setup script generates your config, optionally starts a bundled ntfy server,
 
 When creating an API key in Immich, grant these permissions:
 
-| Permission | Access | Used for |
-|---|---|---|
-| **Memories** | Read | On-this-day notifications |
-| **Search** | Read | Finding person photos |
-| **People** | Read | Face recognition features |
-| **Albums** | Read + Write | Album notifications and collage storage |
-| **Assets** | Read + Write | Thumbnails and collage uploads |
+| Permission | Used for |
+|---|---|
+| `memory.read` | On-this-day notifications |
+| `person.read` | Face recognition features |
+| `asset.read` | Asset details and metadata search |
+| `asset.view` | Thumbnail previews in notifications |
+| `asset.upload` | Weekly collage upload |
+| `album.read` | Album notifications |
+| `album.create` | Creating the collage album |
+| `albumAsset.create` | Adding collages to the album |
 
-If you don't use the weekly collage and Trip features, you don't need write permission for Albums and Assets.
+If you don't use the weekly collage and Trip features, you can skip `asset.upload`, `album.create`, and `albumAsset.create`.
 
 ## Screenshots
 
