@@ -117,7 +117,9 @@ def send_single_notification(
     asset_id = notification.get("asset_id")
 
     immich_url = config["immich"]["url"]
-    click_base = config["immich"].get("external_url") or "https://my.immich.app"
+    click_base = config["immich"].get("external_url") or ""
+    if click_base and not click_base.startswith(("http://", "https://")):
+        click_base = f"https://{click_base}"
     ntfy_url = config["ntfy"]["url"]
     topic = user["ntfy_topic"]
     retry_config = config["settings"]["retry"]
@@ -152,7 +154,7 @@ def send_single_notification(
         # Use pre-built click_url from notification (e.g. Then & Now links to "now" photo)
         # or build from asset_id
         click_url = notification.get("click_url")
-        if not click_url:
+        if not click_url and click_base:
             if asset_id:
                 click_url = f"{click_base}/photos/{asset_id}"
             else:

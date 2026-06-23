@@ -92,7 +92,9 @@ def process_user_slot(
         return result
 
     immich_url = config["immich"]["url"]
-    click_base = config["immich"].get("external_url") or "https://my.immich.app"
+    click_base = config["immich"].get("external_url") or ""
+    if click_base and not click_base.startswith(("http://", "https://")):
+        click_base = f"https://{click_base}"
     retry_config = config["settings"]["retry"]
     messages = config.get("messages", [])
     person_messages = config.get("person_messages", [])
