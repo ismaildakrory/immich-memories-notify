@@ -72,8 +72,8 @@ def send_notification(
 
     # Encode title for HTTP header (RFC 2047 for non-ASCII)
     try:
-        # Try latin-1 encoding first (fast path)
-        title.encode('latin-1')
+        # Try ASCII encoding first (fast path)
+        title.encode('ascii')
         encoded_title = title
     except UnicodeEncodeError:
         # Contains non-ASCII, use base64 encoding for header
