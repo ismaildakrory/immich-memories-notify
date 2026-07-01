@@ -384,7 +384,16 @@ async def test_ntfy_connection(req: ConnectionTestRequest):
                     timeout=5,
                 )
                 if attach_resp.status_code == 200:
-                    pass  # attachments work anonymously
+                    attach_data = attach_resp.json()
+                    attachment_url = attach_data.get("attachment", {}).get("url", "")
+                    env_vars = load_env_file(ENV_PATH)
+                    ntfy_ext = env_vars.get("NTFY_EXTERNAL_URL", "") or os.environ.get("NTFY_EXTERNAL_URL", "")
+                    if attachment_url and ntfy_ext and not attachment_url.startswith(ntfy_ext):
+                        attach_warning = (
+                            f"Attachment URL ({attachment_url}) does not match NTFY_EXTERNAL_URL ({ntfy_ext}) — "
+                            "thumbnails may not display on your phone. "
+                            "Check that base-url in your ntfy server.yaml matches NTFY_EXTERNAL_URL"
+                        )
                 elif attach_resp.status_code in (401, 403):
                     pass  # auth required but attachments are configured — correct for secured ntfy
                 else:
