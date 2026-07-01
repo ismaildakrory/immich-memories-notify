@@ -48,7 +48,35 @@ Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
 docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
 
-During [Quick Start](#quick-start) setup, choose option 2 (pre-built image) to pull from GHCR instead of building locally. The image is also available for Unraid and Kubernetes users who manage containers independently.
+During [Quick Start](#quick-start) setup, choose option 2 (pre-built image) to pull from GHCR instead of building locally.
+
+<details>
+<summary><strong>Standalone setup (Unraid, Portainer, etc.)</strong></summary>
+
+```bash
+mkdir -p immich-memories-notify && cd immich-memories-notify
+mkdir -p state
+touch .env config.yaml
+
+docker run -d \
+  --name immich-memories-dashboard \
+  --network host \
+  --restart unless-stopped \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/state:/app/state \
+  -v $(pwd)/.env:/app/.env \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /etc/localtime:/etc/localtime:ro \
+  -e TZ=$(cat /etc/timezone 2>/dev/null || echo UTC) \
+  -e CONFIG_PATH=/app/config.yaml \
+  -e STATE_PATH=/app/state/state.json \
+  -e ENV_PATH=/app/.env \
+  ghcr.io/ismaildakrory/immich-memories-notify:latest
+```
+
+Then open `http://your-server-ip:5000` — the setup wizard will guide you through the rest.
+
+</details>
 
 ## Immich API Key Permissions
 
