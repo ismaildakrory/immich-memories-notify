@@ -44,25 +44,11 @@ The setup script generates your config, optionally starts a bundled ntfy server,
 
 Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
 
-```bash
-docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
+```
+ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
 
-To use the pre-built image instead of building locally:
-
-```bash
-git clone https://github.com/ismaildakrory/immich-memories-notify.git
-cd immich-memories-notify
-bash setup.sh   # Choose option 2 (pre-built image)
-```
-
-Or manually use the provided compose file:
-
-```bash
-docker compose -f docker-compose.ghcr.yml up -d dashboard
-```
-
-This is useful for Kubernetes, Unraid, or any environment where you prefer pulling a pre-built image over building locally.
+During `setup.sh`, choose option 2 (pre-built image) to use the GHCR image instead of building locally. This is recommended for Unraid, Kubernetes, and similar environments.
 
 ## Immich API Key Permissions
 
