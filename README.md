@@ -44,8 +44,8 @@ The setup script generates your config, optionally starts a bundled ntfy server,
 
 Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
 
-```
-ghcr.io/ismaildakrory/immich-memories-notify:latest
+```bash
+docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
 
 During `setup.sh`, choose option 2 (pre-built image) to use the GHCR image instead of building locally. This is recommended for Unraid, Kubernetes, and similar environments.
