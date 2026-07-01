@@ -46,17 +46,27 @@ Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`. This
 
 **Using setup.sh (easiest):** Run the [Quick Start](#quick-start) steps and choose option 2 (pre-built image) when prompted.
 
-**Manual setup:**
+**Manual setup (no git clone needed):**
 
 ```bash
-docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
-
-# Create required files
+mkdir -p immich-memories-notify && cd immich-memories-notify
 mkdir -p state
 touch .env config.yaml
 
-# Start the dashboard
-docker compose -f docker-compose.ghcr.yml up -d dashboard
+docker run -d \
+  --name immich-memories-dashboard \
+  --network host \
+  --restart unless-stopped \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/state:/app/state \
+  -v $(pwd)/.env:/app/.env \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /etc/localtime:/etc/localtime:ro \
+  -e TZ=$(cat /etc/timezone 2>/dev/null || echo UTC) \
+  -e CONFIG_PATH=/app/config.yaml \
+  -e STATE_PATH=/app/state/state.json \
+  -e ENV_PATH=/app/.env \
+  ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
 
 Then open `http://your-server-ip:5000` — the setup wizard will guide you through configuring Immich, ntfy, and your first user.
