@@ -42,34 +42,13 @@ The setup script generates your config, optionally starts a bundled ntfy server,
 
 ## Docker Image
 
-Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`. This is recommended for Unraid, Kubernetes, and similar environments.
-
-**Using setup.sh (easiest):** Run the [Quick Start](#quick-start) steps and choose option 2 (pre-built image) when prompted.
-
-**Manual setup (no git clone needed):**
+Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
 
 ```bash
-mkdir -p immich-memories-notify && cd immich-memories-notify
-mkdir -p state
-touch .env config.yaml
-
-docker run -d \
-  --name immich-memories-dashboard \
-  --network host \
-  --restart unless-stopped \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  -v $(pwd)/state:/app/state \
-  -v $(pwd)/.env:/app/.env \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /etc/localtime:/etc/localtime:ro \
-  -e TZ=$(cat /etc/timezone 2>/dev/null || echo UTC) \
-  -e CONFIG_PATH=/app/config.yaml \
-  -e STATE_PATH=/app/state/state.json \
-  -e ENV_PATH=/app/.env \
-  ghcr.io/ismaildakrory/immich-memories-notify:latest
+docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
 
-Then open `http://your-server-ip:5000` — the setup wizard will guide you through configuring Immich, ntfy, and your first user.
+During [Quick Start](#quick-start) setup, choose option 2 (pre-built image) to pull from GHCR instead of building locally. The image is also available for Unraid and Kubernetes users who manage containers independently.
 
 ## Immich API Key Permissions
 
