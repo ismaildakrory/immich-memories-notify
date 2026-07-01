@@ -42,13 +42,24 @@ The setup script generates your config, optionally starts a bundled ntfy server,
 
 ## Docker Image
 
-Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
+Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`. This is recommended for Unraid, Kubernetes, and similar environments.
+
+**Using setup.sh (easiest):** Run the [Quick Start](#quick-start) steps and choose option 2 (pre-built image) when prompted.
+
+**Manual setup:**
 
 ```bash
 docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
+
+# Create required files
+mkdir -p state
+touch .env config.yaml
+
+# Start the dashboard
+docker compose -f docker-compose.ghcr.yml up -d dashboard
 ```
 
-During `setup.sh`, choose option 2 (pre-built image) to use the GHCR image instead of building locally. This is recommended for Unraid, Kubernetes, and similar environments.
+Then open `http://your-server-ip:5000` — the setup wizard will guide you through configuring Immich, ntfy, and your first user.
 
 ## Immich API Key Permissions
 
