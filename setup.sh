@@ -118,6 +118,27 @@ echo ""
 echo -e "${YELLOW}Press Enter to use default values shown in [brackets].${NC}"
 
 # ============================================================
+# Step 0 — Install method
+# ============================================================
+print_step "Install Method"
+echo ""
+echo "  Choose how to run the application:"
+echo ""
+echo "    1) Build locally from source (default)"
+echo "    2) Pull pre-built image from GHCR (recommended for Unraid, Kubernetes, etc.)"
+echo ""
+
+prompt INSTALL_METHOD "Install method" "1"
+
+if [ "$INSTALL_METHOD" = "2" ]; then
+    USE_GHCR=y
+    print_ok "Will use pre-built image from GHCR"
+else
+    USE_GHCR=n
+    print_ok "Will build locally from source"
+fi
+
+# ============================================================
 # Step 1 — Immich
 # ============================================================
 print_step "Step 1 — Immich Server"
@@ -307,6 +328,22 @@ EOF
     print_ok ".env created (permissions: 600)"
 fi
 
+# Ensure state directory exists (needed for volume mount)
+mkdir -p state
+# Ensure config.yaml exists (needed for volume mount)
+if [ ! -f config.yaml ]; then
+    cat > config.yaml << 'CONFIGEOF'
+immich:
+  url: ${IMMICH_URL}
+  external_url: ${IMMICH_EXTERNAL_URL}
+ntfy:
+  url: ${NTFY_URL}
+  external_url: ${NTFY_EXTERNAL_URL}
+users: []
+CONFIGEOF
+    print_ok "config.yaml created"
+fi
+
 # --- docker-compose.override.yml (if bundled ntfy) ----------
 if [ "$USE_BUNDLED_NTFY" = "y" ]; then
     # Generate ntfy server.yaml
@@ -391,19 +428,36 @@ echo ""
 echo ""
 prompt_yn START_NOW "Start services now (dashboard$([ "$USE_BUNDLED_NTFY" = "y" ] && echo " + ntfy"))" "y"
 
+COMPOSE_CMD="docker compose"
+if [ "$USE_GHCR" = "y" ]; then
+    if [ "$USE_BUNDLED_NTFY" = "y" ]; then
+        COMPOSE_CMD="docker compose -f docker-compose.ghcr.yml -f docker-compose.override.yml"
+    else
+        COMPOSE_CMD="docker compose -f docker-compose.ghcr.yml"
+    fi
+fi
+
 if [ "$START_NOW" = "y" ]; then
     echo ""
     print_step "Starting services..."
     echo ""
 
     if [ "$USE_BUNDLED_NTFY" = "y" ]; then
-        echo -e "  ${BOLD}docker compose up -d ntfy${NC}"
-        docker compose up -d ntfy
+        echo -e "  ${BOLD}${COMPOSE_CMD} up -d ntfy${NC}"
+        $COMPOSE_CMD up -d ntfy
         echo ""
     fi
 
-    echo -e "  ${BOLD}docker compose up -d --build dashboard${NC}"
-    docker compose up -d --build dashboard
+    if [ "$USE_GHCR" = "y" ]; then
+        echo -e "  ${BOLD}${COMPOSE_CMD} pull${NC}"
+        $COMPOSE_CMD pull
+        echo ""
+        echo -e "  ${BOLD}${COMPOSE_CMD} up -d dashboard${NC}"
+        $COMPOSE_CMD up -d dashboard
+    else
+        echo -e "  ${BOLD}${COMPOSE_CMD} up -d --build dashboard${NC}"
+        $COMPOSE_CMD up -d --build dashboard
+    fi
     echo ""
 
     # Detect host IP for dashboard URL
@@ -421,9 +475,13 @@ else
     echo "  When ready, start the services:"
     echo ""
     if [ "$USE_BUNDLED_NTFY" = "y" ]; then
-        echo -e "    ${BOLD}docker compose up -d ntfy${NC}"
+        echo -e "    ${BOLD}${COMPOSE_CMD} up -d ntfy${NC}"
     fi
-    echo -e "    ${BOLD}docker compose up -d dashboard${NC}"
+    if [ "$USE_GHCR" = "y" ]; then
+        echo -e "    ${BOLD}${COMPOSE_CMD} up -d dashboard${NC}"
+    else
+        echo -e "    ${BOLD}${COMPOSE_CMD} up -d --build dashboard${NC}"
+    fi
     echo ""
     echo "  Then open: ${BOLD}http://localhost:5000${NC}"
     echo "  The setup wizard will appear automatically."

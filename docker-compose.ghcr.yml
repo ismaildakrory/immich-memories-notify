@@ -1,0 +1,38 @@
+# ============================================================
+# IMMICH MEMORIES NOTIFY - DOCKER COMPOSE (Pre-built Image)
+# ============================================================
+#
+# Use this file if you want to pull the pre-built image from GHCR
+# instead of building locally from source.
+#
+# USAGE:
+#   docker compose -f docker-compose.ghcr.yml up -d dashboard
+#   docker compose -f docker-compose.ghcr.yml exec dashboard python -m notify --slot 1 --test --no-delay
+#
+# Or set it as default:
+#   cp docker-compose.ghcr.yml docker-compose.yml
+#
+# ============================================================
+
+services:
+  dashboard:
+    image: ghcr.io/ismaildakrory/immich-memories-notify:latest
+    container_name: immich-memories-dashboard
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./state:/app/state
+      - ./custom_templates:/app/custom_templates:ro
+      - ./.env:/app/.env
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+    env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
+      - CONFIG_PATH=/app/config.yaml
+      - STATE_PATH=/app/state/state.json
+      - ENV_PATH=/app/.env
+      - DASHBOARD_USER=${DASHBOARD_USER:-admin}
+      - DASHBOARD_TOKEN=${DASHBOARD_TOKEN:-}
+      - DASHBOARD_PORT=${DASHBOARD_PORT:-5000}
+    network_mode: host
+    restart: unless-stopped

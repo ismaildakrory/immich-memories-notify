@@ -48,6 +48,20 @@ Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
 docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
 
+To use the pre-built image instead of building locally:
+
+```bash
+git clone https://github.com/ismaildakrory/immich-memories-notify.git
+cd immich-memories-notify
+bash setup.sh   # Choose option 2 (pre-built image)
+```
+
+Or manually use the provided compose file:
+
+```bash
+docker compose -f docker-compose.ghcr.yml up -d dashboard
+```
+
 This is useful for Kubernetes, Unraid, or any environment where you prefer pulling a pre-built image over building locally.
 
 ## Immich API Key Permissions
