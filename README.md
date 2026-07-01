@@ -6,12 +6,14 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Docker Image](#docker-image)
 - [Immich API Key Permissions](#immich-api-key-permissions)
 - [Screenshots](#screenshots)
 - [Common Commands](#common-commands)
 - [Configuration](#configuration)
 - [Self-Hosting ntfy](#self-hosting-ntfy)
 - [Dashboard Authentication](#dashboard-authentication)
+- [Dashboard Port](#dashboard-port)
 - [Troubleshooting](#troubleshooting)
 - [Requirements](#requirements)
 - [Contributing](#contributing)
@@ -37,6 +39,16 @@ bash setup.sh
 ```
 
 The setup script generates your config, optionally starts a bundled ntfy server, and launches the dashboard. A wizard walks you through connecting Immich, ntfy, and adding your first user. The scheduler runs automatically inside the dashboard container.
+
+## Docker Image
+
+Pre-built images are available on GHCR for `linux/amd64` and `linux/arm64`:
+
+```bash
+docker pull ghcr.io/ismaildakrory/immich-memories-notify:latest
+```
+
+This is useful for Kubernetes, Unraid, or any environment where you prefer pulling a pre-built image over building locally.
 
 ## Immich API Key Permissions
 
@@ -94,7 +106,7 @@ All settings are manageable from the **web dashboard**. For manual editing:
 
 | File | Purpose |
 |------|---------|
-| `.env` | Secrets — API keys, passwords, server URLs |
+| `.env` | Secrets — API keys, passwords, server URLs, dashboard port |
 | `config.yaml` | Everything else — users, settings, messages |
 | `state/state.json` | Notification tracking (auto-generated) |
 
@@ -190,6 +202,13 @@ DASHBOARD_TOKEN=your-secret-token
 ```
 If not set, the dashboard is open (fine for local network).
 
+## Dashboard Port
+
+The dashboard runs on port 5000 by default. To change it, set `DASHBOARD_PORT` in `.env`:
+```
+DASHBOARD_PORT=8080
+```
+
 ## Upgrading from v2.4.x
 
 v2.5.0 merges the scheduler into the dashboard container. To upgrade:
@@ -212,6 +231,7 @@ The old `scheduler` container is no longer needed. If you skip `docker compose d
 
 | Problem | Fix |
 |---------|-----|
+| Clicking notification doesn't open Immich app | Set `IMMICH_EXTERNAL_URL=https://my.immich.app` in `.env` — the Immich mobile app only handles links from this domain |
 | No notifications | `docker compose run --rm notify --slot 1 --dry-run --no-delay` to check for memories |
 | No thumbnails | Run with `--test --force`, look for upload warnings in output |
 | No person photos | Name your people in Immich, ensure photos older than 30 days exist |
