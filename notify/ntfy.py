@@ -9,7 +9,7 @@ from .immich import fetch_thumbnail
 from .utils import with_retry
 
 
-def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, timeout: int = 30) -> str | None:
+def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, timeout: int = 30, ntfy_external_url: str = None) -> str | None:
     """Upload an image to ntfy and return the URL."""
     logger = logging.getLogger("immich-memories-notify")
     temp_topic = f"upload-{uuid.uuid4().hex[:12]}"
@@ -24,6 +24,13 @@ def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, t
         attachment_url = attachment.get("url")
         if not attachment_url:
             logger.warning("ntfy upload returned 200 but no attachment URL — check that NTFY_BASE_URL and NTFY_ATTACHMENT_CACHE_SIZE are set on your ntfy server")
+        else:
+            logger.debug(f"Attachment URL: {attachment_url}")
+            if ntfy_external_url and not attachment_url.startswith(ntfy_external_url):
+                logger.warning(
+                    f"Attachment URL ({attachment_url}) does not match NTFY_EXTERNAL_URL ({ntfy_external_url}) — "
+                    "thumbnails may not display on your phone. Check that base-url in your ntfy server.yaml matches NTFY_EXTERNAL_URL"
+                )
         return attachment_url
 
     body = response.text[:200]
@@ -61,6 +68,7 @@ def send_notification(
     auth: tuple = None,
     timeout: int = 10,
     is_video: bool = False,
+    ntfy_external_url: str = None,
 ) -> bool:
     """Send a notification to ntfy."""
     topic = _sanitize_header(topic)
@@ -91,7 +99,7 @@ def send_notification(
 
     # Upload thumbnail and attach it
     if thumbnail_data:
-        image_url = upload_image_to_ntfy(ntfy_url, thumbnail_data, auth=auth)
+        image_url = upload_image_to_ntfy(ntfy_url, thumbnail_data, auth=auth, ntfy_external_url=ntfy_external_url)
         if image_url:
             headers["Attach"] = image_url
         else:
@@ -121,6 +129,7 @@ def send_single_notification(
     if click_base and not click_base.startswith(("http://", "https://")):
         click_base = f"https://{click_base}"
     ntfy_url = config["ntfy"]["url"]
+    ntfy_external_url = config["ntfy"].get("external_url") or ""
     topic = user["ntfy_topic"]
     retry_config = config["settings"]["retry"]
     api_key = user["immich_api_key"]
@@ -170,6 +179,7 @@ def send_single_notification(
                 click_url=click_url,
                 auth=ntfy_auth,
                 is_video=is_video,
+                ntfy_external_url=ntfy_external_url,
             ),
             max_attempts=retry_config["max_attempts"],
             delay=retry_config["delay_seconds"],
