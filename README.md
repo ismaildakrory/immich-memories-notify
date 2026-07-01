@@ -7,13 +7,12 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Docker Image](#docker-image)
-- [Immich API Key Permissions](#immich-api-key-permissions)
 - [Screenshots](#screenshots)
 - [Common Commands](#common-commands)
 - [Configuration](#configuration)
 - [Self-Hosting ntfy](#self-hosting-ntfy)
-- [Dashboard Authentication](#dashboard-authentication)
-- [Dashboard Port](#dashboard-port)
+- [Dashboard](#dashboard)
+- [Immich API Key Permissions](#immich-api-key-permissions)
 - [Troubleshooting](#troubleshooting)
 - [Requirements](#requirements)
 - [Contributing](#contributing)
@@ -77,23 +76,6 @@ docker run -d \
 Then open `http://your-server-ip:5000` — the setup wizard will guide you through the rest.
 
 </details>
-
-## Immich API Key Permissions
-
-When creating an API key in Immich, grant these permissions:
-
-| Permission | Used for |
-|---|---|
-| `memory.read` | On-this-day notifications |
-| `person.read` | Face recognition features |
-| `asset.read` | Asset details and metadata search |
-| `asset.view` | Thumbnail previews in notifications |
-| `asset.upload` | Weekly collage upload |
-| `album.read` | Album notifications |
-| `album.create` | Creating the collage album |
-| `albumAsset.create` | Adding collages to the album |
-
-If you don't use the weekly collage and Trip features, you can skip `asset.upload`, `album.create`, and `albumAsset.create`.
 
 ## Screenshots
 
@@ -222,38 +204,30 @@ attachment-file-size: 15M
 attachment-expiry-duration: 3h
 ```
 
-## Dashboard Authentication
+## Dashboard
 
-Set in `.env` to password-protect the dashboard:
+Set in `.env` to customize the dashboard:
 ```
-DASHBOARD_TOKEN=your-secret-token
-```
-If not set, the dashboard is open (fine for local network).
-
-## Dashboard Port
-
-The dashboard runs on port 5000 by default. To change it, set `DASHBOARD_PORT` in `.env`:
-```
-DASHBOARD_PORT=8080
+DASHBOARD_TOKEN=your-secret-token   # Password-protect the dashboard (optional)
+DASHBOARD_PORT=8080                 # Change port (default: 5000)
 ```
 
-## Upgrading from v2.4.x
+## Immich API Key Permissions
 
-v2.5.0 merges the scheduler into the dashboard container. To upgrade:
+When creating an API key in Immich, grant these permissions:
 
-```bash
-git pull
-docker compose down --remove-orphans
-docker compose up -d --build dashboard
-```
+| Permission | Used for |
+|---|---|
+| `memory.read` | On-this-day notifications |
+| `person.read` | Face recognition features |
+| `asset.read` | Asset details and metadata search |
+| `asset.view` | Thumbnail previews in notifications |
+| `asset.upload` | Weekly collage upload |
+| `album.read` | Album notifications |
+| `album.create` | Creating the collage album |
+| `albumAsset.create` | Adding collages to the album |
 
-The old `scheduler` container is no longer needed. If you skip `docker compose down` and just rebuild, the dashboard will automatically stop the old scheduler on startup to prevent double notifications.
-
-> **Bundled ntfy users:** `docker compose down` stops all containers including ntfy. Make sure to restart it alongside the dashboard:
-> ```bash
-> docker compose up -d --build dashboard ntfy
-> ```
-> Or simply `docker compose up -d --build` to restart everything.
+If you don't use the weekly collage and Trip features, you can skip `asset.upload`, `album.create`, and `albumAsset.create`.
 
 ## Troubleshooting
 
