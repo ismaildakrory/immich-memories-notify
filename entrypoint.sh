@@ -15,7 +15,7 @@ crond -l 2
 trap 'kill $UVICORN_PID; wait $UVICORN_PID' TERM INT
 
 # Start uvicorn in background so shell stays PID 1 (reaps zombies)
-uvicorn dashboard.main:app --host 0.0.0.0 --port 5000 &
+uvicorn dashboard.main:app --host 0.0.0.0 --port ${DASHBOARD_PORT:-5000} &
 UVICORN_PID=$!
 
 # Wait for uvicorn — if it dies, container exits
