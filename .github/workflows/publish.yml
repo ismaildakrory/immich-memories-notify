@@ -11,14 +11,6 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image-name: immich-memories-notify
-            dockerfile: ./Dockerfile.dashboard
-          - image-name: immich-memories-notify-cli
-            dockerfile: ./Dockerfile
     permissions:
       contents: read
       packages: write
@@ -50,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.owner.outputs.owner }}/${{ matrix.image-name }}
+          images: ${{ env.REGISTRY }}/${{ steps.owner.outputs.owner }}/immich-memories-notify
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -60,12 +52,10 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: ./Dockerfile.dashboard
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            COPY_SOURCE=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
