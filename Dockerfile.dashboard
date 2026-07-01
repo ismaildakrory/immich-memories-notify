@@ -17,8 +17,10 @@ WORKDIR /app
 COPY VERSION /app/VERSION
 COPY dashboard/ /app/dashboard/
 COPY notify/ /app/notify/
+COPY custom_templates/ /app/custom_templates/
+COPY config.yaml /app/config.yaml
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && mkdir -p /app/state
 
 # Expose port
 EXPOSE 5000
