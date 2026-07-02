@@ -29,13 +29,15 @@ def load_state(state_path: str) -> dict:
 
 
 def save_state(state_path: str, state: dict):
-    """Save state to JSON file."""
+    """Save state to JSON file (atomic write, same lock as the notify engine)."""
     path = Path(state_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(".tmp")
 
     with write_lock(state_path):
-        with open(path, 'w') as f:
+        with open(tmp_path, 'w') as f:
             json.dump(state, f, indent=2)
+        tmp_path.replace(path)
 
 
 @router.get("/", response_model=StateResponse)

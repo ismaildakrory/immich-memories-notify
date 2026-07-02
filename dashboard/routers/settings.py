@@ -114,9 +114,11 @@ async def get_settings(request: Request):
         then_and_now_enabled=settings_data.get("then_and_now_enabled", True),
         then_and_now_cooldown_days=settings_data.get("then_and_now_cooldown_days", 7),
         then_and_now_min_gap=settings_data.get("then_and_now_min_gap", 3),
+        then_and_now_slot=settings_data.get("then_and_now_slot", 0),
         trip_highlights_enabled=settings_data.get("trip_highlights_enabled", True),
         trip_highlights_cooldown_days=settings_data.get("trip_highlights_cooldown_days", 7),
         trip_highlights_min_photos=settings_data.get("trip_highlights_min_photos", 5),
+        trip_highlights_repeat_days=settings_data.get("trip_highlights_repeat_days", 90),
         birthday_enabled=settings_data.get("birthday_enabled", True),
     )
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, Query
 
 from ..models import TestTriggerResponse
+from ..utils.envfile import parse_env_line
 
 ENV_PATH = os.environ.get("ENV_PATH", "/app/.env")
 
@@ -24,10 +25,9 @@ def load_env_for_subprocess() -> dict:
     if env_file.exists():
         with open(env_file) as f:
             for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, _, value = line.partition('=')
-                    env[key.strip()] = value.strip().strip('"').strip("'")
+                parsed = parse_env_line(line)
+                if parsed:
+                    env[parsed[0]] = parsed[1]
     return env
 
 router = APIRouter()

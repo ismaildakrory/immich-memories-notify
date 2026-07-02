@@ -101,7 +101,7 @@ def check_for_updates(config_path: str = "config.yaml", logger: logging.Logger =
     try:
         title_encoded = title
         try:
-            title.encode('latin-1')
+            title.encode('ascii')
         except UnicodeEncodeError:
             import base64
             title_encoded = f"=?UTF-8?B?{base64.b64encode(title.encode('utf-8')).decode('ascii')}?="

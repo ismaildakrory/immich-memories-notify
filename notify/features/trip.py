@@ -11,6 +11,7 @@ from PIL import Image
 
 from ..immich import (
     fetch_thumbnail,
+    get_album_assets,
     get_asset_people,
     get_or_create_album,
     upload_collage_to_album,
@@ -104,15 +105,32 @@ def find_trip_candidate(
     min_photos: int = 5,
     year_range: int = 5,
     logger=None,
+    used_trips: dict = None,
+    repeat_days: int = 90,
 ) -> Optional[dict]:
     """
     Scan past years (limited by year_range) for the same calendar month.
     Groups IMAGE assets by (city, country, year) using exifInfo.
     Photos must be taken within 5 days of each other to count as a trip.
     Returns the group with the most photos that meets the minimum threshold.
+
+    Trips already shown within repeat_days (tracked in used_trips as
+    {"city|country|year": "YYYY-MM-DD"}) are skipped so the same trip
+    doesn't fire over and over.
     """
     target_month = target_date.month
     current_year = target_date.year
+    used_trips = used_trips or {}
+
+    def _recently_shown(trip_key: str) -> bool:
+        shown = used_trips.get(trip_key)
+        if not shown:
+            return False
+        try:
+            return (target_date - date.fromisoformat(shown)).days < repeat_days
+        except (ValueError, TypeError):
+            return False
+
     # (city, country, year) -> [(asset_id, date), ...]
     city_year_assets = {}
 
@@ -139,24 +157,38 @@ def find_trip_candidate(
             if logger:
                 logger.debug(f"  Trip search {year}-{target_month:02d}: {e}")
 
-    # Cluster each group by date proximity, then pick best
-    best = None
-    best_count = 0
+    # Cluster each group by date proximity, then pick randomly among all
+    # eligible trips (not shown recently) for variety
+    eligible = []
+    skipped_recent = 0
     for (city, country, year), assets_dates in city_year_assets.items():
         cluster_ids = _cluster_trip_dates(assets_dates, max_gap_days=5)
         if len(cluster_ids) < min_photos:
             continue
-        if len(cluster_ids) > best_count or (len(cluster_ids) == best_count and best and year < best["year"]):
-            best_count = len(cluster_ids)
-            best = {"city": city, "country": country, "year": year,
-                    "gap": current_year - year, "asset_ids": cluster_ids}
+        trip_key = f"{city}|{country}|{year}"
+        if _recently_shown(trip_key):
+            skipped_recent += 1
+            if logger:
+                logger.debug(f"  Trip {city} ({year}) shown recently ({used_trips.get(trip_key)}), skipping")
+            continue
+        eligible.append({"city": city, "country": country, "year": year,
+                         "gap": current_year - year, "asset_ids": cluster_ids,
+                         "trip_key": trip_key})
 
-    if best and logger:
-        logger.info(f"  Trip candidate: {best['city']}, {best['country']} "
-                    f"({best['year']}, {best_count} photos)")
-    elif logger:
-        logger.debug(f"  No trip candidate (need {min_photos}+ photos in same city within 5 days, past {year_range} years)")
-    return best
+    if eligible:
+        best = random.choice(eligible)
+        if logger:
+            logger.info(f"  Trip candidate: {best['city']}, {best['country']} "
+                        f"({best['year']}, {len(best['asset_ids'])} photos, "
+                        f"picked from {len(eligible)} eligible)")
+        return best
+
+    if logger:
+        if skipped_recent:
+            logger.info(f"  No fresh trip candidate ({skipped_recent} shown within last {repeat_days} days)")
+        else:
+            logger.debug(f"  No trip candidate (need {min_photos}+ photos in same city within 5 days, past {year_range} years)")
+    return None
 
 
 def prepare_trip_notification(
@@ -180,58 +212,92 @@ def prepare_trip_notification(
     gap = trip["gap"]
     asset_ids = trip["asset_ids"]
 
-    selected_ids = random.sample(asset_ids, min(4, len(asset_ids)))
-
-    # Fetch thumbnails for collage
-    thumbnails = []
+    # Reuse an existing collage if this trip's album already has one
+    # (collages are uploaded with deviceId "memnotify"), so re-fires and
+    # test triggers don't pile up duplicate collages in the album.
+    album_name = f"Trip to {city}, {country} ({year})"
+    uploaded_asset_id = None
+    collage = None
     valid_ids = []
-    for aid in selected_ids:
-        try:
-            data = fetch_thumbnail(immich_url, api_key, aid, size="preview")
-            thumbnails.append(data)
-            valid_ids.append(aid)
-        except Exception as e:
-            _logger.debug(f"  Could not fetch thumbnail for {aid}: {e}")
-
-    if not thumbnails:
-        _logger.warning("  No thumbnails fetched for Trip Highlights collage")
-        return None
-
-    # Build collage — use first available custom template or a simple grid
-    def _simple_grid(images, names, w, h, faces=None):
-        """Simple 2×2 (or fewer) grid collage with face-aware cropping."""
-        if faces is None:
-            faces = [[] for _ in images]
-        n = len(images)
-        cols = min(n, 2)
-        rows = (n + cols - 1) // cols
-        cell_w = w // cols
-        cell_h = h // rows
-        canvas = Image.new("RGB", (w, h), (30, 30, 30))
-        for i, img in enumerate(images):
-            col = i % cols
-            row = i // cols
-            img_cropped = cover_crop_image(img, cell_w, cell_h, faces=faces[i] if i < len(faces) else None)
-            canvas.paste(img_cropped, (col * cell_w, row * cell_h))
-        return canvas
-
-    # Fetch face data for smart cropping
-    faces_list = []
-    for aid in valid_ids:
-        try:
-            faces_list.append(get_asset_people(immich_url, api_key, aid))
-        except Exception:
-            faces_list.append([])
-
     try:
-        pil_images = [Image.open(BytesIO(d)).convert("RGB") for d in thumbnails]
-        canvas = _simple_grid(pil_images, [], 1080, 1080, faces=faces_list)
-        buf = BytesIO()
-        canvas.save(buf, format="JPEG", quality=95)
-        collage = buf.getvalue()
+        existing_album = get_album_assets(immich_url, api_key, album_name, _logger)
+        if existing_album:
+            for a in existing_album.get("assets", []):
+                if (a.get("deviceId") == "memnotify"
+                        or str(a.get("deviceAssetId", "")).startswith("memnotify-collage")):
+                    uploaded_asset_id = a.get("id")
+                    _logger.info(f"  Reusing existing collage in album '{album_name}'")
+                    break
     except Exception as e:
-        _logger.warning(f"  Could not create Trip Highlights collage: {e}")
-        return None
+        _logger.debug(f"  Could not check album '{album_name}' for existing collage: {e}")
+
+    if not uploaded_asset_id:
+        selected_ids = random.sample(asset_ids, min(4, len(asset_ids)))
+
+        # Fetch thumbnails for collage
+        thumbnails = []
+        for aid in selected_ids:
+            try:
+                data = fetch_thumbnail(immich_url, api_key, aid, size="preview")
+                thumbnails.append(data)
+                valid_ids.append(aid)
+            except Exception as e:
+                _logger.debug(f"  Could not fetch thumbnail for {aid}: {e}")
+
+        if not thumbnails:
+            _logger.warning("  No thumbnails fetched for Trip Highlights collage")
+            return None
+
+        # Build collage — simple grid with face-aware cropping
+        def _simple_grid(images, names, w, h, faces=None):
+            """Simple 2×2 (or fewer) grid collage with face-aware cropping."""
+            if faces is None:
+                faces = [[] for _ in images]
+            n = len(images)
+            cols = min(n, 2)
+            rows = (n + cols - 1) // cols
+            cell_w = w // cols
+            cell_h = h // rows
+            canvas = Image.new("RGB", (w, h), (30, 30, 30))
+            for i, img in enumerate(images):
+                col = i % cols
+                row = i // cols
+                img_cropped = cover_crop_image(img, cell_w, cell_h, faces=faces[i] if i < len(faces) else None)
+                canvas.paste(img_cropped, (col * cell_w, row * cell_h))
+            return canvas
+
+        # Fetch face data for smart cropping
+        faces_list = []
+        for aid in valid_ids:
+            try:
+                faces_list.append(get_asset_people(immich_url, api_key, aid))
+            except Exception:
+                faces_list.append([])
+
+        try:
+            pil_images = [Image.open(BytesIO(d)).convert("RGB") for d in thumbnails]
+            canvas = _simple_grid(pil_images, [], 1080, 1080, faces=faces_list)
+            buf = BytesIO()
+            canvas.save(buf, format="JPEG", quality=95)
+            collage = buf.getvalue()
+        except Exception as e:
+            _logger.warning(f"  Could not create Trip Highlights collage: {e}")
+            return None
+
+        # Create/find per-trip album, add originals, upload the new collage
+        try:
+            album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
+            if album_id:
+                headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
+                requests.put(
+                    f"{immich_url}/api/albums/{album_id}/assets",
+                    headers=headers,
+                    json={"ids": asset_ids},
+                    timeout=30,
+                )
+                uploaded_asset_id = upload_collage_to_album(immich_url, api_key, collage, album_id, _logger)
+        except Exception as e:
+            _logger.warning(f"  Could not upload Trip Highlights to album: {e}")
 
     # Build message
     if messages:
@@ -254,26 +320,7 @@ def prepare_trip_notification(
     if test_mode:
         title = "[TEST] " + title
 
-    # Create/find per-trip album and add original photos
-    album_name = f"Trip to {city}, {country} ({year})"
-    uploaded_asset_id = None
-    try:
-        album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
-        if album_id:
-            # Add original photos to album
-            headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
-            requests.put(
-                f"{immich_url}/api/albums/{album_id}/assets",
-                headers=headers,
-                json={"ids": asset_ids},
-                timeout=30,
-            )
-            # Upload collage to album
-            uploaded_asset_id = upload_collage_to_album(immich_url, api_key, collage, album_id, _logger)
-    except Exception as e:
-        _logger.warning(f"  Could not upload Trip Highlights to album: {e}")
-
-    click_asset = random.choice(valid_ids)
+    click_asset = random.choice(valid_ids or asset_ids)
 
     return {
         "title": title,
@@ -284,4 +331,5 @@ def prepare_trip_notification(
         "is_trip": True,
         "is_video": False,
         "collage_data": collage,
+        "trip_key": trip.get("trip_key", ""),
     }

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from .utils.envfile import parse_env_line
+
 ENV_FILE = "/app/.cron.env"
 
 DEFAULT_CONFIG = {
@@ -47,6 +49,7 @@ DEFAULT_CONFIG = {
         "trip_highlights_enabled": True,
         "trip_highlights_cooldown_days": 7,
         "trip_highlights_min_photos": 5,
+        "trip_highlights_repeat_days": 90,
         "birthday_enabled": True,
         "notification_windows": [
             {"start": "08:00", "end": "09:00"},
@@ -146,23 +149,33 @@ DEFAULT_CONFIG = {
 
 
 def ensure_config(config_path: str = "/app/config.yaml"):
-    """Create default config.yaml if it doesn't exist, so the dashboard can start."""
+    """Create default config.yaml if it doesn't exist or is empty, so the dashboard can start."""
     path = Path(config_path)
-    if path.is_file():
-        return
-
     log = logging.getLogger("dashboard")
 
-    # Docker bind-mount creates an empty directory when the source file is missing on the host.
-    # That directory is a mount point and can't be removed from inside the container.
-    if path.is_dir():
-        log.error(
-            f"{config_path} is a directory (Docker bind-mount without source file). "
-            "Create the file on the host first: touch config.yaml"
-        )
-        return
+    if path.is_file():
+        # An empty file (e.g. created with `touch config.yaml` for the Docker
+        # bind mount) still needs the default config, otherwise there are no
+        # notification windows and the scheduler never fires.
+        try:
+            with open(path) as f:
+                if yaml.safe_load(f) is not None:
+                    return
+        except yaml.YAMLError:
+            log.warning(f"{config_path} contains invalid YAML — leaving it untouched")
+            return
+        log.info("config.yaml is empty — writing default configuration")
+    else:
+        # Docker bind-mount creates an empty directory when the source file is missing on the host.
+        # That directory is a mount point and can't be removed from inside the container.
+        if path.is_dir():
+            log.error(
+                f"{config_path} is a directory (Docker bind-mount without source file). "
+                "Create the file on the host first: touch config.yaml"
+            )
+            return
+        log.info("config.yaml not found — creating default configuration for first-run wizard")
 
-    log.info("config.yaml not found — creating default configuration for first-run wizard")
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         yaml.dump(DEFAULT_CONFIG, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
@@ -180,14 +193,9 @@ def dump_env():
     try:
         with open(env_path) as f:
             for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, value = line.partition("=")
-                key = key.strip()
-                value = value.strip().strip('"').strip("'")
-                if key:
-                    env[key] = value
+                parsed = parse_env_line(line)
+                if parsed and parsed[0]:
+                    env[parsed[0]] = parsed[1]
     except FileNotFoundError:
         pass
 

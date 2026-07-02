@@ -35,6 +35,7 @@ settings:
   trip_highlights_enabled: true
   trip_highlights_cooldown_days: 7
   trip_highlights_min_photos: 5
+  trip_highlights_repeat_days: 90
   notification_windows:
   - start: '08:00'
     end: '09:00'
@@ -84,10 +85,10 @@ then_and_now_messages:
 - Time flies... {person_name} in {then_year} and {now_year}
 - From {then_year} to {now_year} with {person_name}
 trip_highlights_messages:
-- '{gap} years ago in {city}, {country}! \U0001f30d'
+- '{gap} years ago in {city}, {country}! 🌍'
 - Remember this trip to {city}? Back in {year}!
 - '{city}, {country} — {gap} years have passed'
-- Flashback to {city}, {year} \u2708\ufe0f
+- Flashback to {city}, {year} ✈️
 - What a trip! {city}, {country} — {year}
 album_messages:
 - A random moment from {album_name}

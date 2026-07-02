@@ -14,6 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..crontab import dump_env
+from ..utils.envfile import parse_env_line
 from ..utils.filelock import read_lock, write_lock
 
 router = APIRouter()
@@ -24,7 +25,12 @@ CONFIG_PATH = os.environ.get("CONFIG_PATH", "/app/config.yaml")
 
 
 def _validate_url_not_internal(url: str):
-    """Block SSRF attempts by rejecting URLs that resolve to internal/metadata IPs."""
+    """Reject cloud-metadata / link-local URLs.
+
+    Loopback is deliberately allowed: with network_mode: host, localhost is a
+    perfectly valid address for Immich or the bundled ntfy (setup.sh defaults
+    to http://localhost:2283).
+    """
     parsed = urlparse(url)
     hostname = parsed.hostname
     if not hostname:
@@ -36,7 +42,7 @@ def _validate_url_not_internal(url: str):
 
     try:
         addr = ipaddress.ip_address(hostname)
-        if addr.is_loopback or addr.is_link_local:
+        if addr.is_link_local:
             raise HTTPException(status_code=400, detail="URL points to a blocked address")
     except ValueError:
         pass
@@ -86,12 +92,9 @@ def load_env_file(env_path: str) -> dict:
     with read_lock(env_path):
         with open(path) as f:
             for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, _, value = line.partition('=')
-                    # Remove quotes if present
-                    value = value.strip().strip('"').strip("'")
-                    env_vars[key.strip()] = value
+                parsed = parse_env_line(line)
+                if parsed:
+                    env_vars[parsed[0]] = parsed[1]
 
     return env_vars
 

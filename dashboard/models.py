@@ -40,9 +40,11 @@ class Settings(BaseModel):
     then_and_now_enabled: bool = True
     then_and_now_cooldown_days: int = Field(7, ge=0, le=365)
     then_and_now_min_gap: int = Field(3, ge=1, le=50)
+    then_and_now_slot: int = Field(0, ge=0, le=20)
     trip_highlights_enabled: bool = True
     trip_highlights_cooldown_days: int = Field(7, ge=0, le=365)
     trip_highlights_min_photos: int = Field(5, ge=1, le=100)
+    trip_highlights_repeat_days: int = Field(90, ge=0, le=3650)
     birthday_enabled: bool = True
 
 
@@ -123,9 +125,11 @@ class SettingsUpdate(BaseModel):
     then_and_now_enabled: Optional[bool] = None
     then_and_now_cooldown_days: Optional[int] = Field(None, ge=0, le=365)
     then_and_now_min_gap: Optional[int] = Field(None, ge=1, le=50)
+    then_and_now_slot: Optional[int] = Field(None, ge=0, le=20)
     trip_highlights_enabled: Optional[bool] = None
     trip_highlights_cooldown_days: Optional[int] = Field(None, ge=0, le=365)
     trip_highlights_min_photos: Optional[int] = Field(None, ge=1, le=100)
+    trip_highlights_repeat_days: Optional[int] = Field(None, ge=0, le=3650)
     birthday_enabled: Optional[bool] = None
 
 

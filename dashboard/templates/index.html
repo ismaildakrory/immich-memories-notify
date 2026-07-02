@@ -1009,6 +1009,10 @@
                         <label>Min Photos</label>
                         <input type="number" id="trip_highlights_min_photos" min="1" value="5">
                     </div>
+                    <div class="form-group">
+                        <label>Same-Trip Repeat (days)</label>
+                        <input type="number" id="trip_highlights_repeat_days" min="0" value="90" title="Don't show the same trip again for this many days">
+                    </div>
                 </div>
 
                 <h3>Birthday Settings</h3>
@@ -1418,6 +1422,7 @@
                 document.getElementById('trip_highlights_enabled').checked = data.settings.trip_highlights_enabled;
                 document.getElementById('trip_highlights_cooldown_days').value = data.settings.trip_highlights_cooldown_days;
                 document.getElementById('trip_highlights_min_photos').value = data.settings.trip_highlights_min_photos;
+                document.getElementById('trip_highlights_repeat_days').value = data.settings.trip_highlights_repeat_days ?? 90;
                 document.getElementById('birthday_enabled').checked = data.settings.birthday_enabled !== false;
 
                 // Messages
@@ -1525,6 +1530,7 @@
                 trip_highlights_enabled: document.getElementById('trip_highlights_enabled').checked,
                 trip_highlights_cooldown_days: parseInt(document.getElementById('trip_highlights_cooldown_days').value),
                 trip_highlights_min_photos: parseInt(document.getElementById('trip_highlights_min_photos').value),
+                trip_highlights_repeat_days: parseInt(document.getElementById('trip_highlights_repeat_days').value),
                 birthday_enabled: document.getElementById('birthday_enabled').checked,
             };
 

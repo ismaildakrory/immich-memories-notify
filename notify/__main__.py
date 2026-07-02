@@ -261,6 +261,8 @@ def process_user_slot(
                 # Priority: Trip first, TaN fallback (when both ready)
                 if trip_ready:
                     try:
+                        trips_shown = state.get("users", {}).get(name, {}).get("trips_shown", {})
+                        trip_repeat_days = settings.get("trip_highlights_repeat_days", 90)
                         trip = find_trip_candidate(
                             immich_url=immich_url,
                             api_key=api_key,
@@ -269,6 +271,8 @@ def process_user_slot(
                             min_photos=trip_min_photos,
                             year_range=year_range,
                             logger=logger,
+                            used_trips=trips_shown,
+                            repeat_days=trip_repeat_days,
                         )
                         if trip:
                             notification = prepare_trip_notification(
@@ -445,6 +449,19 @@ def process_user_slot(
             # Mark feature cooldowns only after successful send
             if notification.get("is_trip"):
                 mark_feature_fired(state, name, "last_trip_date", target_date)
+                trip_key = notification.get("trip_key", "")
+                if trip_key:
+                    user_state = state.setdefault("users", {}).setdefault(name, {})
+                    shown = user_state.setdefault("trips_shown", {})
+                    shown[trip_key] = target_date.isoformat()
+                    # Prune entries past the repeat window so state doesn't grow forever
+                    repeat_days = settings.get("trip_highlights_repeat_days", 90)
+                    for key in list(shown):
+                        try:
+                            if (target_date - date.fromisoformat(shown[key])).days >= repeat_days:
+                                del shown[key]
+                        except (ValueError, TypeError):
+                            del shown[key]
             elif notification.get("is_then_and_now"):
                 mark_feature_fired(state, name, "last_tan_date", target_date)
                 user_state = state.setdefault("users", {}).setdefault(name, {})
@@ -586,8 +603,13 @@ Examples:
     total_slots = memory_notifications + person_notifications
     is_person_slot = args.slot > memory_notifications and args.slot <= total_slots
 
-    # On collage day, replace person-photo slots with collage
-    use_collage_for_slot = collage_day and is_person_slot
+    # On collage day, replace the first weekly_collage_slots person-photo slots with collage
+    weekly_collage_slots = settings.get("weekly_collage_slots", person_notifications)
+    use_collage_for_slot = (
+        collage_day
+        and is_person_slot
+        and args.slot - memory_notifications <= weekly_collage_slots
+    )
 
     # Process each user for this slot
     success_count = 0

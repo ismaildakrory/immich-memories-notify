@@ -21,10 +21,10 @@ def file_lock(filepath: str, exclusive: bool = True) -> Generator[None, None, No
             # Safe to read/write the file
             pass
     """
-    lock_dir = Path("/tmp/memnotify-locks")
-    lock_dir.mkdir(parents=True, exist_ok=True)
-    lock_name = Path(filepath).name + '.lock'
-    lock_path = lock_dir / lock_name
+    # Lock file sits next to the target so it is shared across containers via
+    # bind mounts, and matches the lock path used by notify/config.py.
+    lock_path = Path(str(filepath) + '.lock')
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
 
     lock_file = open(lock_path, 'w')
     try:

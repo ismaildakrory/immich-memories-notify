@@ -73,8 +73,20 @@ def load_config(config_path: str = "config.yaml") -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    with open(path) as f:
-        config = yaml.safe_load(f)
+    # Shared lock (same lock file the dashboard uses) so we never read a
+    # half-written config while the dashboard is saving. Falls back to an
+    # unlocked read if the lock file can't be created (e.g. read-only dir).
+    try:
+        with open(str(path) + ".lock", "w") as lock_f:
+            fcntl.flock(lock_f, fcntl.LOCK_SH)
+            try:
+                with open(path) as f:
+                    config = yaml.safe_load(f)
+            finally:
+                fcntl.flock(lock_f, fcntl.LOCK_UN)
+    except OSError:
+        with open(path) as f:
+            config = yaml.safe_load(f)
 
     # Expand environment variables
     config = expand_env_vars(config)

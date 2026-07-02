@@ -336,11 +336,9 @@ def get_asset_people(immich_url: str, api_key: str, asset_id: str, timeout: int 
     """Get people recognized in a specific asset.
 
     Returns list of face dicts with normalized (0-1) bounding box coordinates.
+    Uses the cached asset-details fetch (same endpoint) to avoid repeated calls.
     """
-    headers = {"Accept": "application/json", "x-api-key": api_key}
-    response = requests.get(f"{immich_url}/api/assets/{asset_id}", headers=headers, timeout=timeout)
-    response.raise_for_status()
-    asset_data = response.json()
+    asset_data = fetch_asset_details(immich_url, api_key, asset_id, timeout=timeout)
     people = asset_data.get("people", [])
 
     # Extract face bounding boxes and normalize to 0-1 range
