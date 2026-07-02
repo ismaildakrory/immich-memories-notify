@@ -34,3 +34,6 @@ CLAUDE.md
 docker-compose.override.yml
 ntfy_config/
 ntfy_data/
+
+# Local personal config (contains personal data)
+config.yaml.local

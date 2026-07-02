@@ -23,10 +23,10 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - **Then & Now** — Side-by-side comparison of the same person across years
 - **Trip Highlights** — Collage from a past trip (same city, same month), with smart date clustering
 - **Weekly Collages** — 12 template combinations (Grid, Mosaic, Polaroid, Strip) with face-based smart cropping
+- **Birthdays & Albums** — Birthday greetings for people with a birth date in Immich, plus surprise photos from albums you pick
 - **Web Dashboard** — Manage settings, users, messages, and trigger tests from a browser
 - **Multi-User** — Each user gets personalized notifications from their own library
-- **Guided Setup** — `setup.sh` + first-run dashboard wizard
-- **Bundled ntfy** — Optionally spin up a pre-configured ntfy server
+- **Guided Setup** — `setup.sh` + first-run wizard, with an optional bundled ntfy server
 - **Privacy First** — Everything runs on your network
 
 ## Quick Start
@@ -77,6 +77,20 @@ Then open `http://your-server-ip:5000` — the setup wizard will guide you throu
 
 </details>
 
+<details>
+<summary><strong>Compose stack managers (Dockge, Portainer stacks, etc.)</strong></summary>
+
+Paste [`docker-compose.ghcr.yml`](docker-compose.ghcr.yml) as your stack, then create the mounted files inside the stack folder (for Dockge: `/opt/stacks/<stack-name>/`) **before first start** — otherwise Docker auto-creates `config.yaml` as a *directory* and the container fails with `"Are you trying to mount a directory onto a file?"`:
+
+```bash
+cd /opt/stacks/<stack-name>
+touch config.yaml .env && mkdir -p state
+```
+
+An empty `config.yaml` is fine — defaults are filled in on first start and the wizard guides you through the rest. Already hit the error? `rm -rf config.yaml && touch config.yaml`, then start again.
+
+</details>
+
 ## Screenshots
 
 ![ntfy](https://github.com/user-attachments/assets/b685ebab-2256-4da4-8b80-e00d4d110cd0)
@@ -96,6 +110,8 @@ Then open `http://your-server-ip:5000` — the setup wizard will guide you throu
 ```bash
 # Test a specific slot
 docker compose run --rm notify --slot 1 --test --no-delay
+# (pre-built GHCR image — no notify service, run inside the dashboard container)
+docker compose exec dashboard python -m notify --slot 1 --test --no-delay
 
 # Dry run (preview without sending)
 docker compose run --rm notify --slot 1 --dry-run --no-delay
@@ -126,8 +142,8 @@ All settings are manageable from the **web dashboard**. For manual editing:
 ```yaml
 settings:
   memory_notifications: 3       # Memory slots per day
-  person_notifications: 1       # Person photo slots (when memories exist)
-  fallback_notifications: 3     # Person photos when no memories today
+  person_notifications: 2       # Person/album photo slots (when memories exist)
+  fallback_notifications: 4     # Person photos when no memories today
   top_persons_limit: 5          # Top N named people to feature
   exclude_recent_days: 30       # Skip recent photos for person notifications
   year_range: 20                # How far back to look (collage, trip, TaN)
@@ -136,6 +152,7 @@ settings:
   video_emoji: true             # Add film emoji for videos
   prefer_group_photos: true     # Prioritize multi-person photos
   min_group_size: 2             # Min faces for "group photo"
+  birthday_enabled: true        # Birthday greetings (takes slot 1 priority)
 
   # Then & Now
   then_and_now_enabled: true
@@ -146,15 +163,18 @@ settings:
   trip_highlights_enabled: true
   trip_highlights_cooldown_days: 7
   trip_highlights_min_photos: 5
+  trip_highlights_repeat_days: 90  # Don't show the same trip again for N days
 
   # Weekly Collage
   weekly_collage_enabled: true
   weekly_collage_day: 6         # 0=Sun, 6=Sat
-  weekly_collage_slots: 1
+  weekly_collage_slots: 2       # How many person slots become collages
+  collage_person_limit: 5       # Max people per collage
   collage_template: random      # or: grid_custom, mosaic_custom, polaroid_custom, strip_custom
   collage_album_name: Weekly Highlights
 
-  # Notification windows (one per slot)
+  # Notification windows — one per slot: you need
+  # memory_notifications + person_notifications windows in total
   notification_windows:
     - start: "08:00"
       end: "10:00"
@@ -168,24 +188,21 @@ settings:
 <summary><strong>Message templates</strong></summary>
 
 ```yaml
-messages:
-  - "A little trip back to {year}..."
+messages:                    # {year} {years_ago} {location} {album_name}
   - "Remember this day {years_ago} years ago?"
-
-person_messages:
+person_messages:             # {person_name} {location} {album_name}
   - "A lovely moment with {person_name}..."
-
-video_messages:
-  - "Watch this moment from {year}..."
-
-then_and_now_messages:
-  - "Look how much {person_name} has changed! {then_year} vs {now_year}"
-
-trip_highlights_messages:
+album_messages:              # {album_name} {location}
+  - "A surprise from {album_name}!"
+birthday_messages:           # {person_name}
+  - "Happy Birthday, {person_name}! 🎂"
+then_and_now_messages:       # {person_name} {then_year} {now_year} {gap}
+  - "Then and now — {person_name}, {gap} years apart"
+trip_highlights_messages:    # {city} {country} {year} {gap}
   - "Remember this trip to {city}? Back in {year}!"
 ```
 
-Placeholders: `{year}`, `{years_ago}`, `{person_name}`, `{city}`, `{country}`, `{gap}`, `{then_year}`, `{now_year}`
+Memory, person, and album messages also have `video_*` variants (used when a video is picked), and every type has a `*_titles` list for notification titles (e.g. `memory_titles`, `person_titles`, `album_titles`) with the same core placeholders.
 
 </details>
 
@@ -208,7 +225,8 @@ attachment-expiry-duration: 3h
 
 Set in `.env` to customize the dashboard:
 ```
-DASHBOARD_TOKEN=your-secret-token   # Password-protect the dashboard (optional)
+DASHBOARD_TOKEN=your-secret-token   # Dashboard password — strongly recommended,
+                                    # the container has Docker access
 DASHBOARD_PORT=8080                 # Change port (default: 5000)
 ```
 
@@ -227,7 +245,7 @@ When creating an API key in Immich, grant these permissions:
 | `album.create` | Creating the collage album |
 | `albumAsset.create` | Adding collages to the album |
 
-If you don't use the weekly collage and Trip features, you can skip `asset.upload`, `album.create`, and `albumAsset.create`.
+If you don't use the Weekly Collage, Trip Highlights, or Then & Now features, you can skip `asset.upload`, `album.create`, and `albumAsset.create` (all three features upload their composites to albums).
 
 ## Troubleshooting
 
@@ -239,6 +257,7 @@ If you don't use the weekly collage and Trip features, you can skip `asset.uploa
 | No person photos | Name your people in Immich, ensure photos older than 30 days exist |
 | Already sent today | Use `--force` flag, or delete `state/state.json` |
 | Dashboard not loading | `docker compose logs dashboard` to check errors |
+| `mount ... Are you trying to mount a directory onto a file?` | Host `config.yaml` or `.env` was missing at first start, so Docker created a directory. Stop, `rm -rf config.yaml && touch config.yaml` (same for `.env`), start again |
 | `git pull` fails with local changes | `git stash && git pull && git stash pop` — your `.env` and `config.yaml` are preserved |
 
 ## Requirements

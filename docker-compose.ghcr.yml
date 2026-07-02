@@ -5,7 +5,21 @@
 # Use this file if you want to pull the pre-built image from GHCR
 # instead of building locally from source.
 #
+# IMPORTANT — create these files BEFORE the first start:
+#   touch config.yaml .env && mkdir -p state
+#
+# config.yaml and .env are mounted as single files. If they don't
+# exist on the host, Docker silently creates them as DIRECTORIES
+# and the container fails with:
+#   "Are you trying to mount a directory onto a file?"
+# (In Dockge/Portainer: create them inside the stack folder,
+#  e.g. /opt/stacks/<stack-name>/, before hitting Start.)
+#
+# An empty config.yaml is fine — the dashboard fills in defaults
+# on first start and the setup wizard does the rest.
+#
 # USAGE:
+#   touch config.yaml .env && mkdir -p state
 #   docker compose -f docker-compose.ghcr.yml up -d dashboard
 #   docker compose -f docker-compose.ghcr.yml exec dashboard python -m notify --slot 1 --test --no-delay
 #
@@ -21,8 +35,11 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./state:/app/state
-      - ./custom_templates:/app/custom_templates:ro
       - ./.env:/app/.env
+      # Collage templates are built into the image. Only add this mount if you
+      # want your own custom templates (the host folder must contain them —
+      # an empty folder hides the built-in ones):
+      # - ./custom_templates:/app/custom_templates:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
