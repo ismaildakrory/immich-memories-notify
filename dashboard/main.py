@@ -135,6 +135,13 @@ async def health_check():
 
 
 # Dashboard UI
+app.mount(
+    "/static",
+    StaticFiles(directory=str(Path(__file__).parent / "static")),
+    name="static",
+)
+
+
 @app.get("/", response_class=HTMLResponse, tags=["ui"])
 async def dashboard_ui(username: str = Depends(verify_credentials)):
     """Serve the dashboard HTML."""

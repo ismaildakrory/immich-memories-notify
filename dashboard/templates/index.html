@@ -5,585 +5,245 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Immich Memories Notify - Dashboard</title>
     <style>
-        :root {
-            --bg-color: #1a1a2e;
-            --card-bg: #16213e;
-            --accent: #4a90d9;
-            --accent-hover: #5ba0e9;
-            --text: #e0e0e0;
-            --text-muted: #8899a6;
-            --success: #4ade80;
-            --warning: #fbbf24;
-            --error: #f87171;
-            --border: #2a3f5f;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg-color);
-            color: var(--text);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
-            background: var(--card-bg);
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 30px;
-        }
-
-        header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        header p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 1rem;
-            border-radius: 6px 6px 0 0;
-            transition: all 0.2s;
-        }
-
-        .tab-btn:hover {
-            color: var(--text);
-            background: rgba(74, 144, 217, 0.1);
-        }
-
-        .tab-btn.active {
-            color: var(--accent);
-            background: var(--card-bg);
-            border-bottom: 2px solid var(--accent);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
-        }
-
-        .card h2 {
-            font-size: 1.2rem;
-            margin-bottom: 16px;
-            color: var(--accent);
-        }
-
-        .card h3 {
-            font-size: 1rem;
-            margin: 20px 0 12px;
-            color: var(--text);
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        input[type="text"],
-        input[type="number"],
-        input[type="time"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: var(--bg-color);
-            color: var(--text);
-            font-size: 0.95rem;
-        }
-
-        input:focus,
-        select:focus,
-        textarea:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        textarea {
-            min-height: 120px;
-            resize: vertical;
-            font-family: monospace;
-        }
-
-        button {
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.95rem;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background: var(--accent-hover);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        button.secondary {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-        }
-
-        button.secondary:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        button.danger {
-            background: var(--error);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .toggle {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 26px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--border);
-            border-radius: 26px;
-            transition: 0.3s;
-        }
-
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background: var(--text);
-            border-radius: 50%;
-            transition: 0.3s;
-        }
-
-        .toggle-switch input:checked + .toggle-slider {
-            background: var(--accent);
-        }
-
-        .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(24px);
-        }
-
-        .grid {
-            display: grid;
-            gap: 16px;
-        }
-
-        .grid-2 {
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        }
-
-        .grid-3 {
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        }
-
-        .user-card {
-            background: var(--bg-color);
-            padding: 16px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .user-info h4 {
-            font-size: 1rem;
-            margin-bottom: 4px;
-        }
-
-        .user-info p {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .status-badge.success {
-            background: rgba(74, 222, 128, 0.2);
-            color: var(--success);
-        }
-
-        .status-badge.pending {
-            background: rgba(251, 191, 36, 0.2);
-            color: var(--warning);
-        }
-
-        .window-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .window-row span {
-            color: var(--text-muted);
-        }
-
-        .slot-card {
-            background: var(--bg-color);
-            padding: 16px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .slot-card h4 {
-            margin-bottom: 8px;
-        }
-
-        .slot-card button {
-            margin-top: 10px;
-            width: 100%;
-        }
-
-        .output-box {
-            background: #0d1117;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 16px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            white-space: pre-wrap;
-            max-height: 300px;
-            overflow-y: auto;
-            margin-top: 16px;
-        }
-
-        .alert {
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-        }
-
-        .alert.success {
-            background: rgba(74, 222, 128, 0.15);
-            border: 1px solid var(--success);
-            color: var(--success);
-        }
-
-        .alert.error {
-            background: rgba(248, 113, 113, 0.15);
-            border: 1px solid var(--error);
-            color: var(--error);
-        }
-
-        .loading {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--text-muted);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .state-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-        }
-
-        .state-user {
-            background: var(--bg-color);
-            padding: 16px;
-            border-radius: 8px;
-        }
-
-        .state-user h4 {
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .slots-display {
-            display: flex;
-            gap: 6px;
-            margin-top: 10px;
-        }
-
-        .slot-indicator {
-            width: 30px;
-            height: 30px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.85rem;
-            font-weight: 600;
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-        }
-
-        .slot-indicator.sent {
-            background: var(--success);
-            color: var(--bg-color);
-            border-color: var(--success);
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-
-            .tabs {
-                flex-wrap: wrap;
-            }
-
-            .tab-btn {
-                padding: 8px 16px;
-                font-size: 0.9rem;
-            }
-        }
-
-        /* ---- Setup Wizard ---- */
-        .wizard-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(10, 10, 20, 0.92);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .wizard-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 36px;
-            max-width: 560px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .wizard-card h2 {
-            font-size: 1.5rem;
-            margin-bottom: 6px;
-        }
-
-        .wizard-card .wizard-subtitle {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-bottom: 28px;
-        }
-
-        .wizard-progress-bar {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 32px;
-        }
-
-        .wizard-progress-step {
-            flex: 1;
-            height: 4px;
-            border-radius: 2px;
-            background: var(--border);
-            transition: background 0.3s;
-        }
-
-        .wizard-progress-step.active {
-            background: var(--accent);
-        }
-
-        .wizard-progress-step.done {
-            background: var(--success);
-        }
-
-        .wizard-step-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .wizard-nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 28px;
-        }
-
-        .wizard-skip {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            cursor: pointer;
-            background: none;
-            border: none;
-            padding: 0;
-            text-decoration: underline;
-        }
-
-        .wizard-skip:hover {
-            color: var(--text);
-            background: none;
-        }
-
-        .wizard-result {
-            margin-top: 12px;
-            font-size: 0.85rem;
-            padding: 10px 14px;
-            border-radius: 6px;
-        }
-
-        .wizard-result.success {
-            background: rgba(74, 222, 128, 0.12);
-            color: var(--success);
-            border: 1px solid rgba(74, 222, 128, 0.3);
-        }
-
-        .wizard-result.error {
-            background: rgba(248, 113, 113, 0.12);
-            color: var(--error);
-            border: 1px solid rgba(248, 113, 113, 0.3);
-        }
-
-        .wizard-result.info {
-            background: rgba(74, 144, 217, 0.12);
-            color: var(--accent);
-            border: 1px solid rgba(74, 144, 217, 0.3);
-        }
-
-        .wizard-commands {
-            background: #0d1117;
-            border-radius: 6px;
-            padding: 10px 14px;
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 8px;
-            white-space: pre-wrap;
-        }
-
-        .wizard-done-icon {
-            font-size: 3.5rem;
-            text-align: center;
-            margin-bottom: 16px;
-        }
-
-        .wizard-done-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .wizard-done-list li {
-            padding: 6px 0;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.9rem;
-        }
-
-        .wizard-done-list li:last-child {
-            border-bottom: none;
-        }
-
-        .wizard-ntfy-auto {
-            background: rgba(74, 144, 217, 0.08);
-            border: 1px solid rgba(74, 144, 217, 0.25);
-            border-radius: 8px;
-            padding: 14px;
-            margin-top: 16px;
-        }
-
-        .wizard-ntfy-auto label {
-            color: var(--text) !important;
-            font-weight: 500;
-        }
+:root{
+  --bg-color:#0c1424;
+  --bg-secondary:#182236;
+  --card-bg:#111a2c;
+  --inset:#0a1120;
+  --border:#26324b;
+  --border-light:#37455f;
+  --text:#e9eef6;
+  --text-muted:#97a6bf;
+  --text-faint:#63728c;
+  --accent:#2f7de1;
+  --accent-hover:#5197ec;
+  --accent-soft:rgba(47,125,225,0.16);
+  --accent-ring:rgba(47,125,225,0.32);
+  --success:#46c97d;
+  --warning:#f0b74a;
+  --error:#ef6f6f;
+  --sidebar-bg:rgba(17,26,44,0.78);
+  --glow:rgba(47,125,225,0.13);
+  --logo-chip:#ffffff;
+  --logo-chip-shadow:0 2px 8px rgba(0,0,0,0.28);
+  --radius:12px;
+  --radius-sm:8px;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+}
+:root[data-theme="light"]{
+  --bg-color:#eef1f8;
+  --bg-secondary:#ffffff;
+  --card-bg:#ffffff;
+  --inset:#f1f4fa;
+  --border:#dde3ee;
+  --border-light:#c6cfde;
+  --text:#14213b;
+  --text-muted:#586a86;
+  --text-faint:#8b98af;
+  --accent:#2f7de1;
+  --accent-hover:#1f6ad0;
+  --accent-soft:rgba(47,125,225,0.11);
+  --accent-ring:rgba(47,125,225,0.26);
+  --success:#1f9d57;
+  --warning:#b9820f;
+  --error:#d64545;
+  --sidebar-bg:#ffffff;
+  --glow:rgba(47,125,225,0.06);
+  --logo-chip:transparent;
+  --logo-chip-shadow:none;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font-sans);background:var(--bg-color);color:var(--text);line-height:1.55;min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover);text-decoration:underline}
+code{font-family:var(--font-mono);font-size:0.85em;background:var(--inset);border:1px solid var(--border);padding:1px 5px;border-radius:5px;color:var(--text)}
+body::before{content:"";position:fixed;inset:0 0 auto 0;height:340px;background:radial-gradient(120% 100% at 18% 0%,var(--glow),transparent 60%);pointer-events:none;z-index:0}
+
+/* ---- App shell ---- */
+.app{display:flex;min-height:100vh;position:relative;z-index:1}
+.sidebar{width:236px;flex-shrink:0;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:12px;padding:6px 8px 22px}
+.brand-mark{width:54px;height:54px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block}
+.brand-text{display:flex;flex-direction:column;line-height:1.15}
+.brand-text strong{font-size:0.92rem;font-weight:600;letter-spacing:-0.01em}
+.brand-text span{font-size:0.72rem;color:var(--text-faint)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.tab-btn{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border:none;color:var(--text-muted);padding:9px 11px;border-radius:9px;font-size:0.875rem;font-weight:500;font-family:inherit;cursor:pointer;transition:background .15s,color .15s}
+.tab-btn svg{width:19px;height:19px;flex-shrink:0;opacity:.9}
+.tab-btn:hover{background:var(--accent-soft);color:var(--text)}
+.tab-btn.active{background:var(--accent-soft);color:var(--accent)}
+.sidebar-footer{margin-top:auto;padding:14px 4px 2px;border-top:1px solid var(--border)}
+.theme-toggle{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:8px 11px;border-radius:9px;font-size:0.8rem;font-weight:500;font-family:inherit;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.theme-toggle:hover{background:var(--accent-soft);color:var(--text);border-color:var(--border-light)}
+.theme-toggle svg{width:16px;height:16px;flex-shrink:0}
+.theme-toggle .icon-moon,.theme-toggle .label-dark{display:none}
+:root[data-theme="light"] .theme-toggle .icon-sun,:root[data-theme="light"] .theme-toggle .label-light{display:none}
+:root[data-theme="light"] .theme-toggle .icon-moon,:root[data-theme="light"] .theme-toggle .label-dark{display:inline-block}
+#version-info{font-size:0.75rem;color:var(--text-faint);margin-top:10px;padding-left:2px}
+#version-info a{color:var(--warning)}
+.main{flex:1;min-width:0}
+.content{max-width:960px;margin:0 auto;padding:30px 36px 64px}
+
+/* ---- Tabs visibility (do not remove) ---- */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ---- Cards ---- */
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;margin-bottom:18px}
+.card h2{font-size:1.05rem;font-weight:600;color:var(--text);letter-spacing:-0.01em;margin-bottom:14px}
+.card h3{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-faint);font-weight:700;margin:24px 0 12px}
+.setup-banner{background:var(--accent-soft);border-color:rgba(47,125,225,0.3)}
+.setup-banner h2{margin-bottom:2px}
+.setup-sub{color:var(--text-muted);font-size:0.85rem;margin-bottom:10px}
+
+/* ---- Forms ---- */
+.form-group{margin-bottom:13px}
+.form-group label{display:block;margin-bottom:5px;font-size:0.8rem;color:var(--text-muted);font-weight:500}
+input[type="text"],input[type="number"],input[type="time"],input[type="password"],select,textarea{width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--inset);color:var(--text);font-size:0.875rem;font-family:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
+textarea{min-height:110px;resize:vertical;font-family:var(--font-mono);font-size:0.82rem;line-height:1.5}
+input::placeholder,textarea::placeholder{color:var(--text-faint)}
+small{font-size:0.76rem}
+
+/* ---- Buttons ---- */
+button{background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:var(--radius-sm);cursor:pointer;font-size:0.85rem;font-weight:600;font-family:inherit;white-space:nowrap;transition:background .15s,border-color .15s,opacity .15s}
+button:hover{background:var(--accent-hover)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.secondary{background:transparent;border:1px solid var(--border-light);color:var(--text);font-weight:500}
+button.secondary:hover{background:var(--accent-soft);border-color:var(--text-faint)}
+button.danger{background:transparent;border:1px solid rgba(214,69,69,0.5);color:var(--error);font-weight:500}
+button.danger:hover{background:rgba(214,69,69,0.13)}
+.btn-group{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ---- Toggle ---- */
+.toggle{display:flex;align-items:center;gap:10px;font-size:0.85rem}
+.toggle-switch{position:relative;width:42px;height:24px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border-light);border-radius:24px;transition:.25s}
+.toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 2px rgba(0,0,0,0.3)}
+.toggle-switch input:checked + .toggle-slider{background:var(--accent)}
+.toggle-switch input:checked + .toggle-slider:before{transform:translateX(18px)}
+
+/* ---- Grid ---- */
+.grid{display:grid;gap:14px}
+.grid-2{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.grid-3{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.grid-msg{grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:12px 18px}
+#messages-tab textarea{min-height:76px}
+#messages-tab .form-group{margin-bottom:0}
+.subnav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:5px}
+.subnav-btn{flex:0 0 auto;background:transparent;border:none;color:var(--text-muted);padding:7px 14px;border-radius:7px;font-size:0.82rem;font-weight:600;font-family:inherit;cursor:pointer;transition:.15s}
+.subnav-btn:hover{color:var(--text);background:var(--accent-soft)}
+.subnav-btn.active{background:var(--accent);color:#fff}
+.section-label{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-faint);font-weight:700;margin:18px 0 12px}
+.feature-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.feature-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--inset);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s,background .15s}
+.feature-card:hover{border-color:var(--border-light)}
+.feature-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.feature-text strong{font-size:0.86rem;font-weight:600;color:var(--text)}
+.feature-text span{font-size:0.75rem;color:var(--text-muted);line-height:1.35}
+.stat-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:6px}
+.stat-tile{background:var(--inset);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.stat-label{font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600}
+.stat-tile strong{font-size:1.5rem;font-weight:700;color:var(--text);letter-spacing:-0.02em}
+.loading-state{display:flex;align-items:center;gap:10px;color:var(--text-muted);font-size:0.85rem;padding:6px 0}
+.empty-state{text-align:center;color:var(--text-muted);font-size:0.88rem;padding:24px 12px;border:1px dashed var(--border-light);border-radius:10px}
+.save-bar{position:sticky;bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:20px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border-light);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.25);backdrop-filter:blur(8px)}
+.save-hint{font-size:0.82rem;color:var(--text-muted)}
+.save-bar.dirty{border-color:var(--accent)}
+.save-bar.dirty .save-hint{color:var(--accent);font-weight:600}
+
+/* ---- User cards ---- */
+.user-card{background:var(--inset);padding:14px;border-radius:10px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.user-info h4{font-size:0.95rem;margin-bottom:3px;font-weight:600}
+.user-info p{font-size:0.8rem;color:var(--text-muted)}
+.status-badge{padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:600}
+.status-badge.success{background:rgba(70,201,125,0.16);color:var(--success)}
+.status-badge.pending{background:rgba(240,183,74,0.16);color:var(--warning)}
+
+/* ---- Windows ---- */
+.window-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--inset)}
+.window-row span{color:var(--text-muted);font-size:0.85rem}
+
+/* ---- Slots ---- */
+.slot-card{background:var(--inset);padding:16px;border-radius:10px;text-align:center;border:1px solid var(--border)}
+.slot-card h4{margin-bottom:6px;font-size:0.9rem}
+.slot-card button{margin-top:12px;width:100%}
+.output-box{background:var(--inset);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-family:var(--font-mono);font-size:0.8rem;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-top:16px;color:var(--text-muted)}
+
+/* ---- Alerts ---- */
+.alert{padding:11px 14px;border-radius:var(--radius-sm);margin-bottom:14px;font-size:0.85rem}
+.alert.success{background:rgba(70,201,125,0.13);border:1px solid rgba(70,201,125,0.35);color:var(--success)}
+.alert.error{background:rgba(239,111,111,0.13);border:1px solid rgba(239,111,111,0.35);color:var(--error)}
+.alert.warning{background:rgba(240,183,74,0.13);border:1px solid rgba(240,183,74,0.35);color:var(--warning)}
+.loading{display:inline-block;width:15px;height:15px;border:2px solid var(--border-light);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- State summary ---- */
+.state-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.state-user{background:var(--inset);padding:16px;border-radius:10px;border:1px solid var(--border)}
+.state-user h4{margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:0.95rem}
+.slots-display{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.slot-indicator{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:700;background:var(--card-bg);border:1px solid var(--border);color:var(--text-muted)}
+.slot-indicator.sent{background:var(--success);color:#06210f;border-color:var(--success)}
+
+/* ---- Dropdowns ---- */
+.city-dropdown,.album-dropdown{background:var(--bg-secondary)!important;border:1px solid var(--border-light)!important;border-radius:8px!important}
+
+/* scrollbars */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--text-faint);background-clip:padding-box}
+
+/* ---- Setup Wizard ---- */
+.wizard-overlay{position:fixed;inset:0;background:rgba(6,10,18,0.82);backdrop-filter:blur(6px);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard-card{background:var(--card-bg);border:1px solid var(--border-light);border-radius:16px;padding:34px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.5)}
+.wizard-card h2{font-size:1.4rem;margin-bottom:6px;font-weight:600;letter-spacing:-0.01em}
+.wizard-card .wizard-subtitle{color:var(--text-muted);font-size:0.9rem;margin-bottom:26px}
+.wizard-progress-bar{display:flex;gap:6px;margin-bottom:30px}
+.wizard-progress-step{flex:1;height:4px;border-radius:3px;background:var(--border-light);transition:background .3s}
+.wizard-progress-step.active{background:var(--accent)}
+.wizard-progress-step.done{background:var(--success)}
+.wizard-step-label{font-size:0.72rem;color:var(--text-faint);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700}
+.wizard-nav{display:flex;justify-content:space-between;align-items:center;margin-top:26px;gap:12px;flex-wrap:wrap}
+.wizard-skip{font-size:0.82rem;color:var(--text-muted);cursor:pointer;background:none;border:none;padding:0;text-decoration:underline;font-weight:500}
+.wizard-skip:hover{color:var(--text);background:none}
+.wizard-result{margin-top:12px;font-size:0.85rem;padding:10px 14px;border-radius:var(--radius-sm)}
+.wizard-result.success{background:rgba(70,201,125,0.12);color:var(--success);border:1px solid rgba(70,201,125,0.3)}
+.wizard-result.error{background:rgba(239,111,111,0.12);color:var(--error);border:1px solid rgba(239,111,111,0.3)}
+.wizard-result.info{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(47,125,225,0.3)}
+.wizard-commands{background:var(--inset);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted);margin-top:8px;white-space:pre-wrap}
+.wizard-done-icon{font-size:3.2rem;text-align:center;margin-bottom:14px}
+.wizard-done-list{list-style:none;padding:0}
+.wizard-done-list li{padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:0.88rem}
+.wizard-done-list li:last-child{border-bottom:none}
+.wizard-ntfy-auto{background:var(--accent-soft);border:1px solid rgba(47,125,225,0.25);border-radius:10px;padding:14px;margin-top:16px}
+.wizard-ntfy-auto label{color:var(--text)!important;font-weight:500}
+
+@media (max-width:820px){
+  .app{flex-direction:column}
+  .sidebar{width:auto;height:auto;position:sticky;top:0;z-index:50;padding:10px 12px;border-right:none;border-bottom:1px solid var(--border)}
+  .brand{padding:2px 4px 10px}
+  .nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:2px}
+  .tab-btn{flex-direction:column;gap:5px;padding:8px 12px;font-size:0.68rem;white-space:nowrap;text-align:center}
+  .tab-btn svg{width:20px;height:20px}
+  .sidebar-footer{position:absolute;top:12px;right:12px;margin:0;padding:0;border-top:none}
+  .sidebar-footer #version-info{display:none}
+  .theme-toggle{margin-top:0;padding:7px}
+  .theme-toggle span{display:none}
+  .content{padding:20px 16px 44px}
+  .subnav{overflow-x:auto;flex-wrap:nowrap}
+  .feature-grid{grid-template-columns:1fr}
+  .stat-tiles{grid-template-columns:repeat(2,1fr)}
+  .save-bar{bottom:10px}
+  .wizard-card{padding:24px 20px}
+  .wizard-nav{gap:10px}
+}
     </style>
+<script>(function(){try{var t=localStorage.getItem('imn-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 </head>
 <body>
 
@@ -777,36 +437,74 @@
     </div>
     <!-- ============================================================ -->
 
-    <header>
-        <div class="container" style="display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <h1>Immich Memories Notify</h1>
-                <p>Dashboard for managing memory notifications</p>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">
+                    <img src="/static/logo-mark.png" alt="Immich Memories">
+                </div>
+                <div class="brand-text">
+                    <strong>Immich Memories</strong>
+                    <span>Notify dashboard</span>
+                </div>
             </div>
-            <div id="version-info" style="text-align: right; font-size: 0.8rem; color: var(--text-muted);"></div>
-        </div>
-    </header>
 
-    <main class="container">
-        <div id="setup-checklist" class="card" style="display: none; margin-bottom: 20px; border-left: 3px solid var(--accent);">
-            <h2 style="font-size: 1.1rem;">Getting Started</h2>
-            <div id="setup-items"></div>
-        </div>
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="state">Today's Status</button>
-            <button class="tab-btn" data-tab="settings">Settings</button>
-            <button class="tab-btn" data-tab="messages">Messages</button>
-            <button class="tab-btn" data-tab="secrets">Secrets</button>
-            <button class="tab-btn" data-tab="test">Test</button>
-        </div>
+            <nav class="nav">
+                <button class="tab-btn active" data-tab="state">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Today's Status</span>
+                </button>
+                <button class="tab-btn" data-tab="settings">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8h9M18 8h1M5 16h1M10 16h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="8" r="2.4" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="16" r="2.4" stroke="currentColor" stroke-width="1.8"/></svg>
+                    <span>Settings</span>
+                </button>
+                <button class="tab-btn" data-tab="messages">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                    <span>Messages</span>
+                </button>
+                <button class="tab-btn" data-tab="secrets">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9" rx="2.2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    <span>Secrets</span>
+                </button>
+                <button class="tab-btn" data-tab="test">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 7.5l8 4.5-8 4.5V7.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                    <span>Test</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle color theme">
+                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                    <span class="label-light">Light mode</span>
+                    <span class="label-dark">Dark mode</span>
+                </button>
+                <div id="version-info"></div>
+            </div>
+        </aside>
+
+        <div class="main">
+            <div class="content">
+                <div id="setup-checklist" class="card setup-banner" style="display: none;">
+                    <h2>Getting started</h2>
+                    <p class="setup-sub">A few steps left before notifications start flowing.</p>
+                    <div id="setup-items"></div>
+                </div>
 
         <!-- State Tab -->
         <div id="state-tab" class="tab-content active">
             <div class="card">
                 <h2>Today's Notifications</h2>
                 <div id="state-alert"></div>
+                <div class="stat-tiles" id="stat-tiles">
+                    <div class="stat-tile"><span class="stat-label">Active users</span><strong id="stat-users">—</strong></div>
+                    <div class="stat-tile"><span class="stat-label">Sent today</span><strong id="stat-sent">—</strong></div>
+                    <div class="stat-tile"><span class="stat-label">Time windows</span><strong id="stat-windows">—</strong></div>
+                    <div class="stat-tile"><span class="stat-label">Next window</span><strong id="stat-next">—</strong></div>
+                </div>
+                <h3 class="section-label">Per user</h3>
                 <div id="state-summary" class="state-summary">
-                    <p style="color: var(--text-muted)">Loading...</p>
+                    <div class="loading-state"><span class="loading"></span>Loading…</div>
                 </div>
                 <div class="btn-group" style="margin-top: 20px;">
                     <button onclick="refreshState()">Refresh</button>
@@ -816,10 +514,18 @@
 
         <!-- Settings Tab -->
         <div id="settings-tab" class="tab-content">
+            <div class="subnav">
+                <button class="subnav-btn active" type="button" data-section="users" onclick="switchSettingsSection('users')">Users</button>
+                <button class="subnav-btn" type="button" data-section="schedule" onclick="switchSettingsSection('schedule')">Schedule</button>
+                <button class="subnav-btn" type="button" data-section="general" onclick="switchSettingsSection('general')">General</button>
+                <button class="subnav-btn" type="button" data-section="collage" onclick="switchSettingsSection('collage')">Collage &amp; Highlights</button>
+            </div>
+
+            <div class="settings-section" data-section="users">
             <div class="card">
                 <h2>Users</h2>
                 <div id="users-list" class="grid grid-2">
-                    <p style="color: var(--text-muted)">Loading...</p>
+                    <div class="loading-state"><span class="loading"></span>Loading…</div>
                 </div>
                 <div class="btn-group" style="margin-top: 16px;">
                     <button class="secondary" onclick="showAddUserModal()">Add User</button>
@@ -889,10 +595,13 @@
                 </div>
             </div>
 
+            </div>
+
+            <div class="settings-section" data-section="schedule" style="display:none;">
             <div class="card">
                 <h2>Notification Time:</h2>
                 <div id="windows-list">
-                    <p style="color: var(--text-muted)">Loading...</p>
+                    <div class="loading-state"><span class="loading"></span>Loading…</div>
                 </div>
                 <div class="btn-group" style="margin-top: 20px;">
                     <button onclick="saveWindows()">Save Windows</button>
@@ -900,6 +609,9 @@
                 </div>
             </div>
 
+            </div>
+
+            <div class="settings-section" data-section="general" style="display:none;">
             <div class="card">
                 <h2>General Settings</h2>
                 <div id="settings-alert"></div>
@@ -919,63 +631,63 @@
                 </div>
 
                 <h3>Feature Toggles</h3>
-                <div class="grid grid-3">
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                <div class="grid feature-grid">
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Location</strong><span>Show where a memory was taken</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="include_location">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Location</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Album</strong><span>Mention the album a photo belongs to</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="include_album">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Album</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Video Emoji</strong><span>Flag video memories with an icon</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="video_emoji">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Video Emoji</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Prefer Groups</strong><span>Favor photos featuring several people</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="prefer_group_photos">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Prefer Groups</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Then &amp; Now</strong><span>Compare older and recent photos of a person</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="then_and_now_enabled">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Then &amp; Now</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Trip Highlights</strong><span>Resurface highlights from past trips</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="trip_highlights_enabled">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Trip Highlights</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Weekly Collage</strong><span>Send a weekly collage of favourites</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="weekly_collage_enabled">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Weekly Collage</span>
-                    </div>
-                    <div class="toggle">
-                        <label class="toggle-switch">
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Birthday</strong><span>Send a birthday greeting on the day</span></span>
+                        <span class="toggle-switch">
                             <input type="checkbox" id="birthday_enabled">
                             <span class="toggle-slider"></span>
-                        </label>
-                        <span>Birthday</span>
-                    </div>
+                        </span>
+                    </label>
                 </div>
                 <div class="form-group" style="margin-top: 8px;">
                     <label>Lookback Years</label>
@@ -983,6 +695,12 @@
                     <small style="color: var(--text-muted); display: block; margin-top: 4px;">How far back to search for Then &amp; Now, Trip Highlights, and Collage photos</small>
                 </div>
 
+            </div>
+            </div>
+
+            <div class="settings-section" data-section="collage" style="display:none;">
+            <div class="card">
+                <h2>Collage &amp; Highlights</h2>
                 <h3>Weekly Collage</h3>
                 <div class="grid grid-2">
                     <div class="form-group">
@@ -1034,9 +752,12 @@
                     </div>
                 </div>
 
-                <div class="btn-group" style="margin-top: 20px;">
-                    <button onclick="saveSettings()">Save Settings</button>
-                </div>
+            </div>
+            </div>
+
+            <div class="save-bar" id="settings-savebar" style="display:none;">
+                <span class="save-hint" id="settings-save-hint">Changes save to your config file</span>
+                <button onclick="saveSettings()">Save settings</button>
             </div>
         </div>
 
@@ -1045,6 +766,7 @@
             <div class="card">
                 <h2>Message Templates</h2>
                 <div id="messages-alert"></div>
+                <div class="grid grid-msg">
 
                 <div class="form-group">
                     <label>Memory Messages (one per line)</label>
@@ -1098,8 +820,13 @@
                     <small style="color: var(--text-muted)">Placeholders: {person_name}</small>
                 </div>
 
-                <h2 style="margin-top: 30px;">Title Templates</h2>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Title Templates</h2>
                 <p style="color: var(--text-muted); margin-bottom: 15px;">Customize notification headers. One per line — a random one is picked each time.</p>
+                <div class="grid grid-msg">
 
                 <div class="form-group">
                     <label>Memory Titles (one per line)</label>
@@ -1143,9 +870,12 @@
                     <small style="color: var(--text-muted)">Placeholders: {person_name}</small>
                 </div>
 
-                <div class="btn-group">
-                    <button onclick="saveMessages()">Save Messages</button>
                 </div>
+            </div>
+
+            <div class="save-bar">
+                <span class="save-hint" id="messages-save-hint">Changes save to your config file</span>
+                <button onclick="saveMessages()">Save messages</button>
             </div>
         </div>
 
@@ -1191,7 +921,7 @@
 
                 <div id="user-secrets-container">
                     <!-- Dynamically populated by JavaScript -->
-                    <p style="color: var(--text-muted)">Loading users...</p>
+                    <div class="loading-state"><span class="loading"></span>Loading users…</div>
                 </div>
 
                 <h3>Dashboard</h3>
@@ -1250,7 +980,9 @@
                 </div>
             </div>
         </div>
-    </main>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Tab switching
@@ -2618,6 +2350,92 @@
             document.getElementById('wizard-overlay').style.display = 'none';
         }
 
+    </script>
+    <script>
+        function toggleTheme(){
+            var cur = document.documentElement.getAttribute('data-theme') || 'dark';
+            var next = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('imn-theme', next); } catch(e) {}
+        }
+
+        // ---- Settings sub-sections ----
+        function switchSettingsSection(name){
+            document.querySelectorAll('#settings-tab .settings-section').forEach(function(s){
+                s.style.display = s.dataset.section === name ? 'block' : 'none';
+            });
+            document.querySelectorAll('#settings-tab .subnav-btn').forEach(function(b){
+                b.classList.toggle('active', b.dataset.section === name);
+            });
+            var bar = document.getElementById('settings-savebar');
+            if (bar) bar.style.display = (name === 'general' || name === 'collage') ? 'flex' : 'none';
+        }
+
+        // ---- Status dashboard tiles ----
+        function imnSetTile(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
+        function imnNextWindow(windows){
+            if (!windows || !windows.length) return '—';
+            var now = new Date(); var mins = now.getHours()*60 + now.getMinutes();
+            function parseT(t){ var p = (t||'').split(':'); return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); }
+            function fmt12(m){ var h = Math.floor(m/60), mm = m%60, ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + (mm<10?'0':'') + mm + ' ' + ap; }
+            for (var i = 0; i < windows.length; i++){
+                var s = parseT(windows[i].start), e = parseT(windows[i].end);
+                if (mins >= s && mins < e) return 'Now → ' + fmt12(e);
+            }
+            var starts = windows.map(function(w){ return parseT(w.start); }).sort(function(a,b){ return a-b; });
+            var next = starts.filter(function(s){ return s > mins; })[0];
+            return fmt12(next != null ? next : starts[0]);
+        }
+        async function initStatusTiles(){
+            try {
+                var settings = await fetch('/api/settings/').then(function(r){ return r.json(); });
+                var state = await fetch('/api/state/today').then(function(r){ return r.json(); }).catch(function(){ return {users:{}}; });
+                var users = settings.users || [];
+                var enabled = users.filter(function(u){ return u.enabled; });
+                var windows = (settings.settings && settings.settings.notification_windows) || [];
+                var sent = 0, su = (state && state.users) || {};
+                Object.keys(su).forEach(function(k){ sent += (su[k].notification_count || 0); });
+                imnSetTile('stat-users', enabled.length);
+                imnSetTile('stat-sent', sent);
+                imnSetTile('stat-windows', windows.length);
+                imnSetTile('stat-next', imnNextWindow(windows));
+            } catch(e) {}
+        }
+
+        // ---- Unsaved-changes hint ----
+        function imnSetDirty(tabId, val){
+            var hint = document.getElementById(tabId === 'settings-tab' ? 'settings-save-hint' : 'messages-save-hint');
+            if (!hint) return;
+            var bar = hint.closest('.save-bar');
+            hint.textContent = val ? 'Unsaved changes' : 'Changes save to your config file';
+            if (bar) bar.classList.toggle('dirty', val);
+        }
+        function initDirtyTracking(){
+            ['settings-tab','messages-tab'].forEach(function(id){
+                var root = document.getElementById(id); if (!root) return;
+                var mark = function(){ imnSetDirty(id, true); };
+                root.addEventListener('input', mark);
+                root.addEventListener('change', mark);
+            });
+            document.querySelectorAll('.save-bar button').forEach(function(btn){
+                btn.addEventListener('click', function(){
+                    var bar = btn.closest('.save-bar');
+                    setTimeout(function(){
+                        if (!bar) return;
+                        bar.classList.remove('dirty');
+                        var h = bar.querySelector('.save-hint');
+                        if (h) h.textContent = 'Changes save to your config file';
+                    }, 400);
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+            initStatusTiles();
+            var rb = document.querySelector('#state-tab .btn-group button');
+            if (rb) rb.addEventListener('click', initStatusTiles);
+            initDirtyTracking();
+        });
     </script>
 </body>
 </html>
