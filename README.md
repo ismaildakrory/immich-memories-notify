@@ -24,7 +24,9 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - **Trip Highlights** — Collage from a past trip (same city, same month), with smart date clustering
 - **Weekly Collages** — 12 template combinations (Grid, Mosaic, Polaroid, Strip) with face-based smart cropping
 - **Birthdays & Albums** — Birthday greetings for people with a birth date in Immich, plus surprise photos from albums you pick
-- **Web Dashboard** — Manage settings, users, messages, and trigger tests from a browser
+- **Apprise Support** — Send via Telegram, Discord, Slack, email, and [100+ other services](https://github.com/caronc/apprise/wiki) — per-user choice alongside ntfy
+- **Smart Scheduling** — Layered priority engine with per-window event control — choose which notification types each time window can send
+- **Web Dashboard** — Modern UI with sidebar navigation, light/dark theme, settings management, and test notifications
 - **Multi-User** — Each user gets personalized notifications from their own library
 - **Guided Setup** — `setup.sh` + first-run wizard, with an optional bundled ntfy server
 - **Privacy First** — Everything runs on your network
@@ -93,6 +95,8 @@ An empty `config.yaml` is fine — defaults are filled in on first start and the
 
 ## Screenshots
 
+> Screenshots below show v2.x — updated screenshots for v3.0 coming soon.
+
 ![ntfy](https://github.com/user-attachments/assets/b685ebab-2256-4da4-8b80-e00d4d110cd0)
 ![expand](https://github.com/user-attachments/assets/f039766a-5b87-4bbd-8965-3e1cad0da19f)
 <img width="1256" height="590" alt="Status" src="https://github.com/user-attachments/assets/9d00c677-5124-4617-b89f-9468b279e818" />
@@ -141,9 +145,6 @@ All settings are manageable from the **web dashboard**. For manual editing:
 
 ```yaml
 settings:
-  memory_notifications: 3       # Memory slots per day
-  person_notifications: 2       # Person/album photo slots (when memories exist)
-  fallback_notifications: 4     # Person photos when no memories today
   top_persons_limit: 5          # Top N named people to feature
   exclude_recent_days: 30       # Skip recent photos for person notifications
   year_range: 20                # How far back to look (collage, trip, TaN)
@@ -152,7 +153,7 @@ settings:
   video_emoji: true             # Add film emoji for videos
   prefer_group_photos: true     # Prioritize multi-person photos
   min_group_size: 2             # Min faces for "group photo"
-  birthday_enabled: true        # Birthday greetings (takes slot 1 priority)
+  birthday_enabled: true        # Birthday greetings (pre-empts window 1)
 
   # Then & Now
   then_and_now_enabled: true
@@ -165,22 +166,54 @@ settings:
   trip_highlights_min_photos: 5
   trip_highlights_repeat_days: 90  # Don't show the same trip again for N days
 
-  # Weekly Collage
+  # Collage
   weekly_collage_enabled: true
-  weekly_collage_day: 6         # 0=Sun, 6=Sat
-  weekly_collage_slots: 2       # How many person slots become collages
+  collage_cooldown_days: 7      # Min days between collages
   collage_person_limit: 5       # Max people per collage
   collage_template: random      # or: grid_custom, mosaic_custom, polaroid_custom, strip_custom
   collage_album_name: Weekly Highlights
 
-  # Notification windows — one per slot: you need
-  # memory_notifications + person_notifications windows in total
+  # Notification windows — each window sends one notification per day.
+  # Window 1 always sends a memory. Windows 2+ pick from their events
+  # list using a layered priority system (specials first, then weighted random).
   notification_windows:
     - start: "08:00"
       end: "10:00"
+      events: [memory]                          # Window 1: memory only
     - start: "12:00"
       end: "14:00"
+      events: [memory, person, album, then_and_now, trip_highlights, collage]
+    - start: "20:00"
+      end: "22:00"
+      events: [person, album, trip_highlights, collage]
 ```
+
+</details>
+
+<details>
+<summary><strong>User config</strong></summary>
+
+Each user can use either ntfy or Apprise for notifications:
+
+```yaml
+users:
+  - name: Alice
+    immich_api_key: ${IMMICH_API_KEY_ALICE}
+    ntfy_topic: immich-memories-alice
+    ntfy_username: alice
+    ntfy_password: ${NTFY_PASSWORD_ALICE}
+    enabled: true
+    home_cities: [London]       # Excluded from Trip Highlights
+    album_names: [Favorites]    # Album photo notifications
+
+  - name: Bob
+    immich_api_key: ${IMMICH_API_KEY_BOB}
+    notification_service: apprise
+    apprise_url: ${APPRISE_URL_BOB}   # e.g. tgram://bottoken/ChatID
+    enabled: true
+```
+
+Secrets (API keys, passwords, Apprise URLs) go in `.env` and are referenced with `${VAR_NAME}` in config.yaml. The dashboard manages this automatically.
 
 </details>
 
@@ -263,9 +296,10 @@ If you don't use the Weekly Collage, Trip Highlights, or Then & Now features, yo
 ## Requirements
 
 - [Immich](https://immich.app/) (self-hosted)
-- [ntfy](https://ntfy.sh/) (self-hosted or bundled)
+- **Notification service** — one of:
+  - [ntfy](https://ntfy.sh/) (self-hosted or bundled) with the mobile app ([Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) / [iOS](https://apps.apple.com/app/ntfy/id1625396347))
+  - [Apprise](https://github.com/caronc/apprise)-compatible service (Telegram, Discord, Slack, email, [and more](https://github.com/caronc/apprise/wiki))
 - Docker & Docker Compose
-- ntfy mobile app ([Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) / [iOS](https://apps.apple.com/app/ntfy/id1625396347))
 - Named people in Immich for face features
 
 ## Contributing
