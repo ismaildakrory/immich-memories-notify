@@ -22,9 +22,9 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - **Daily Memories** — Photos from this day in previous years, with face preference and location context
 - **Then & Now** — Side-by-side comparison of the same person across years
 - **Trip Highlights** — Collage from a past trip (same city, same month), with smart date clustering
-- **Weekly Collages** — 12 template combinations (Grid, Mosaic, Polaroid, Strip) with face-based smart cropping
+- **Collages** — 12 template combinations (Grid, Mosaic, Polaroid, Strip) with face-based smart cropping
 - **Birthdays & Albums** — Birthday greetings for people with a birth date in Immich, plus surprise photos from albums you pick
-- **Apprise Support** — Send via Telegram, Discord, Slack, email, and [100+ other services](https://github.com/caronc/apprise/wiki) — per-user choice alongside ntfy
+- **Apprise Support** — Send via Telegram, Discord, Slack, email, and [100+ other services](https://github.com/caronc/apprise/wiki) per-user choice alongside ntfy
 - **Smart Scheduling** — Layered priority engine with per-window event control — choose which notification types each time window can send
 - **Web Dashboard** — Modern UI with sidebar navigation, light/dark theme, settings management, and test notifications
 - **Multi-User** — Each user gets personalized notifications from their own library
@@ -95,19 +95,13 @@ An empty `config.yaml` is fine — defaults are filled in on first start and the
 
 ## Screenshots
 
-> Screenshots below show v2.x — updated screenshots for v3.0 coming soon.
+<img width="1080" height="1505" alt="0" src="https://github.com/user-attachments/assets/4da4ca71-e669-40fb-9e9a-55908ef0eb55" />
+<img width="1026" height="642" alt="1" src="https://github.com/user-attachments/assets/d4b9ffa1-40c0-46a7-8a52-b38eda49d0cc" />
+<img width="1402" height="545" alt="1 5" src="https://github.com/user-attachments/assets/2e913c01-cc92-410d-b00b-fa2a737a5f2d" />
+<img width="1027" height="758" alt="2" src="https://github.com/user-attachments/assets/743262c2-6b83-44b3-b7df-9046101a5f44" />
+<img width="1407" height="1200" alt="3" src="https://github.com/user-attachments/assets/a182555f-948d-4892-8225-2e3fdf6fbff0" />
 
-![ntfy](https://github.com/user-attachments/assets/b685ebab-2256-4da4-8b80-e00d4d110cd0)
-![expand](https://github.com/user-attachments/assets/f039766a-5b87-4bbd-8965-3e1cad0da19f)
-<img width="1256" height="590" alt="Status" src="https://github.com/user-attachments/assets/9d00c677-5124-4617-b89f-9468b279e818" />
-<img width="1031" height="1201" alt="Settings" src="https://github.com/user-attachments/assets/829b0fc4-4af3-45e7-a4e0-0e8cfe9221d4" />
-<img width="1257" height="1115" alt="Messages" src="https://github.com/user-attachments/assets/94df34a8-17d9-47c3-a865-ea3286fd5516" />
-<img width="1242" height="1196" alt="Secrets" src="https://github.com/user-attachments/assets/732ace52-0ea0-4ab7-bb42-82c543beaae2" />
-<img width="1250" height="1115" alt="Test" src="https://github.com/user-attachments/assets/2ea0e52e-4854-4268-8b79-a14905428e71" />
-<img width="1148" height="285" alt="Then & Now and Trip Highlights" src="https://github.com/user-attachments/assets/10127da5-35ee-4057-b2c0-230e5fc53dc4" />
-<img width="1148" height="292" alt="City picker" src="https://github.com/user-attachments/assets/9d625ed5-7962-44c5-8e22-00cf88bc8f87" />
 
-<img width="1716" height="927" alt="Collage templates" src="https://github.com/user-attachments/assets/33e533c7-f397-444c-b795-6fc6f0979175" />
 
 ## Common Commands
 
@@ -301,6 +295,7 @@ If you don't use the Weekly Collage, Trip Highlights, or Then & Now features, yo
   - [Apprise](https://github.com/caronc/apprise)-compatible service (Telegram, Discord, Slack, email, [and more](https://github.com/caronc/apprise/wiki))
 - Docker & Docker Compose
 - Named people in Immich for face features
+- Birthday in Immich for birthday notifications
 
 ## Contributing
 
