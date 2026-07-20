@@ -567,18 +567,46 @@ def get_album_assets(
                 logger.debug(f"Album '{album_name}' not found")
             return None
 
-        response = requests.get(f"{immich_url}/api/albums/{album_id}", headers=headers, timeout=30)
-        response.raise_for_status()
-        data = response.json()
+        assets = _fetch_album_assets_by_search(immich_url, api_key, album_id)
         return {
             "album_id": album_id,
             "album_name": album_name,
-            "assets": data.get("assets", []),
+            "assets": assets,
         }
     except Exception as e:
         if logger:
             logger.warning(f"Failed to fetch album '{album_name}': {e}")
         return None
+
+
+def _fetch_album_assets_by_search(
+    immich_url: str, api_key: str, album_id: str, timeout: int = 30
+) -> list:
+    """Fetch album assets via search/metadata (works with Immich v2 and v3)."""
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    all_assets = []
+    page = 1
+    while True:
+        payload = {"albumId": album_id, "size": 1000, "page": page}
+        response = requests.post(
+            f"{immich_url}/api/search/metadata",
+            headers=headers,
+            json=payload,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+        assets = data.get("assets", [])
+        if isinstance(assets, dict):
+            items = assets.get("items", [])
+            all_assets.extend(items)
+            if len(items) < 1000:
+                break
+        else:
+            all_assets.extend(assets)
+            break
+        page += 1
+    return all_assets
 
 
 def upload_collage_to_album(
@@ -591,14 +619,11 @@ def upload_collage_to_album(
     """Upload collage image to Immich and add to album."""
     try:
         headers = {"x-api-key": api_key}
-        now_iso = datetime.now().isoformat()
-        device_asset_id = f"memnotify-collage-{int(time.time())}"
+        now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
-        # Upload via POST /api/assets with multipart
-        files = {"assetData": ("collage.jpg", collage_data, "image/jpeg")}
+        collage_filename = f"memnotify-collage-{int(time.time())}.jpg"
+        files = {"assetData": (collage_filename, collage_data, "image/jpeg")}
         data = {
-            "deviceAssetId": device_asset_id,
-            "deviceId": "memnotify",
             "fileCreatedAt": now_iso,
             "fileModifiedAt": now_iso,
         }
@@ -619,14 +644,13 @@ def upload_collage_to_album(
         if not asset_id:
             return None
 
-        # Add to album via PUT /api/albums/{id}/assets
+        # Add to album (POST for v3, fallback to PUT for v2)
         add_headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
-        response = requests.put(
-            f"{immich_url}/api/albums/{album_id}/assets",
-            headers=add_headers,
-            json={"ids": [asset_id]},
-            timeout=30,
-        )
+        add_url = f"{immich_url}/api/albums/{album_id}/assets"
+        add_body = {"ids": [asset_id]}
+        response = requests.post(add_url, headers=add_headers, json=add_body, timeout=30)
+        if response.status_code in (404, 405):
+            response = requests.put(add_url, headers=add_headers, json=add_body, timeout=30)
 
         if response.status_code == 200:
             logger.info(f"Collage added to album, asset ID: {asset_id}")

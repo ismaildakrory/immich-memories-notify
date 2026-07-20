@@ -101,7 +101,6 @@ def load_config(config_path: str = "config.yaml") -> dict:
     settings.setdefault("log_level", "INFO")
     settings.setdefault("then_and_now_enabled", True)
     settings.setdefault("then_and_now_min_gap", 3)
-    settings.setdefault("then_and_now_slot", 0)  # 0 = auto (last memory slot)
     settings.setdefault("trip_highlights_enabled", True)
     settings.setdefault("then_and_now_cooldown_days", 7)
     settings.setdefault("trip_highlights_cooldown_days", 7)
@@ -109,8 +108,44 @@ def load_config(config_path: str = "config.yaml") -> dict:
     if "collage_year_range" in settings and "year_range" not in settings:
         settings["year_range"] = settings.pop("collage_year_range")
     settings.setdefault("year_range", 5)
+    # Migrate weekly_collage_day → collage_cooldown_days
+    if "weekly_collage_day" in settings:
+        settings.pop("weekly_collage_day")
+    settings.setdefault("collage_cooldown_days", 7)
+
+    # Migrate windows: ensure each window has an 'events' list
+    _migrate_window_events(config)
+
+    # Default notification_service for users
+    for user in config.get("users", []):
+        user.setdefault("notification_service", "ntfy")
 
     return config
+
+
+ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"]
+
+
+def _migrate_window_events(config: dict):
+    """Add events field to windows that don't have it. Remove deprecated slot-count fields."""
+    settings = config.get("settings", {})
+    windows = settings.get("notification_windows", [])
+    for window in windows:
+        if "events" not in window:
+            window["events"] = list(ALL_EVENTS)
+
+    # Remove deprecated fields (they're no longer used by the engine)
+    for old_field in ["memory_notifications", "person_notifications",
+                      "fallback_notifications", "then_and_now_slot", "weekly_collage_slots"]:
+        settings.pop(old_field, None)
+
+
+def get_window_events(config: dict, slot: int) -> list:
+    """Get enabled events list for a window (slot is 1-indexed)."""
+    windows = config.get("settings", {}).get("notification_windows", [])
+    if 0 < slot <= len(windows):
+        return windows[slot - 1].get("events", list(ALL_EVENTS))
+    return list(ALL_EVENTS)
 
 
 # =============================================================================
@@ -250,3 +285,18 @@ def mark_feature_fired(state: dict, user_name: str, feature_key: str, target_dat
     if user_name not in state["users"]:
         state["users"][user_name] = {}
     state["users"][user_name][feature_key] = target_date.isoformat()
+
+
+def was_special_sent_today(state: dict, user_name: str, target_date: date) -> bool:
+    """Check if a special event (T&N/Trip/Collage) already fired today for this user."""
+    user_state = state.get("users", {}).get(user_name, {})
+    return user_state.get("special_sent_date") == target_date.isoformat()
+
+
+def mark_special_sent_today(state: dict, user_name: str, target_date: date):
+    """Record that a special event fired today for this user."""
+    if "users" not in state:
+        state["users"] = {}
+    if user_name not in state["users"]:
+        state["users"][user_name] = {}
+    state["users"][user_name]["special_sent_date"] = target_date.isoformat()

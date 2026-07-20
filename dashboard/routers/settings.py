@@ -90,9 +90,6 @@ async def get_settings(request: Request):
         retry=settings_data.get("retry", {}),
         state_file=settings_data.get("state_file", "state/state.json"),
         log_level=settings_data.get("log_level", "INFO"),
-        memory_notifications=settings_data.get("memory_notifications", 3),
-        person_notifications=settings_data.get("person_notifications", 2),
-        fallback_notifications=settings_data.get("fallback_notifications", 3),
         top_persons_limit=settings_data.get("top_persons_limit", 5),
         exclude_recent_days=settings_data.get("exclude_recent_days", 30),
         include_location=settings_data.get("include_location", True),
@@ -104,8 +101,7 @@ async def get_settings(request: Request):
             NotificationWindow(**w) for w in settings_data.get("notification_windows", [])
         ],
         weekly_collage_enabled=settings_data.get("weekly_collage_enabled", False),
-        weekly_collage_day=settings_data.get("weekly_collage_day", 6),
-        weekly_collage_slots=settings_data.get("weekly_collage_slots", 1),
+        collage_cooldown_days=settings_data.get("collage_cooldown_days", 7),
         collage_person_limit=settings_data.get("collage_person_limit", 5),
         year_range=settings_data.get("year_range",
                    settings_data.get("collage_year_range", 5)),
@@ -114,7 +110,6 @@ async def get_settings(request: Request):
         then_and_now_enabled=settings_data.get("then_and_now_enabled", True),
         then_and_now_cooldown_days=settings_data.get("then_and_now_cooldown_days", 7),
         then_and_now_min_gap=settings_data.get("then_and_now_min_gap", 3),
-        then_and_now_slot=settings_data.get("then_and_now_slot", 0),
         trip_highlights_enabled=settings_data.get("trip_highlights_enabled", True),
         trip_highlights_cooldown_days=settings_data.get("trip_highlights_cooldown_days", 7),
         trip_highlights_min_photos=settings_data.get("trip_highlights_min_photos", 5),
@@ -127,6 +122,7 @@ async def get_settings(request: Request):
         UserInfo(
             name=u.get("name", ""),
             ntfy_topic=u.get("ntfy_topic", ""),
+            notification_service=u.get("notification_service", "ntfy"),
             enabled=u.get("enabled", True),
             home_cities=u.get("home_cities") or ([u["home_city"]] if u.get("home_city") else []),
             album_names=u.get("album_names", []),
@@ -181,7 +177,7 @@ async def update_windows(request: Request, update: WindowsUpdate, background_tas
             if "settings" not in config:
                 config["settings"] = {}
             config["settings"]["notification_windows"] = [
-                {"start": w.start, "end": w.end} for w in update.notification_windows
+                {"start": w.start, "end": w.end, "events": w.events} for w in update.notification_windows
             ]
             _write_yaml(config_path, config)
     except FileNotFoundError:
@@ -303,6 +299,7 @@ async def get_users(request: Request):
         UserInfo(
             name=u.get("name", ""),
             ntfy_topic=u.get("ntfy_topic", ""),
+            notification_service=u.get("notification_service", "ntfy"),
             enabled=u.get("enabled", True),
             home_cities=u.get("home_cities") or ([u["home_city"]] if u.get("home_city") else []),
             album_names=u.get("album_names", []),
@@ -339,7 +336,8 @@ async def toggle_user(request: Request, name: str, update: UserEnabledUpdate):
 
 class NewUser(BaseModel):
     name: str = Field(..., max_length=64, pattern=r"^[a-zA-Z0-9 _\-؀-ۿ]+$")
-    ntfy_topic: str = Field(..., max_length=256, pattern=r"^[a-zA-Z0-9_\-]+$")
+    notification_service: str = Field("ntfy", pattern=r"^(ntfy|apprise)$")
+    ntfy_topic: str = Field("", max_length=256)
     ntfy_username: str = Field("", max_length=64)
     enabled: bool = True
 
@@ -352,6 +350,7 @@ class RenameUser(BaseModel):
 async def add_user(request: Request, user: NewUser):
     """Add a new user."""
     config_path = get_config_path(request)
+    safe_name = user.name.upper().replace(" ", "_")
 
     try:
         with exclusive_lock(config_path):
@@ -364,12 +363,21 @@ async def add_user(request: Request, user: NewUser):
 
             new_user = {
                 "name": user.name,
-                "immich_api_key": "${IMMICH_API_KEY_" + user.name.upper().replace(" ", "_") + "}",
-                "ntfy_topic": user.ntfy_topic,
-                "ntfy_username": user.ntfy_username or user.name.lower(),
-                "ntfy_password": "${NTFY_PASSWORD_" + user.name.upper().replace(" ", "_") + "}",
+                "immich_api_key": "${IMMICH_API_KEY_" + safe_name + "}",
                 "enabled": user.enabled,
             }
+
+            env_vars_needed = [f"IMMICH_API_KEY_{safe_name}"]
+
+            if user.notification_service == "apprise":
+                new_user["notification_service"] = "apprise"
+                new_user["apprise_url"] = "${APPRISE_URL_" + safe_name + "}"
+                env_vars_needed.append(f"APPRISE_URL_{safe_name}")
+            else:
+                new_user["ntfy_topic"] = user.ntfy_topic
+                new_user["ntfy_username"] = user.ntfy_username or user.name.lower()
+                new_user["ntfy_password"] = "${NTFY_PASSWORD_" + safe_name + "}"
+                env_vars_needed.append(f"NTFY_PASSWORD_{safe_name}")
 
             users.append(new_user)
             config["users"] = users
@@ -381,11 +389,8 @@ async def add_user(request: Request, user: NewUser):
 
     return {
         "message": f"User '{user.name}' added",
-        "note": "Remember to add API key and password to .env file",
-        "env_vars_needed": [
-            f"IMMICH_API_KEY_{user.name.upper().replace(' ', '_')}",
-            f"NTFY_PASSWORD_{user.name.upper().replace(' ', '_')}",
-        ],
+        "note": "Remember to add secrets to .env file",
+        "env_vars_needed": env_vars_needed,
     }
 
 
@@ -554,6 +559,49 @@ async def set_user_album_names(request: Request, name: str, body: dict):
         raise HTTPException(status_code=404, detail="Config file not found")
 
     return {"message": f"User '{name}' album_names updated"}
+
+
+class NotificationServiceUpdate(BaseModel):
+    notification_service: str = Field(..., pattern=r"^(ntfy|apprise)$")
+    ntfy_topic: str = Field("", max_length=256)
+    ntfy_username: str = Field("", max_length=64)
+
+
+@router.put("/users/{name}/notification_service")
+async def set_user_notification_service(request: Request, name: str, body: NotificationServiceUpdate):
+    """Switch a user's notification service (ntfy or apprise)."""
+    config_path = get_config_path(request)
+
+    try:
+        with exclusive_lock(config_path):
+            config = load_config_exclusive(config_path)
+            users = config.get("users", [])
+            user = next((u for u in users if u.get("name") == name), None)
+            if not user:
+                raise HTTPException(status_code=404, detail=f"User '{name}' not found")
+
+            safe_name = name.upper().replace(" ", "_")
+
+            if body.notification_service == "apprise":
+                user["notification_service"] = "apprise"
+                user["apprise_url"] = user.get("apprise_url") or "${APPRISE_URL_" + safe_name + "}"
+                user.pop("ntfy_topic", None)
+                user.pop("ntfy_username", None)
+                user.pop("ntfy_password", None)
+            else:
+                user["notification_service"] = "ntfy"
+                user["ntfy_topic"] = body.ntfy_topic or user.get("ntfy_topic", "")
+                user["ntfy_username"] = body.ntfy_username or user.get("ntfy_username", name.lower())
+                user["ntfy_password"] = user.get("ntfy_password") or "${NTFY_PASSWORD_" + safe_name + "}"
+                user.pop("apprise_url", None)
+
+            _write_yaml(config_path, config)
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    return {"message": f"User '{name}' notification service set to '{body.notification_service}'"}
 
 
 @router.put("/users/{name}/rename")

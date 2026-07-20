@@ -114,22 +114,17 @@ async def get_available_slots(request: Request):
 
     settings = config.get("settings", {})
     windows = settings.get("notification_windows", [])
-    mem = settings.get("memory_notifications", 3)
-    person = settings.get("person_notifications", 2)
-    total = mem + person
 
     slots = []
     for i, w in enumerate(windows, 1):
-        slot_type = "memory" if i <= mem else "person"
+        events = w.get("events", ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"])
         slots.append({
             "number": i,
             "window": f"{w.get('start', '?')} – {w.get('end', '?')}",
-            "type": slot_type,
+            "events": events,
         })
 
     return {
         "slots": slots,
-        "memory_slots": mem,
-        "person_slots": person,
-        "total_slots": total,
+        "window_count": len(windows),
     }

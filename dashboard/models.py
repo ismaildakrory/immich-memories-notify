@@ -13,15 +13,16 @@ class RetrySettings(BaseModel):
 class NotificationWindow(BaseModel):
     start: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="Start time (HH:MM)")
     end: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="End time (HH:MM)")
+    events: List[str] = Field(
+        default=["memory", "person", "album", "then_and_now", "trip_highlights", "collage"],
+        description="Event types this window can send",
+    )
 
 
 class Settings(BaseModel):
     retry: RetrySettings = Field(default_factory=RetrySettings)
     state_file: str = Field("state/state.json", max_length=256)
     log_level: str = Field("INFO", max_length=10)
-    memory_notifications: int = Field(3, ge=0, le=20)
-    person_notifications: int = Field(2, ge=0, le=20)
-    fallback_notifications: int = Field(3, ge=0, le=20)
     top_persons_limit: int = Field(5, ge=1, le=50)
     exclude_recent_days: int = Field(30, ge=0, le=3650)
     include_location: bool = True
@@ -32,15 +33,13 @@ class Settings(BaseModel):
     year_range: int = Field(5, ge=1, le=50)
     notification_windows: List[NotificationWindow] = Field(default_factory=list)
     weekly_collage_enabled: bool = False
-    weekly_collage_day: int = Field(6, ge=0, le=6)
-    weekly_collage_slots: int = Field(1, ge=1, le=10)
+    collage_cooldown_days: int = Field(7, ge=1, le=365)
     collage_person_limit: int = Field(5, ge=1, le=20)
     collage_template: str = Field("grid", max_length=64)
     collage_album_name: str = Field("Weekly Highlights", max_length=128)
     then_and_now_enabled: bool = True
     then_and_now_cooldown_days: int = Field(7, ge=0, le=365)
     then_and_now_min_gap: int = Field(3, ge=1, le=50)
-    then_and_now_slot: int = Field(0, ge=0, le=20)
     trip_highlights_enabled: bool = True
     trip_highlights_cooldown_days: int = Field(7, ge=0, le=365)
     trip_highlights_min_photos: int = Field(5, ge=1, le=100)
@@ -51,7 +50,8 @@ class Settings(BaseModel):
 class UserInfo(BaseModel):
     """User info with sensitive fields redacted."""
     name: str
-    ntfy_topic: str
+    ntfy_topic: str = ""
+    notification_service: str = "ntfy"
     enabled: bool = True
     home_cities: List[str] = Field(default_factory=list)
     album_names: List[str] = Field(default_factory=list)
@@ -105,9 +105,6 @@ class MessagesUpdate(BaseModel):
 
 class SettingsUpdate(BaseModel):
     """Partial settings update."""
-    memory_notifications: Optional[int] = Field(None, ge=0, le=20)
-    person_notifications: Optional[int] = Field(None, ge=0, le=20)
-    fallback_notifications: Optional[int] = Field(None, ge=0, le=20)
     top_persons_limit: Optional[int] = Field(None, ge=1, le=50)
     exclude_recent_days: Optional[int] = Field(None, ge=0, le=3650)
     include_location: Optional[bool] = None
@@ -117,15 +114,13 @@ class SettingsUpdate(BaseModel):
     min_group_size: Optional[int] = Field(None, ge=1, le=20)
     year_range: Optional[int] = Field(None, ge=1, le=50)
     weekly_collage_enabled: Optional[bool] = None
-    weekly_collage_day: Optional[int] = Field(None, ge=0, le=6)
-    weekly_collage_slots: Optional[int] = Field(None, ge=1, le=10)
+    collage_cooldown_days: Optional[int] = Field(None, ge=1, le=365)
     collage_person_limit: Optional[int] = Field(None, ge=1, le=20)
     collage_template: Optional[str] = Field(None, max_length=64)
     collage_album_name: Optional[str] = Field(None, max_length=128)
     then_and_now_enabled: Optional[bool] = None
     then_and_now_cooldown_days: Optional[int] = Field(None, ge=0, le=365)
     then_and_now_min_gap: Optional[int] = Field(None, ge=1, le=50)
-    then_and_now_slot: Optional[int] = Field(None, ge=0, le=20)
     trip_highlights_enabled: Optional[bool] = None
     trip_highlights_cooldown_days: Optional[int] = Field(None, ge=0, le=365)
     trip_highlights_min_photos: Optional[int] = Field(None, ge=1, le=100)

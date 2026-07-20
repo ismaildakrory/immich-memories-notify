@@ -72,6 +72,7 @@ class UserSecretUpdate(BaseModel):
     """Update a single user's secrets."""
     api_key: Optional[str] = Field(None, max_length=256)
     ntfy_password: Optional[str] = Field(None, max_length=256)
+    apprise_url: Optional[str] = Field(None, max_length=1024)
 
 
 def load_config(config_path: str) -> dict:
@@ -157,16 +158,18 @@ def get_env_var_name(user_name: str, var_type: str) -> str:
     Looks at config.yaml to find what variable the user is configured to use,
     then extracts the variable name from ${VAR_NAME} format.
     """
+    field_map = {
+        "api_key": "immich_api_key",
+        "ntfy_password": "ntfy_password",
+        "apprise_url": "apprise_url",
+    }
     try:
         config = load_config(CONFIG_PATH)
         users = config.get("users", [])
         for user in users:
             if user.get("name") == user_name:
-                if var_type == "api_key":
-                    ref = user.get("immich_api_key", "")
-                else:  # ntfy_password
-                    ref = user.get("ntfy_password", "")
-                # Extract var name from ${VAR_NAME}
+                config_field = field_map.get(var_type, var_type)
+                ref = user.get(config_field, "")
                 match = re.match(r'\$\{(\w+)\}', ref)
                 if match:
                     return match.group(1)
@@ -175,9 +178,12 @@ def get_env_var_name(user_name: str, var_type: str) -> str:
 
     # Fallback to standard naming
     safe_name = user_name.upper().replace(" ", "_")
-    if var_type == "api_key":
-        return f"IMMICH_API_KEY_{safe_name}"
-    return f"NTFY_PASSWORD_{safe_name}"
+    fallbacks = {
+        "api_key": f"IMMICH_API_KEY_{safe_name}",
+        "ntfy_password": f"NTFY_PASSWORD_{safe_name}",
+        "apprise_url": f"APPRISE_URL_{safe_name}",
+    }
+    return fallbacks.get(var_type, f"NTFY_PASSWORD_{safe_name}")
 
 
 @router.get("/urls")
@@ -210,20 +216,31 @@ async def get_secrets_masked(request: Request):
         if not user_name:
             continue
 
+        service = user.get("notification_service", "ntfy")
         api_key_var = get_env_var_name(user_name, "api_key")
-        password_var = get_env_var_name(user_name, "ntfy_password")
-
         api_key_value = env_vars.get(api_key_var, "")
-        password_value = env_vars.get(password_var, "")
 
-        users_secrets[user_name] = {
+        user_secrets = {
             "api_key": mask_secret(api_key_value),
             "api_key_set": bool(api_key_value),
             "api_key_var": api_key_var,
-            "ntfy_password": mask_secret(password_value),
-            "ntfy_password_set": bool(password_value),
-            "ntfy_password_var": password_var,
+            "notification_service": service,
         }
+
+        if service == "apprise":
+            apprise_var = get_env_var_name(user_name, "apprise_url")
+            apprise_value = env_vars.get(apprise_var, "")
+            user_secrets["apprise_url"] = mask_secret(apprise_value)
+            user_secrets["apprise_url_set"] = bool(apprise_value)
+            user_secrets["apprise_url_var"] = apprise_var
+        else:
+            password_var = get_env_var_name(user_name, "ntfy_password")
+            password_value = env_vars.get(password_var, "")
+            user_secrets["ntfy_password"] = mask_secret(password_value)
+            user_secrets["ntfy_password_set"] = bool(password_value)
+            user_secrets["ntfy_password_var"] = password_var
+
+        users_secrets[user_name] = user_secrets
 
     return {
         "urls": {
@@ -277,6 +294,10 @@ async def update_secrets(update: SecretsUpdate, background_tasks: BackgroundTask
                 var_name = get_env_var_name(user_name, "ntfy_password")
                 env_vars[var_name] = secrets["ntfy_password"]
                 updated.append(var_name)
+            if secrets.get("apprise_url"):
+                var_name = get_env_var_name(user_name, "apprise_url")
+                env_vars[var_name] = secrets["apprise_url"]
+                updated.append(var_name)
 
     if updated:
         save_env_file(ENV_PATH, env_vars)
@@ -304,6 +325,11 @@ async def update_user_secrets(user_name: str, update: UserSecretUpdate, backgrou
     if update.ntfy_password:
         var_name = get_env_var_name(user_name, "ntfy_password")
         env_vars[var_name] = update.ntfy_password
+        updated.append(var_name)
+
+    if update.apprise_url:
+        var_name = get_env_var_name(user_name, "apprise_url")
+        env_vars[var_name] = update.apprise_url
         updated.append(var_name)
 
     if updated:

@@ -292,9 +292,12 @@
 
         .window-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
         }
 
         .window-row span {
@@ -678,46 +681,68 @@
                     <input type="text" id="wz-user-name" placeholder="e.g., Alice" style="width:100%">
                 </div>
                 <div class="form-group">
-                    <label>ntfy topic <span style="color:var(--error)">*</span></label>
-                    <input type="text" id="wz-user-topic" placeholder="e.g., immich-alice" style="width:100%">
-                    <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
-                        Subscribe to this topic in the ntfy app on your phone.
-                    </p>
-                </div>
-                <div class="form-group">
                     <label>Immich API key <span style="color:var(--error)">*</span></label>
                     <input type="text" id="wz-user-api-key" placeholder="Paste API key from Immich → Account → API Keys"
                            style="width:100%">
                 </div>
+                <div class="form-group">
+                    <label>Notification Service</label>
+                    <select id="wz-user-service" onchange="wizardToggleService()" style="width:100%; padding:8px; background:var(--bg-color); color:var(--text); border:1px solid var(--border); border-radius:6px;">
+                        <option value="ntfy">ntfy (default)</option>
+                        <option value="apprise">Apprise (Telegram, Discord, etc.)</option>
+                    </select>
+                </div>
 
-                <div id="wz-ntfy-auto-section" style="display:none;" class="wizard-ntfy-auto">
-                    <div class="toggle" style="margin-bottom:12px;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="wz-auto-ntfy-toggle" onchange="wizardToggleNtfyAuto()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <label for="wz-auto-ntfy-toggle">Create ntfy user automatically (bundled ntfy)</label>
+                <div id="wz-ntfy-fields">
+                    <div class="form-group">
+                        <label>ntfy topic <span style="color:var(--error)">*</span></label>
+                        <input type="text" id="wz-user-topic" placeholder="e.g., immich-alice" style="width:100%">
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+                            Subscribe to this topic in the ntfy app on your phone.
+                        </p>
                     </div>
-                    <div id="wz-ntfy-auto-fields" style="display:none;">
-                        <div class="form-group" style="margin-bottom:10px;">
-                            <label>ntfy username</label>
-                            <input type="text" id="wz-user-ntfy-username" placeholder="e.g., alice" style="width:100%">
+
+                    <div id="wz-ntfy-auto-section" style="display:none;" class="wizard-ntfy-auto">
+                        <div class="toggle" style="margin-bottom:12px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="wz-auto-ntfy-toggle" onchange="wizardToggleNtfyAuto()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <label for="wz-auto-ntfy-toggle">Create ntfy user automatically (bundled ntfy)</label>
                         </div>
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label>ntfy password</label>
-                            <input type="password" id="wz-user-ntfy-password" placeholder="Choose a password" style="width:100%">
+                        <div id="wz-ntfy-auto-fields" style="display:none;">
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label>ntfy username</label>
+                                <input type="text" id="wz-user-ntfy-username" placeholder="e.g., alice" style="width:100%">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>ntfy password</label>
+                                <input type="password" id="wz-user-ntfy-password" placeholder="Choose a password" style="width:100%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="wz-ntfy-password-manual" style="margin-top:16px;">
+                        <label>ntfy password <span style="color:var(--error)">*</span></label>
+                        <input type="password" id="wz-user-ntfy-password-manual" placeholder="Password for your ntfy account" style="width:100%">
+                        <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="wz-ntfy-no-auth" style="margin:0;">
+                            <label for="wz-ntfy-no-auth" style="font-size:0.85rem; color:var(--text-muted); margin:0; cursor:pointer;">
+                                My ntfy doesn't require authentication (open server)
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <div class="form-group" id="wz-ntfy-password-manual" style="margin-top:16px;">
-                    <label>ntfy password <span style="color:var(--error)">*</span></label>
-                    <input type="password" id="wz-user-ntfy-password-manual" placeholder="Password for your ntfy account" style="width:100%">
-                    <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
-                        <input type="checkbox" id="wz-ntfy-no-auth" style="margin:0;">
-                        <label for="wz-ntfy-no-auth" style="font-size:0.85rem; color:var(--text-muted); margin:0; cursor:pointer;">
-                            My ntfy doesn't require authentication (open server)
-                        </label>
+                <div id="wz-apprise-fields" style="display:none;">
+                    <div class="form-group">
+                        <label>Apprise URL <span style="color:var(--error)">*</span></label>
+                        <input type="text" id="wz-user-apprise-url" placeholder="e.g., tgram://bottoken/ChatID" style="width:100%">
+                        <small style="color: var(--text-muted)">
+                            Telegram: <code>tgram://bottoken/ChatID</code><br>
+                            Discord: <code>discord://WebhookID/WebhookToken</code><br>
+                            <a href="https://github.com/caronc/apprise/wiki" target="_blank" style="color: var(--accent);">Full URL list</a>
+                        </small>
                     </div>
                 </div>
 
@@ -816,26 +841,46 @@
                         <small style="color: var(--text-muted)">Get from Immich → User Settings → API Keys</small>
                     </div>
                     <div class="form-group">
-                        <label>ntfy Topic</label>
-                        <input type="text" id="new-user-topic" placeholder="e.g., immich-memories-ismail">
+                        <label>Notification Service</label>
+                        <select id="new-user-service" onchange="toggleAddUserService()" style="width: 100%; padding: 8px; background: var(--bg-color); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
+                            <option value="ntfy">ntfy (default)</option>
+                            <option value="apprise">Apprise (Telegram, Discord, etc.)</option>
+                        </select>
                     </div>
-                    <div class="form-group">
-                        <label>ntfy Username</label>
-                        <input type="text" id="new-user-ntfy-username" placeholder="e.g., ismail" oninput="updateNtfyCommands()">
+                    <div id="add-user-ntfy-fields">
+                        <div class="form-group">
+                            <label>ntfy Topic</label>
+                            <input type="text" id="new-user-topic" placeholder="e.g., immich-memories-ismail">
+                        </div>
+                        <div class="form-group">
+                            <label>ntfy Username</label>
+                            <input type="text" id="new-user-ntfy-username" placeholder="e.g., ismail" oninput="updateNtfyCommands()">
+                        </div>
+                        <div class="form-group">
+                            <label>ntfy Password</label>
+                            <input type="password" id="new-user-ntfy-password" placeholder="ntfy password for this user">
+                        </div>
+                        <div id="add-user-bundled-ntfy" style="display: none; margin: 8px 0; padding: 10px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border);">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                                <input type="checkbox" id="new-user-auto-ntfy" checked>
+                                Auto-create ntfy user in bundled server
+                            </label>
+                        </div>
+                        <div id="add-user-external-ntfy-hint" style="display: none; margin: 8px 0; padding: 10px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-muted);">
+                            <strong style="color: var(--warning);">Manual step required:</strong> Create this user on your ntfy server:<br>
+                            <code id="add-user-ntfy-commands" style="display: block; margin-top: 6px; padding: 6px; background: var(--card-bg); border-radius: 4px; font-size: 0.8rem; white-space: pre-line;"></code>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>ntfy Password</label>
-                        <input type="password" id="new-user-ntfy-password" placeholder="ntfy password for this user">
-                    </div>
-                    <div id="add-user-bundled-ntfy" style="display: none; margin: 8px 0; padding: 10px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border);">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
-                            <input type="checkbox" id="new-user-auto-ntfy" checked>
-                            Auto-create ntfy user in bundled server
-                        </label>
-                    </div>
-                    <div id="add-user-external-ntfy-hint" style="display: none; margin: 8px 0; padding: 10px; background: var(--bg-color); border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-muted);">
-                        <strong style="color: var(--warning);">Manual step required:</strong> Create this user on your ntfy server:<br>
-                        <code id="add-user-ntfy-commands" style="display: block; margin-top: 6px; padding: 6px; background: var(--card-bg); border-radius: 4px; font-size: 0.8rem; white-space: pre-line;"></code>
+                    <div id="add-user-apprise-fields" style="display: none;">
+                        <div class="form-group">
+                            <label>Apprise URL</label>
+                            <input type="text" id="new-user-apprise-url" placeholder="e.g., tgram://bottoken/ChatID">
+                            <small style="color: var(--text-muted)">
+                                Telegram: <code>tgram://bottoken/ChatID</code><br>
+                                Discord: <code>discord://WebhookID/WebhookToken</code><br>
+                                <a href="https://github.com/caronc/apprise/wiki" target="_blank" style="color: var(--accent);">Full URL list</a>
+                            </small>
+                        </div>
                     </div>
                     <div class="btn-group">
                         <button onclick="addUser()" id="add-user-btn">Add User</button>
@@ -858,19 +903,7 @@
             <div class="card">
                 <h2>General Settings</h2>
                 <div id="settings-alert"></div>
-                <div class="grid grid-2">
-                    <div class="form-group">
-                        <label>Memory Notifications</label>
-                        <input type="number" id="memory_notifications" min="0" max="10">
-                    </div>
-                    <div class="form-group">
-                        <label>Person Notifications</label>
-                        <input type="number" id="person_notifications" min="0" max="10">
-                    </div>
-                    <div class="form-group">
-                        <label>Fallback Notifications</label>
-                        <input type="number" id="fallback_notifications" min="0" max="10">
-                    </div>
+                <div class="grid grid-3">
                     <div class="form-group">
                         <label>Top Persons Limit</label>
                         <input type="number" id="top_persons_limit" min="1" max="20">
@@ -915,32 +948,46 @@
                         </label>
                         <span>Prefer Groups</span>
                     </div>
-                </div>
-
-                <h3>Weekly Collage Settings</h3>
-                <div class="grid grid-2">
-                    <div class="form-group">
-                        <label>Collage Enabled</label>
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="then_and_now_enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Then &amp; Now</span>
+                    </div>
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="trip_highlights_enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Trip Highlights</span>
+                    </div>
+                    <div class="toggle">
                         <label class="toggle-switch">
                             <input type="checkbox" id="weekly_collage_enabled">
                             <span class="toggle-slider"></span>
                         </label>
+                        <span>Weekly Collage</span>
                     </div>
-                    <div class="form-group">
-                        <label>Collage Day</label>
-                        <select id="weekly_collage_day">
-                            <option value="0">Sunday</option>
-                            <option value="1">Monday</option>
-                            <option value="2">Tuesday</option>
-                            <option value="3">Wednesday</option>
-                            <option value="4">Thursday</option>
-                            <option value="5">Friday</option>
-                            <option value="6">Saturday</option>
-                        </select>
+                    <div class="toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="birthday_enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Birthday</span>
                     </div>
+                </div>
+                <div class="form-group" style="margin-top: 8px;">
+                    <label>Lookback Years</label>
+                    <input type="number" id="year_range" min="1" max="30" value="5" style="width: 80px;">
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">How far back to search for Then &amp; Now, Trip Highlights, and Collage photos</small>
+                </div>
+
+                <h3>Weekly Collage</h3>
+                <div class="grid grid-2">
                     <div class="form-group">
-                        <label>Collage Slots</label>
-                        <input type="number" id="weekly_collage_slots" min="1" max="3" value="1">
+                        <label>Frequency (days)</label>
+                        <input type="number" id="collage_cooldown_days" min="1" max="365" value="7">
                     </div>
                     <div class="form-group">
                         <label>Person Limit</label>
@@ -962,24 +1009,11 @@
                     </div>
                 </div>
 
-                <div class="card" style="margin-top: 20px;">
-                    <h3>Collage Preview</h3>
-                    <div id="collage-preview" style="background: #2a3f5f; padding: 20px; border-radius: 8px; text-align: center;">
-                        <p style="color: #8899a6;">Collage preview will appear here</p>
-                    </div>
-                </div>
-
-                <h3>Then &amp; Now Settings</h3>
+                <h3>Then &amp; Now / Trip Highlights</h3>
+                <small style="color: var(--text-muted); display: block; margin-bottom: 12px;">Settings for special notification types that compare old and recent photos</small>
                 <div class="grid grid-2">
                     <div class="form-group">
-                        <label>Enabled</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="then_and_now_enabled">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label>Frequency (days)</label>
+                        <label>Then &amp; Now Frequency (days)</label>
                         <input type="number" id="then_and_now_cooldown_days" min="1" value="7">
                     </div>
                     <div class="form-group">
@@ -987,26 +1021,11 @@
                         <input type="number" id="then_and_now_min_gap" min="1" value="3">
                     </div>
                     <div class="form-group">
-                        <label>Lookback Years</label>
-                        <input type="number" id="year_range" min="1" max="30" value="5">
-                    </div>
-                </div>
-
-                <h3>Trip Highlights Settings</h3>
-                <div class="grid grid-2">
-                    <div class="form-group">
-                        <label>Enabled</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="trip_highlights_enabled">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label>Frequency (days)</label>
+                        <label>Trip Frequency (days)</label>
                         <input type="number" id="trip_highlights_cooldown_days" min="1" value="7">
                     </div>
                     <div class="form-group">
-                        <label>Min Photos</label>
+                        <label>Min Photos for Trip</label>
                         <input type="number" id="trip_highlights_min_photos" min="1" value="5">
                     </div>
                     <div class="form-group">
@@ -1014,18 +1033,6 @@
                         <input type="number" id="trip_highlights_repeat_days" min="0" value="90" title="Don't show the same trip again for this many days">
                     </div>
                 </div>
-
-                <h3>Birthday Settings</h3>
-                <div class="grid grid-2">
-                    <div class="form-group">
-                        <label>Enabled</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="birthday_enabled">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-                <small style="color: var(--text-muted)">Sends a birthday notification on slot 1 when someone has a birthday set in Immich.</small>
 
                 <div class="btn-group" style="margin-top: 20px;">
                     <button onclick="saveSettings()">Save Settings</button>
@@ -1305,6 +1312,7 @@
                 }
 
                 // Show all configured users, merging with state data
+                const windowCount = (settings.settings.notification_windows || []).length;
                 container.innerHTML = configuredUsers.map(name => {
                     const state = data.users[name] || { slots_sent: [], notification_count: 0, last_sent: null };
                     const safeName = escapeHtml(name);
@@ -1317,7 +1325,7 @@
                             </span>
                         </h4>
                         <div class="slots-display">
-                            ${Array.from({length: _configuredSlots}, (_, i) => i + 1).map(s => `
+                            ${Array.from({length: windowCount}, (_, i) => i + 1).map(s => `
                                 <div class="slot-indicator ${state.slots_sent.includes(s) ? 'sent' : ''}">${s}</div>
                             `).join('')}
                         </div>
@@ -1338,7 +1346,10 @@
                 // Users
                 document.getElementById('users-list').innerHTML = data.users.map(user => {
                     const sn = escapeHtml(user.name);
-                    const st = escapeHtml(user.ntfy_topic);
+                    const service = user.notification_service || 'ntfy';
+                    const serviceLabel = service === 'apprise'
+                        ? '<span style="color: var(--accent);">Apprise</span>'
+                        : `ntfy: ${escapeHtml(user.ntfy_topic)}`;
                     const homeCities = user.home_cities || (user.home_city ? [user.home_city] : []);
                     const safeId = user.name.replace(/[^a-zA-Z0-9]/g, '-');
                     const jsName = user.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -1347,7 +1358,10 @@
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div class="user-info">
                                 <h4>${sn}</h4>
-                                <p>${st}</p>
+                                <p>${serviceLabel}
+                                    <button class="secondary" style="padding: 1px 6px; font-size: 0.7rem; margin-left: 6px; vertical-align: middle;"
+                                        onclick="switchUserService('${jsName}', '${service}')">Switch</button>
+                                </p>
                             </div>
                             <label class="toggle-switch">
                                 <input type="checkbox" ${user.enabled ? 'checked' : ''} onchange="toggleUser('${jsName}', this.checked)">
@@ -1387,14 +1401,7 @@
                 renderWindows(data.settings.notification_windows);
 
                 // Settings
-                document.getElementById('memory_notifications').value = data.settings.memory_notifications;
-                document.getElementById('person_notifications').value = data.settings.person_notifications;
-                document.getElementById('fallback_notifications').value = data.settings.fallback_notifications;
-
-                _memorySlots = data.settings.memory_notifications || 3;
-                _configuredSlots = _memorySlots + (data.settings.person_notifications || 2);
                 _windowCount = (data.settings.notification_windows || []).length;
-                _hasAlbumUsers = data.users.some(u => (u.album_names || []).length > 0);
                 initTestSlots();
                 document.getElementById('top_persons_limit').value = data.settings.top_persons_limit;
                 document.getElementById('exclude_recent_days').value = data.settings.exclude_recent_days;
@@ -1407,12 +1414,10 @@
 
                 // Collage settings
                 document.getElementById('weekly_collage_enabled').checked = data.settings.weekly_collage_enabled;
-                document.getElementById('weekly_collage_day').value = data.settings.weekly_collage_day;
-                document.getElementById('weekly_collage_slots').value = data.settings.weekly_collage_slots;
+                document.getElementById('collage_cooldown_days').value = data.settings.collage_cooldown_days;
                 document.getElementById('collage_person_limit').value = data.settings.collage_person_limit;
                 document.getElementById('collage_album_name').value = data.settings.collage_album_name;
                 document.getElementById('collage_template').value = data.settings.collage_template || 'grid';
-                updateCollagePreview();
 
                 // Then & Now settings
                 document.getElementById('then_and_now_enabled').checked = data.settings.then_and_now_enabled;
@@ -1447,30 +1452,56 @@
             }
         }
 
+        const ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"];
+        const EVENT_LABELS = { memory: "Memory", person: "Person", album: "Album", then_and_now: "Then & Now", trip_highlights: "Trip", collage: "Collage" };
+
         function renderWindows(windows) {
-            document.getElementById('windows-list').innerHTML = windows.map((w, i) => `
+            document.getElementById('windows-list').innerHTML = windows.map((w, i) => {
+                let eventsRow;
+                if (i === 0) {
+                    eventsRow = `<span style="font-size:0.8rem;color:var(--text-muted);font-style:italic;">Memory only</span>`;
+                } else {
+                    const events = w.events || ALL_EVENTS;
+                    eventsRow = ALL_EVENTS.map(ev => `
+                        <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;">
+                            <input type="checkbox" class="window-event" data-event="${ev}" ${events.includes(ev) ? 'checked' : ''}>
+                            ${EVENT_LABELS[ev]}
+                        </label>`).join('');
+                }
+                return `
                 <div class="window-row" data-index="${i}">
-                    <span>Slot ${i + 1}:</span>
+                    <span>Window ${i + 1}:</span>
                     <input type="time" value="${w.start}" class="window-start" style="width: auto;">
                     <span>to</span>
                     <input type="time" value="${w.end}" class="window-end" style="width: auto;">
                     <button class="secondary" onclick="removeWindow(${i})" style="padding: 6px 12px;">Remove</button>
-                </div>
-            `).join('');
+                    <div style="width:100%;display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;padding-left:70px;">
+                        ${eventsRow}
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function addWindow() {
             const list = document.getElementById('windows-list');
             const count = list.querySelectorAll('.window-row').length;
+            const checkboxes = ALL_EVENTS.map(ev => `
+                <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;">
+                    <input type="checkbox" class="window-event" data-event="${ev}" checked>
+                    ${EVENT_LABELS[ev]}
+                </label>`).join('');
             const row = document.createElement('div');
             row.className = 'window-row';
             row.dataset.index = count;
             row.innerHTML = `
-                <span>Slot ${count + 1}:</span>
+                <span>Window ${count + 1}:</span>
                 <input type="time" value="08:00" class="window-start" style="width: auto;">
                 <span>to</span>
                 <input type="time" value="10:00" class="window-end" style="width: auto;">
                 <button class="secondary" onclick="removeWindow(${count})" style="padding: 6px 12px;">Remove</button>
+                <div style="width:100%;display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;padding-left:70px;">
+                    ${checkboxes}
+                </div>
             `;
             list.appendChild(row);
         }
@@ -1478,19 +1509,24 @@
         function removeWindow(index) {
             const rows = document.querySelectorAll('#windows-list .window-row');
             rows[index]?.remove();
-            // Re-index remaining rows
             document.querySelectorAll('#windows-list .window-row').forEach((row, i) => {
                 row.dataset.index = i;
-                row.querySelector('span').textContent = `Slot ${i + 1}:`;
+                row.querySelector('span').textContent = `Window ${i + 1}:`;
             });
         }
 
         async function saveWindows() {
             const rows = document.querySelectorAll('#windows-list .window-row');
-            const windows = Array.from(rows).map(row => ({
-                start: row.querySelector('.window-start').value,
-                end: row.querySelector('.window-end').value,
-            }));
+            const windows = Array.from(rows).map((row, i) => {
+                const events = i === 0
+                    ? ["memory"]
+                    : Array.from(row.querySelectorAll('.window-event:checked')).map(cb => cb.dataset.event);
+                return {
+                    start: row.querySelector('.window-start').value,
+                    end: row.querySelector('.window-end').value,
+                    events: events.length > 0 ? events : [...ALL_EVENTS],
+                };
+            });
 
             try {
                 await api('/settings/windows', {
@@ -1507,9 +1543,6 @@
 
         async function saveSettings() {
             const settings = {
-                memory_notifications: parseInt(document.getElementById('memory_notifications').value),
-                person_notifications: parseInt(document.getElementById('person_notifications').value),
-                fallback_notifications: parseInt(document.getElementById('fallback_notifications').value),
                 top_persons_limit: parseInt(document.getElementById('top_persons_limit').value),
                 exclude_recent_days: parseInt(document.getElementById('exclude_recent_days').value),
                 min_group_size: parseInt(document.getElementById('min_group_size').value),
@@ -1518,8 +1551,7 @@
                 video_emoji: document.getElementById('video_emoji').checked,
                 prefer_group_photos: document.getElementById('prefer_group_photos').checked,
                 weekly_collage_enabled: document.getElementById('weekly_collage_enabled').checked,
-                weekly_collage_day: parseInt(document.getElementById('weekly_collage_day').value),
-                weekly_collage_slots: parseInt(document.getElementById('weekly_collage_slots').value),
+                collage_cooldown_days: parseInt(document.getElementById('collage_cooldown_days').value),
                 collage_person_limit: parseInt(document.getElementById('collage_person_limit').value),
                 year_range: parseInt(document.getElementById('year_range').value),
                 collage_album_name: document.getElementById('collage_album_name').value,
@@ -1541,9 +1573,6 @@
                 });
                 await api('/restart/scheduler', { method: 'POST' }).catch(() => {});
                 showAlert('settings-alert', 'Settings saved and scheduler reloaded');
-                _memorySlots = settings.memory_notifications;
-                _configuredSlots = _memorySlots + settings.person_notifications;
-                initTestSlots();
             } catch (e) {
                 showAlert('settings-alert', e.message, 'error');
             }
@@ -1564,16 +1593,25 @@
         // User management functions
         let _addUserBundledNtfy = false;
 
+        function toggleAddUserService() {
+            const service = document.getElementById('new-user-service').value;
+            document.getElementById('add-user-ntfy-fields').style.display = service === 'ntfy' ? 'block' : 'none';
+            document.getElementById('add-user-apprise-fields').style.display = service === 'apprise' ? 'block' : 'none';
+        }
+
         async function showAddUserModal() {
             document.getElementById('add-user-modal').style.display = 'flex';
             document.getElementById('new-user-name').value = '';
             document.getElementById('new-user-api-key').value = '';
+            document.getElementById('new-user-service').value = 'ntfy';
             document.getElementById('new-user-topic').value = '';
             document.getElementById('new-user-ntfy-username').value = '';
             document.getElementById('new-user-ntfy-password').value = '';
+            document.getElementById('new-user-apprise-url').value = '';
             document.getElementById('add-user-alert').innerHTML = '';
             document.getElementById('add-user-bundled-ntfy').style.display = 'none';
             document.getElementById('add-user-external-ntfy-hint').style.display = 'none';
+            toggleAddUserService();
 
             try {
                 const resp = await fetch('/api/ntfy/status');
@@ -1603,13 +1641,10 @@
         async function addUser() {
             const name = document.getElementById('new-user-name').value.trim();
             const apiKey = document.getElementById('new-user-api-key').value.trim();
-            const topic = document.getElementById('new-user-topic').value.trim();
-            const ntfyUsername = document.getElementById('new-user-ntfy-username').value.trim();
-            const ntfyPassword = document.getElementById('new-user-ntfy-password').value;
-            const autoNtfy = _addUserBundledNtfy && document.getElementById('new-user-auto-ntfy').checked;
+            const service = document.getElementById('new-user-service').value;
 
-            if (!name || !topic) {
-                showAlert('add-user-alert', 'Name and topic are required', 'error');
+            if (!name) {
+                showAlert('add-user-alert', 'Name is required', 'error');
                 return;
             }
             if (!apiKey) {
@@ -1617,21 +1652,61 @@
                 return;
             }
 
+            if (service === 'apprise') {
+                const appriseUrl = document.getElementById('new-user-apprise-url').value.trim();
+                if (!appriseUrl) {
+                    showAlert('add-user-alert', 'Apprise URL is required', 'error');
+                    return;
+                }
+
+                const btn = document.getElementById('add-user-btn');
+                btn.disabled = true; btn.textContent = 'Adding...';
+
+                try {
+                    await api('/settings/users', {
+                        method: 'POST',
+                        body: JSON.stringify({ name, notification_service: 'apprise' }),
+                    });
+                    const secretsBody = { users: {} };
+                    secretsBody.users[name] = { api_key: apiKey, apprise_url: appriseUrl };
+                    await api('/secrets/', { method: 'PUT', body: JSON.stringify(secretsBody) });
+
+                    hideAddUserModal();
+                    showAlert('settings-alert', `User '${name}' added with Apprise notifications.`);
+                    loadSettings();
+                } catch (e) {
+                    showAlert('add-user-alert', e.message, 'error');
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Add User';
+                }
+                return;
+            }
+
+            // ntfy path
+            const topic = document.getElementById('new-user-topic').value.trim();
+            const ntfyUsername = document.getElementById('new-user-ntfy-username').value.trim();
+            const ntfyPassword = document.getElementById('new-user-ntfy-password').value;
+            const autoNtfy = _addUserBundledNtfy && document.getElementById('new-user-auto-ntfy').checked;
+
+            if (!topic) {
+                showAlert('add-user-alert', 'ntfy topic is required', 'error');
+                return;
+            }
+
             const btn = document.getElementById('add-user-btn');
             btn.disabled = true; btn.textContent = 'Adding...';
 
             try {
-                // Step 1: Add user to config.yaml
                 await api('/settings/users', {
                     method: 'POST',
                     body: JSON.stringify({
                         name: name,
+                        notification_service: 'ntfy',
                         ntfy_topic: topic,
                         ntfy_username: ntfyUsername || name.toLowerCase(),
                     }),
                 });
 
-                // Step 2: Save API key + ntfy password to .env
                 const secretsBody = { users: {} };
                 secretsBody.users[name] = { api_key: apiKey };
                 if (ntfyPassword) secretsBody.users[name].ntfy_password = ntfyPassword;
@@ -1640,7 +1715,6 @@
                     body: JSON.stringify(secretsBody),
                 });
 
-                // Step 3: Auto-create ntfy user if bundled
                 if (autoNtfy && ntfyPassword) {
                     const ntfyResp = await fetch('/api/ntfy/create-user', {
                         method: 'POST',
@@ -1672,6 +1746,42 @@
                 showAlert('add-user-alert', e.message, 'error');
             } finally {
                 btn.disabled = false; btn.textContent = 'Add User';
+            }
+        }
+
+        async function switchUserService(userName, currentService) {
+            const newService = currentService === 'ntfy' ? 'apprise' : 'ntfy';
+            const body = { notification_service: newService };
+
+            if (newService === 'ntfy') {
+                const topic = prompt(`Enter ntfy topic for ${userName}:`, `immich-memories-${userName.toLowerCase()}`);
+                if (!topic) return;
+                body.ntfy_topic = topic;
+                body.ntfy_username = userName.toLowerCase();
+            } else {
+                const appriseUrl = prompt(`Enter Apprise URL for ${userName}:\n(e.g., tgram://bottoken/ChatID)`);
+                if (!appriseUrl) return;
+                // Save apprise URL to .env
+                try {
+                    const secretsBody = { users: {} };
+                    secretsBody.users[userName] = { apprise_url: appriseUrl };
+                    await api('/secrets/', { method: 'PUT', body: JSON.stringify(secretsBody) });
+                } catch (e) {
+                    showAlert('settings-alert', `Failed to save Apprise URL: ${e.message}`, 'error');
+                    return;
+                }
+            }
+
+            try {
+                await api(`/settings/users/${encodeURIComponent(userName)}/notification_service`, {
+                    method: 'PUT',
+                    body: JSON.stringify(body),
+                });
+                showAlert('settings-alert', `${userName} switched to ${newService}.`);
+                loadSettings();
+                loadSecrets();
+            } catch (e) {
+                showAlert('settings-alert', e.message, 'error');
             }
         }
 
@@ -1903,28 +2013,25 @@
 
         // Test functions
         let _windowCount = 5;
-        let _configuredSlots = 5;
-        let _memorySlots = 3;
-        let _hasAlbumUsers = false;
 
         function initTestSlots() {
-            const count = Math.max(_windowCount, _configuredSlots);
-            const slots = Array.from({length: count}, (_, i) => i + 1);
-            document.getElementById('test-slots').innerHTML = slots.map(slot => {
-                let label, style = '';
-                if (slot > _configuredSlots) {
-                    label = 'Unused';
-                    style = 'opacity: 0.5;';
-                } else if (slot <= _memorySlots) {
-                    label = 'Memory / Fallback';
+            const rows = document.querySelectorAll('#windows-list .window-row');
+            document.getElementById('test-slots').innerHTML = Array.from({length: _windowCount}, (_, i) => {
+                const row = rows[i];
+                let eventsLabel;
+                if (i === 0) {
+                    eventsLabel = 'Memory only';
+                } else if (row) {
+                    const checked = Array.from(row.querySelectorAll('.window-event:checked')).map(cb => EVENT_LABELS[cb.dataset.event]);
+                    eventsLabel = (checked.length > 0 && checked.length < ALL_EVENTS.length) ? checked.join(', ') : 'All events';
                 } else {
-                    label = _hasAlbumUsers ? 'Person / Album' : 'Person Photo';
+                    eventsLabel = 'All events';
                 }
                 return `
-                <div class="slot-card" style="${style}">
-                    <h4>Slot ${slot}</h4>
-                    <p style="color: var(--text-muted); font-size: 0.85rem;">${label}</p>
-                    <button onclick="triggerTest(${slot})"${slot > _configuredSlots ? ' disabled' : ''}>Send Test</button>
+                <div class="slot-card">
+                    <h4>Window ${i + 1}</h4>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">${eventsLabel}</p>
+                    <button onclick="triggerTest(${i + 1})">Send Test</button>
                 </div>`;
             }).join('');
         }
@@ -1983,19 +2090,27 @@
                         const user = data.users[userName];
                         const safeId = userName.replace(/[^a-zA-Z0-9]/g, '_');
                         const sn = escapeHtml(userName);
+                        const service = user.notification_service || 'ntfy';
+                        const secondField = service === 'apprise'
+                            ? `<div class="form-group">
+                                    <label>Apprise URL <small style="color: var(--text-muted)">(${escapeHtml(user.apprise_url_var || '')})</small></label>
+                                    <input type="password" id="secret_${safeId}_apprise_url" placeholder="Enter new Apprise URL...">
+                                    <small style="color: var(--text-muted)">${user.apprise_url_set ? `Current: ${escapeHtml(user.apprise_url)}` : 'Not set'}</small>
+                                </div>`
+                            : `<div class="form-group">
+                                    <label>ntfy Password <small style="color: var(--text-muted)">(${escapeHtml(user.ntfy_password_var || '')})</small></label>
+                                    <input type="password" id="secret_${safeId}_ntfy_password" placeholder="Enter new password...">
+                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${escapeHtml(user.ntfy_password)}` : 'Not set'} · Leave blank if your ntfy server has no authentication</small>
+                                </div>`;
                         return `
-                            <h3>${sn}</h3>
+                            <h3>${sn} <small style="color: var(--text-muted); font-weight: normal;">(${service})</small></h3>
                             <div class="grid grid-2">
                                 <div class="form-group">
                                     <label>Immich API Key <small style="color: var(--text-muted)">(${escapeHtml(user.api_key_var)})</small></label>
                                     <input type="password" id="secret_${safeId}_api_key" placeholder="Enter new API key...">
                                     <small style="color: var(--text-muted)">${user.api_key_set ? `Current: ${escapeHtml(user.api_key)}` : 'Not set'}</small>
                                 </div>
-                                <div class="form-group">
-                                    <label>ntfy Password <small style="color: var(--text-muted)">(${escapeHtml(user.ntfy_password_var)})</small></label>
-                                    <input type="password" id="secret_${safeId}_ntfy_password" placeholder="Enter new password...">
-                                    <small style="color: var(--text-muted)">${user.ntfy_password_set ? `Current: ${escapeHtml(user.ntfy_password)}` : 'Not set'} · Leave blank if your ntfy server has no authentication</small>
-                                </div>
+                                ${secondField}
                             </div>
                         `;
                     }).join('');
@@ -2032,11 +2147,13 @@
                 const safeId = userName.replace(/[^a-zA-Z0-9]/g, '_');
                 const apiKey = document.getElementById(`secret_${safeId}_api_key`)?.value.trim();
                 const ntfyPassword = document.getElementById(`secret_${safeId}_ntfy_password`)?.value.trim();
+                const appriseUrl = document.getElementById(`secret_${safeId}_apprise_url`)?.value.trim();
 
-                if (apiKey || ntfyPassword) {
+                if (apiKey || ntfyPassword || appriseUrl) {
                     userSecrets[userName] = {};
                     if (apiKey) userSecrets[userName].api_key = apiKey;
                     if (ntfyPassword) userSecrets[userName].ntfy_password = ntfyPassword;
+                    if (appriseUrl) userSecrets[userName].apprise_url = appriseUrl;
                 }
             }
             if (Object.keys(userSecrets).length > 0) {
@@ -2120,9 +2237,12 @@
                 const ntfySet = !!(secrets.urls && secrets.urls.ntfy_url);
                 const enabledUsers = (settings.users || []).filter(u => u.enabled);
                 const hasUsers = enabledUsers.length > 0;
+                const hasNtfyUsers = enabledUsers.some(u => (u.notification_service || 'ntfy') === 'ntfy');
 
                 checks.push({ ok: immichSet, text: 'Immich URL configured', tab: 'secrets' });
-                checks.push({ ok: ntfySet, text: 'ntfy URL configured', tab: 'secrets' });
+                if (hasNtfyUsers || !hasUsers) {
+                    checks.push({ ok: ntfySet, text: 'ntfy URL configured', tab: 'secrets' });
+                }
                 checks.push({ ok: hasUsers, text: 'At least one user added', tab: 'settings' });
 
                 if (hasUsers) {
@@ -2336,6 +2456,12 @@
             wizardGoToStep(3);
         }
 
+        function wizardToggleService() {
+            const service = document.getElementById('wz-user-service').value;
+            document.getElementById('wz-ntfy-fields').style.display = service === 'ntfy' ? 'block' : 'none';
+            document.getElementById('wz-apprise-fields').style.display = service === 'apprise' ? 'block' : 'none';
+        }
+
         function wizardToggleNtfyAuto() {
             const checked = document.getElementById('wz-auto-ntfy-toggle').checked;
             document.getElementById('wz-ntfy-auto-fields').style.display = checked ? 'block' : 'none';
@@ -2344,14 +2470,57 @@
 
         async function wizardStep3AddUser() {
             const name = document.getElementById('wz-user-name').value.trim();
-            const topic = document.getElementById('wz-user-topic').value.trim();
             const apiKey = document.getElementById('wz-user-api-key').value.trim();
+            const service = document.getElementById('wz-user-service').value;
             if (!name) { wizardShowResult('wz-user-result', 'error', 'Display name is required.'); return; }
-            if (!topic) { wizardShowResult('wz-user-result', 'error', 'ntfy topic is required.'); return; }
             if (!apiKey) { wizardShowResult('wz-user-result', 'error', 'Immich API key is required.'); return; }
 
             const btn = document.getElementById('wz-add-user-btn');
             btn.disabled = true; btn.textContent = 'Adding...';
+
+            if (service === 'apprise') {
+                const appriseUrl = document.getElementById('wz-user-apprise-url').value.trim();
+                if (!appriseUrl) {
+                    wizardShowResult('wz-user-result', 'error', 'Apprise URL is required.');
+                    btn.disabled = false; btn.textContent = 'Add User →';
+                    return;
+                }
+
+                try {
+                    const addResp = await fetch('/api/settings/users', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({name, notification_service: 'apprise'})
+                    });
+                    if (!addResp.ok) {
+                        const err = await addResp.json();
+                        wizardShowResult('wz-user-result', 'error', 'Failed to add user: ' + (err.detail || addResp.status));
+                        btn.disabled = false; btn.textContent = 'Add User →';
+                        return;
+                    }
+                    const secretsBody = {users: {}};
+                    secretsBody.users[name] = {api_key: apiKey, apprise_url: appriseUrl};
+                    await fetch('/api/secrets/', {
+                        method: 'PUT', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(secretsBody)
+                    });
+
+                    wizardSummary.push('User added: ' + name + ' (Apprise)');
+                    const doneItems = wizardSummary.map(s =>
+                        `<li><span style="color:var(--success)">&#10003;</span> ${escapeHtml(s)}</li>`
+                    ).join('');
+                    document.getElementById('wz-done-list').innerHTML = doneItems;
+                    wizardGoToStep(4);
+                } catch (e) {
+                    wizardShowResult('wz-user-result', 'error', 'Unexpected error: ' + e);
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Add User →';
+                }
+                return;
+            }
+
+            // ntfy path
+            const topic = document.getElementById('wz-user-topic').value.trim();
+            if (!topic) { wizardShowResult('wz-user-result', 'error', 'ntfy topic is required.'); btn.disabled = false; btn.textContent = 'Add User →'; return; }
 
             const autoNtfy = wizardBundledNtfy && document.getElementById('wz-auto-ntfy-toggle').checked;
             const ntfyUsername = autoNtfy ? document.getElementById('wz-user-ntfy-username').value.trim() : '';
@@ -2369,7 +2538,6 @@
                 btn.disabled = false; btn.textContent = 'Add User →';
                 return;
             }
-            // Manual path: require password unless user explicitly opts out
             const ntfyNoAuth = !autoNtfy && document.getElementById('wz-ntfy-no-auth').checked;
             if (!autoNtfy && !ntfyPassword && !ntfyNoAuth) {
                 wizardShowResult('wz-user-result', 'error', 'Enter your ntfy password, or check "My ntfy doesn\'t require authentication" if your server is open.');
@@ -2378,10 +2546,9 @@
             }
 
             try {
-                // Step 1: Add user to config.yaml
                 const addResp = await fetch('/api/settings/users', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name, ntfy_topic: topic, ntfy_username: ntfyUsername || name.toLowerCase()})
+                    body: JSON.stringify({name, notification_service: 'ntfy', ntfy_topic: topic, ntfy_username: ntfyUsername || name.toLowerCase()})
                 });
                 if (!addResp.ok) {
                     const err = await addResp.json();
@@ -2390,8 +2557,6 @@
                     return;
                 }
 
-                // Step 2: Save API key
-                const safeVarName = name.toUpperCase().replace(/\s+/g, '_');
                 const secretsBody = {users: {}};
                 secretsBody.users[name] = {api_key: apiKey};
                 if (ntfyPassword) secretsBody.users[name].ntfy_password = ntfyPassword;
@@ -2400,7 +2565,6 @@
                     body: JSON.stringify(secretsBody)
                 });
 
-                // Step 3: Optionally create ntfy user
                 let ntfyCommands = null;
                 if (autoNtfy) {
                     const ntfyResp = await fetch('/api/ntfy/create-user', {
@@ -2421,7 +2585,6 @@
                 wizardSummary.push('User added: ' + name);
                 if (autoNtfy) wizardSummary.push('ntfy user created: ' + ntfyUsername);
 
-                // Build done list
                 const doneItems = wizardSummary.map(s =>
                     `<li><span style="color:var(--success)">&#10003;</span> ${escapeHtml(s)}</li>`
                 ).join('');
@@ -2455,59 +2618,6 @@
             document.getElementById('wizard-overlay').style.display = 'none';
         }
 
-        // Collage preview function
-        function updateCollagePreview() {
-            const preview = document.getElementById('collage-preview');
-            const enabled = document.getElementById('weekly_collage_enabled').checked;
-            const template = document.getElementById('collage_template')?.value || 'grid';
-            const people = document.getElementById('collage_person_limit')?.value || '5';
-            const years = document.getElementById('year_range')?.value || '5';
-            const album = document.getElementById('collage_album_name')?.value || 'Weekly Highlights';
-            const daySelect = document.getElementById('weekly_collage_day');
-            const dayName = daySelect?.options[daySelect.selectedIndex]?.text || 'Saturday';
-
-            const templateDescriptions = {
-                random: 'Randomly picks from 12 template/overlay combinations',
-                grid_custom: '6 photos in 3x2 grid with custom overlay (3 variants)',
-                mosaic_custom: '1 large + 6 small photos with custom overlay (3 variants)',
-                polaroid_custom: '5 photos with custom overlay (3 variants)',
-                strip_custom: '3 photos vertical strip with custom overlay (3 variants)',
-            };
-
-            preview.innerHTML = `
-                <p style="color: ${enabled ? '#4ade80' : '#f87171'}; font-weight: 600; margin-bottom: 10px;">
-                    ${enabled ? 'Enabled' : 'Disabled'}
-                </p>
-                <p style="font-size: 0.9rem; color: #8899a6; text-align: left;">
-                    <strong>Template:</strong> ${escapeHtml(template)} — ${escapeHtml(templateDescriptions[template] || '')}<br>
-                    <strong>People:</strong> Top ${escapeHtml(people)} named people<br>
-                    <strong>Year range:</strong> Last ${escapeHtml(years)} years<br>
-                    <strong>Album:</strong> ${escapeHtml(album)}<br>
-                    <strong>Day:</strong> Every ${escapeHtml(dayName)}
-                </p>
-            `;
-        }
-
-        // Update preview when settings change
-        document.addEventListener('DOMContentLoaded', () => {
-            // Add event listeners to collage settings to update preview
-            const collageSettings = [
-                'weekly_collage_enabled',
-                'weekly_collage_day',
-                'weekly_collage_slots',
-                'collage_person_limit',
-                'year_range',
-                'collage_album_name',
-                'collage_template'
-            ];
-
-            collageSettings.forEach(settingId => {
-                const element = document.getElementById(settingId);
-                if (element) {
-                    element.addEventListener('change', updateCollagePreview);
-                }
-            });
-        });
     </script>
 </body>
 </html>

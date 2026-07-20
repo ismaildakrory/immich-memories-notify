@@ -212,9 +212,8 @@ def prepare_trip_notification(
     gap = trip["gap"]
     asset_ids = trip["asset_ids"]
 
-    # Reuse an existing collage if this trip's album already has one
-    # (collages are uploaded with deviceId "memnotify"), so re-fires and
-    # test triggers don't pile up duplicate collages in the album.
+    # Reuse an existing collage if this trip's album already has one.
+    # Detection: check originalFileName prefix (v3) or legacy deviceId/deviceAssetId (v2).
     album_name = f"Trip to {city}, {country} ({year})"
     uploaded_asset_id = None
     collage = None
@@ -223,7 +222,8 @@ def prepare_trip_notification(
         existing_album = get_album_assets(immich_url, api_key, album_name, _logger)
         if existing_album:
             for a in existing_album.get("assets", []):
-                if (a.get("deviceId") == "memnotify"
+                if (str(a.get("originalFileName", "")).startswith("memnotify-collage")
+                        or a.get("deviceId") == "memnotify"
                         or str(a.get("deviceAssetId", "")).startswith("memnotify-collage")):
                     uploaded_asset_id = a.get("id")
                     _logger.info(f"  Reusing existing collage in album '{album_name}'")
@@ -289,12 +289,11 @@ def prepare_trip_notification(
             album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
             if album_id:
                 headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
-                requests.put(
-                    f"{immich_url}/api/albums/{album_id}/assets",
-                    headers=headers,
-                    json={"ids": asset_ids},
-                    timeout=30,
-                )
+                add_url = f"{immich_url}/api/albums/{album_id}/assets"
+                add_body = {"ids": asset_ids}
+                resp = requests.post(add_url, headers=headers, json=add_body, timeout=30)
+                if resp.status_code in (404, 405):
+                    requests.put(add_url, headers=headers, json=add_body, timeout=30)
                 uploaded_asset_id = upload_collage_to_album(immich_url, api_key, collage, album_id, _logger)
         except Exception as e:
             _logger.warning(f"  Could not upload Trip Highlights to album: {e}")

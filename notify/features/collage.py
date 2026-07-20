@@ -12,7 +12,6 @@ from typing import List, Optional
 
 from PIL import Image
 
-from ..config import get_slots_sent_today, mark_slot_sent
 from ..immich import (
     fetch_thumbnail,
     get_asset_people,
@@ -21,7 +20,6 @@ from ..immich import (
     get_top_persons,
     upload_collage_to_album,
 )
-from ..ntfy import send_single_notification
 
 
 def cover_crop_image(img: Image.Image, target_w: int, target_h: int, faces: list = None) -> Image.Image:
@@ -80,20 +78,6 @@ def cover_crop_image(img: Image.Image, target_w: int, target_h: int, faces: list
     cropped = scaled.crop((crop_x, crop_y, crop_x + target_w, crop_y + target_h))
     return cropped
 
-
-def is_collage_day(settings: dict, target_date: date) -> bool:
-    """Check if today is the configured collage day.
-
-    Config uses Sun=0, Sat=6 convention.
-    Python weekday() uses Mon=0, Sun=6.
-    Convert Python weekday to config convention: (weekday + 1) % 7
-    """
-    if not settings.get("weekly_collage_enabled", False):
-        return False
-
-    collage_day = settings.get("weekly_collage_day", 6)  # Saturday in Sun=0 convention
-    python_as_config = (target_date.weekday() + 1) % 7
-    return python_as_config == collage_day
 
 
 # =============================================================================
@@ -391,69 +375,3 @@ def create_collage_image(
         return None
 
 
-def process_collage_slot(
-    user: dict,
-    config: dict,
-    state: dict,
-    target_date: date,
-    slot: int,
-    test_mode: bool = False,
-    dry_run: bool = False,
-    force: bool = False,
-    logger: logging.Logger = None,
-) -> dict:
-    """Process a collage notification for a user."""
-    try:
-        user_name = user["name"]
-        ntfy_user = user.get("ntfy_username")
-        ntfy_pass = user.get("ntfy_password")
-        ntfy_auth = (ntfy_user, ntfy_pass) if ntfy_user and ntfy_pass else None
-
-        # Check if slot already sent
-        slots_sent = get_slots_sent_today(state, user_name, target_date)
-        if not force and not test_mode and slot in slots_sent:
-            logger.info(f"  [{user_name}] Collage slot {slot} already sent today")
-            return {"success": True, "message": "Already sent"}
-
-        settings = config.get("settings", {})
-        collage_notification = generate_weekly_collage(
-            user=user,
-            config=config,
-            target_date=target_date,
-            settings=settings,
-            logger=logger,
-            test_mode=test_mode,
-        )
-
-        if not collage_notification or not collage_notification.get("has_content"):
-            logger.info(f"  [{user_name}] No collage generated")
-            return {"success": False, "message": "No collage generated"}
-
-        if dry_run:
-            logger.info(f"  [{user_name}] [DRY RUN] Would send collage: {collage_notification['title']}")
-            return {"success": True, "message": "Dry run successful"}
-
-        # Always provide collage_data as thumbnail fallback (Immich needs time to process uploads)
-        thumbnail_override = collage_notification.get("collage_data")
-
-        success = send_single_notification(
-            user=user,
-            notification=collage_notification,
-            config=config,
-            ntfy_auth=ntfy_auth,
-            logger=logger,
-            thumbnail_override=thumbnail_override,
-        )
-
-        if success:
-            if not test_mode:
-                mark_slot_sent(state, user_name, target_date, slot, collage_notification.get("asset_id"))
-            logger.info(f"  [{user_name}] Collage sent for slot {slot}")
-        else:
-            logger.warning(f"  [{user_name}] Failed to send collage")
-
-        return {"success": success, "message": "Sent" if success else "Failed"}
-
-    except Exception as e:
-        logger.error(f"Error processing collage slot for {user['name']}: {e}")
-        return {"success": False, "message": str(e)}
