@@ -5,7 +5,7 @@ import random
 from datetime import date
 from typing import Optional
 
-from ..immich import fetch_asset_details, select_asset_with_face_preference
+from ..immich import fetch_asset_details, is_generated_asset, select_asset_with_face_preference
 from ..utils import format_location, get_primary_album
 
 
@@ -59,8 +59,10 @@ def prepare_memory_notification(
     )
 
     if not selected_asset:
-        # Fallback to first available, but skip if all already sent
+        # Fallback to first available, skip already sent and app-generated
         available = [a for a in assets if a.get("id") not in assets_sent]
+        available = [a for a in available
+                     if not is_generated_asset(fetch_asset_details(immich_url, api_key, a["id"]))]
         if not available:
             return None
         selected_asset = available[0]

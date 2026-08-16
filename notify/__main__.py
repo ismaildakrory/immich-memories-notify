@@ -20,10 +20,13 @@ Usage:
 
 import argparse
 import logging
+import os
 import random
 import sys
 import time
 from datetime import date, datetime
+
+import requests
 
 from .config import (
     get_assets_sent_today,
@@ -568,6 +571,67 @@ def _execute_event(
     return None
 
 
+def _tag_existing_generated(config_path: str):
+    """One-time backfill: find assets uploaded by the app and tag them."""
+    from .immich import GENERATED_TAG_NAME, _get_or_create_tag
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logger = logging.getLogger("immich-memories-notify")
+    config = load_config(config_path)
+    immich_url = config["immich"]["url"]
+
+    for user in config.get("users", []):
+        if not user.get("enabled", True):
+            continue
+        name = user["name"]
+        api_key = user["immich_api_key"]
+        logger.info(f"[{name}] Scanning for app-generated assets...")
+
+        tag_id = _get_or_create_tag(immich_url, api_key)
+        if not tag_id:
+            logger.error(f"[{name}] Could not create tag '{GENERATED_TAG_NAME}'")
+            continue
+
+        # Search by filename prefix (all uploads use memnotify-collage-*.jpg)
+        headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
+        asset_ids = []
+        page = 1
+        while True:
+            resp = requests.post(
+                f"{immich_url}/api/search/metadata", headers=headers,
+                json={"originalFileName": "memnotify-collage", "size": 200, "page": page}, timeout=30,
+            )
+            if resp.status_code != 200:
+                break
+            data = resp.json().get("assets", {})
+            items = data.get("items", []) if isinstance(data, dict) else data
+            asset_ids.extend(a["id"] for a in items if a.get("id"))
+            if len(items) < 200:
+                break
+            page += 1
+
+        if not asset_ids:
+            logger.info(f"[{name}] No app-generated assets found")
+            continue
+
+        tagged = 0
+        for i in range(0, len(asset_ids), 25):
+            batch = asset_ids[i:i + 25]
+            try:
+                resp = requests.put(
+                    f"{immich_url}/api/tags/{tag_id}/assets",
+                    headers=headers, json={"ids": batch}, timeout=60,
+                )
+                if resp.status_code == 200:
+                    tagged += len(batch)
+            except Exception as e:
+                logger.warning(f"[{name}] Error tagging batch: {e}")
+
+        logger.info(f"[{name}] Tagged {tagged} assets as '{GENERATED_TAG_NAME}'")
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Send Immich memory notifications",
@@ -589,6 +653,7 @@ Examples:
     parser.add_argument("--force", action="store_true", help="Force send even if already sent today")
     parser.add_argument("--no-delay", action="store_true", help="Skip random delay, send immediately")
     parser.add_argument("--date", help="Specific date to check (YYYY-MM-DD)")
+    parser.add_argument("--tag-generated", action="store_true", help="Tag existing app-generated assets in Immich (one-time backfill)")
     args = parser.parse_args()
 
     if args.check_updates:
@@ -597,8 +662,11 @@ Examples:
         logger = logging.getLogger("immich-memories-notify")
         return check_for_updates(config_path=args.config, logger=logger)
 
+    if args.tag_generated:
+        return _tag_existing_generated(args.config)
+
     if not args.slot:
-        parser.error("--slot is required (unless using --check-updates)")
+        parser.error("--slot is required (unless using --check-updates or --tag-generated)")
 
     # Load config first to get log settings
     try:
@@ -670,6 +738,13 @@ Examples:
     # Load state
     state_file = settings.get("state_file", "state/state.json")
     state = load_state(state_file)
+
+    # One-time migration: tag existing app-generated assets
+    if not state.get("tag_backfill_done"):
+        logger.info("Running one-time backfill: tagging app-generated assets...")
+        _tag_existing_generated(args.config)
+        state["tag_backfill_done"] = True
+        save_state(state_file, state)
 
     # Get enabled users
     users = [u for u in config.get("users", []) if u.get("enabled", True)]

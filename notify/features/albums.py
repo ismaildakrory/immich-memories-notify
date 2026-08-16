@@ -5,7 +5,7 @@ import random
 from datetime import date
 from typing import Optional
 
-from ..immich import fetch_asset_details, get_album_assets
+from ..immich import fetch_asset_details, get_album_assets, is_generated_asset
 from ..utils import format_location, get_primary_album
 
 
@@ -63,8 +63,10 @@ def prepare_album_notification(
         # Use "on this day" if available, otherwise all assets
         candidates = on_this_day if on_this_day else all_assets
 
-        # Exclude already-sent assets
+        # Exclude already-sent and app-generated assets
         candidates = [a for a in candidates if a.get("id") not in assets_sent]
+        candidates = [a for a in candidates
+                     if not is_generated_asset(fetch_asset_details(immich_url, api_key, a["id"]))]
         if not candidates:
             continue
 

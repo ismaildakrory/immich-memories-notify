@@ -101,8 +101,6 @@ An empty `config.yaml` is fine — defaults are filled in on first start and the
 <img width="1027" height="758" alt="2" src="https://github.com/user-attachments/assets/743262c2-6b83-44b3-b7df-9046101a5f44" />
 <img width="1407" height="1200" alt="3" src="https://github.com/user-attachments/assets/a182555f-948d-4892-8225-2e3fdf6fbff0" />
 
-
-
 ## Common Commands
 
 ```bash
@@ -267,12 +265,12 @@ When creating an API key in Immich, grant these permissions:
 | `person.read` | Face recognition features |
 | `asset.read` | Asset details and metadata search |
 | `asset.view` | Thumbnail previews in notifications |
-| `asset.upload` | Weekly collage upload |
+| `asset.upload` | Collage upload |
 | `album.read` | Album notifications |
 | `album.create` | Creating the collage album |
 | `albumAsset.create` | Adding collages to the album |
 
-If you don't use the Weekly Collage, Trip Highlights, or Then & Now features, you can skip `asset.upload`, `album.create`, and `albumAsset.create` (all three features upload their composites to albums).
+If you don't use the Collage, Trip Highlights, or Then & Now features, you can skip `asset.upload`, `album.create`, and `albumAsset.create` (all three features upload their composites to albums).
 
 ## Troubleshooting
 
