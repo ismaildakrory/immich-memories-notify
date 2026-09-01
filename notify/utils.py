@@ -49,13 +49,17 @@ def format_location(exif_info: dict) -> dict:
     }
 
 
-def get_primary_album(asset_details: dict) -> str | None:
+def get_primary_album(asset_details: dict, albums: list = None) -> str | None:
     """
-    Get the first album name from asset's albums array.
+    Get the first album name for an asset.
+
+    Immich v2 embedded an 'albums' array in asset details; v3 removed it, so
+    callers on v3 pass the result of fetch_asset_albums() as `albums`.
     Returns album name or None if not in any album.
     """
-    albums = asset_details.get("albums", [])
-    if albums and len(albums) > 0:
+    if albums is None:
+        albums = asset_details.get("albums", [])
+    if albums:
         return albums[0].get("albumName")
     return None
 

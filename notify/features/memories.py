@@ -5,7 +5,12 @@ import random
 from datetime import date
 from typing import Optional
 
-from ..immich import fetch_asset_details, is_generated_asset, select_asset_with_face_preference
+from ..immich import (
+    fetch_asset_albums,
+    fetch_asset_details,
+    is_generated_asset,
+    select_asset_with_face_preference,
+)
 from ..utils import format_location, get_primary_album
 
 
@@ -86,7 +91,9 @@ def prepare_memory_notification(
                 location_data = format_location(exif_info)
                 location_str = location_data.get("location", "")
             if include_album:
-                album_name = get_primary_album(asset_details)
+                album_name = get_primary_album(
+                    asset_details, fetch_asset_albums(immich_url, api_key, asset_id)
+                )
         except Exception as e:
             if logger:
                 logger.debug(f"Could not fetch asset details for {asset_id}: {e}")

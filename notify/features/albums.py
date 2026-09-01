@@ -5,7 +5,12 @@ import random
 from datetime import date
 from typing import Optional
 
-from ..immich import fetch_asset_details, get_album_assets, is_generated_asset
+from ..immich import (
+    fetch_asset_albums,
+    fetch_asset_details,
+    get_album_assets,
+    is_generated_asset,
+)
 from ..utils import format_location, get_primary_album
 
 
@@ -63,14 +68,21 @@ def prepare_album_notification(
         # Use "on this day" if available, otherwise all assets
         candidates = on_this_day if on_this_day else all_assets
 
-        # Exclude already-sent and app-generated assets
+        # Exclude already-sent assets
         candidates = [a for a in candidates if a.get("id") not in assets_sent]
-        candidates = [a for a in candidates
-                     if not is_generated_asset(fetch_asset_details(immich_url, api_key, a["id"]))]
         if not candidates:
             continue
 
-        asset = random.choice(candidates)
+        # Pick randomly, re-roll if generated (avoids O(n) API calls)
+        random.shuffle(candidates)
+        asset = None
+        for candidate in candidates:
+            details = fetch_asset_details(immich_url, api_key, candidate["id"])
+            if not is_generated_asset(details):
+                asset = candidate
+                break
+        if asset is None:
+            continue
         asset_id = asset.get("id")
         is_video = asset.get("type") == "VIDEO"
 
@@ -88,7 +100,9 @@ def prepare_album_notification(
                     location_data = format_location(exif_info)
                     location_str = location_data.get("location", "")
                 if include_album:
-                    detail_album_name = get_primary_album(asset_details)
+                    detail_album_name = get_primary_album(
+                        asset_details, fetch_asset_albums(immich_url, api_key, asset_id)
+                    )
             except Exception as e:
                 if logger:
                     logger.debug(f"Could not fetch asset details for {asset_id}: {e}")

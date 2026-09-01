@@ -597,7 +597,7 @@ def _fetch_album_assets_by_search(
     all_assets = []
     page = 1
     while True:
-        payload = {"albumId": album_id, "size": 1000, "page": page}
+        payload = {"albumIds": [album_id], "size": 1000, "page": page}
         response = requests.post(
             f"{immich_url}/api/search/metadata",
             headers=headers,
@@ -617,6 +617,24 @@ def _fetch_album_assets_by_search(
             break
         page += 1
     return all_assets
+
+
+def fetch_asset_albums(immich_url: str, api_key: str, asset_id: str, timeout: int = 10) -> list:
+    """Fetch the albums containing an asset.
+
+    Immich v3 dropped the 'albums' field from asset details, so album membership
+    must be queried separately via GET /api/albums?assetId=...
+    """
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    response = requests.get(
+        f"{immich_url}/api/albums",
+        headers=headers,
+        params={"assetId": asset_id},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return data if isinstance(data, list) else []
 
 
 def upload_collage_to_album(
