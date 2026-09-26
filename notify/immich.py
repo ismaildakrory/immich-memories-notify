@@ -50,12 +50,16 @@ def parse_memories(memories: list) -> dict:
         if not year:
             continue
 
+        memory_id = memory.get("id")
+
         for asset in memory.get("assets", []):
             asset_id = asset.get("id")
             asset_type = asset.get("type", "IMAGE")
 
             if asset_id:
                 result["by_year"][year]["assets"].append(asset)
+                if memory_id:
+                    result["by_year"][year]["memory_id"] = memory_id
                 if result["first_asset_id"] is None:
                     result["first_asset_id"] = asset_id
 

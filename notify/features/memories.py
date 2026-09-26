@@ -44,6 +44,7 @@ def prepare_memory_notification(
     year = years[year_index]
     year_data = parsed["by_year"].get(year, {})
     assets = year_data.get("assets", [])
+    memory_id = year_data.get("memory_id")
 
     if not assets:
         return None
@@ -148,7 +149,7 @@ def prepare_memory_notification(
     if test_mode:
         title = "[TEST] " + title
 
-    return {
+    result = {
         "title": title,
         "message": message,
         "has_content": True,
@@ -159,3 +160,8 @@ def prepare_memory_notification(
         "location": location_str,
         "album_name": album_name,
     }
+
+    if memory_id:
+        result["click_url"] = f"immich://memory?id={memory_id}"
+
+    return result
