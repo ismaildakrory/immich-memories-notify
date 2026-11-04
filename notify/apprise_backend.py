@@ -7,7 +7,7 @@ import tempfile
 import apprise
 
 from .immich import fetch_thumbnail
-from .utils import with_retry
+from .utils import ensure_jpeg, with_retry
 
 
 def send_single_notification(
@@ -40,7 +40,7 @@ def send_single_notification(
     elif asset_id:
         try:
             thumbnail_data = with_retry(
-                lambda: fetch_thumbnail(immich_url, api_key, asset_id),
+                lambda: ensure_jpeg(fetch_thumbnail(immich_url, api_key, asset_id, size="preview")),
                 max_attempts=retry_config["max_attempts"],
                 delay=retry_config["delay_seconds"],
                 logger=logger,

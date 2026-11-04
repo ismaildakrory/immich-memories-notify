@@ -1,5 +1,6 @@
 """Utility functions: retry logic, location formatting, delay calculation."""
 
+import io
 import random
 import time
 from datetime import datetime, timedelta
@@ -18,6 +19,21 @@ def with_retry(func, max_attempts: int = 3, delay: int = 5, logger=None):
             if attempt < max_attempts:
                 time.sleep(delay)
     raise last_error
+
+
+def ensure_jpeg(data: bytes) -> bytes:
+    """Re-encode WebP image data as JPEG.
+
+    ntfy clients only render a preview for JPEG/PNG/GIF attachments, and show
+    just "Attachment: <name>" for WebP. Immich serves its small thumbnails as
+    WebP, and its preview format is configurable, so normalise before sending.
+    """
+    if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+        return data
+    from PIL import Image
+    out = io.BytesIO()
+    Image.open(io.BytesIO(data)).convert("RGB").save(out, "JPEG", quality=85)
+    return out.getvalue()
 
 
 def format_location(exif_info: dict) -> dict:
