@@ -69,6 +69,7 @@ def send_notification(
     timeout: int = 10,
     is_video: bool = False,
     ntfy_external_url: str = None,
+    priority: str = "default",
 ) -> bool:
     """Send a notification to ntfy."""
     topic = _sanitize_header(topic)
@@ -91,7 +92,7 @@ def send_notification(
     headers = {
         "Title": encoded_title,
         "Tags": tags,
-        "Priority": "default",
+        "Priority": priority if priority in ("min", "low", "default", "high", "max") else "default",
     }
 
     if click_url:
@@ -131,6 +132,7 @@ def send_single_notification(
     ntfy_url = config["ntfy"]["url"]
     ntfy_external_url = config["ntfy"].get("external_url") or ""
     topic = user["ntfy_topic"]
+    priority = user.get("ntfy_priority", "default")
     retry_config = config["settings"]["retry"]
     api_key = user["immich_api_key"]
 
@@ -180,6 +182,7 @@ def send_single_notification(
                 auth=ntfy_auth,
                 is_video=is_video,
                 ntfy_external_url=ntfy_external_url,
+                priority=priority,
             ),
             max_attempts=retry_config["max_attempts"],
             delay=retry_config["delay_seconds"],

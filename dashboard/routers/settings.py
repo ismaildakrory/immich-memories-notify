@@ -122,6 +122,7 @@ async def get_settings(request: Request):
         UserInfo(
             name=u.get("name", ""),
             ntfy_topic=u.get("ntfy_topic", ""),
+            ntfy_priority=u.get("ntfy_priority", "default"),
             notification_service=u.get("notification_service", "ntfy"),
             enabled=u.get("enabled", True),
             home_cities=u.get("home_cities") or ([u["home_city"]] if u.get("home_city") else []),
@@ -299,6 +300,7 @@ async def get_users(request: Request):
         UserInfo(
             name=u.get("name", ""),
             ntfy_topic=u.get("ntfy_topic", ""),
+            ntfy_priority=u.get("ntfy_priority", "default"),
             notification_service=u.get("notification_service", "ntfy"),
             enabled=u.get("enabled", True),
             home_cities=u.get("home_cities") or ([u["home_city"]] if u.get("home_city") else []),
@@ -339,6 +341,7 @@ class NewUser(BaseModel):
     notification_service: str = Field("ntfy", pattern=r"^(ntfy|apprise)$")
     ntfy_topic: str = Field("", max_length=256)
     ntfy_username: str = Field("", max_length=64)
+    ntfy_priority: str = Field("default", pattern=r"^(min|low|default|high|max)$")
     enabled: bool = True
 
 
@@ -377,6 +380,8 @@ async def add_user(request: Request, user: NewUser):
                 new_user["ntfy_topic"] = user.ntfy_topic
                 new_user["ntfy_username"] = user.ntfy_username or user.name.lower()
                 new_user["ntfy_password"] = "${NTFY_PASSWORD_" + safe_name + "}"
+                if user.ntfy_priority != "default":
+                    new_user["ntfy_priority"] = user.ntfy_priority
                 env_vars_needed.append(f"NTFY_PASSWORD_{safe_name}")
 
             users.append(new_user)
@@ -588,6 +593,7 @@ async def set_user_notification_service(request: Request, name: str, body: Notif
                 user.pop("ntfy_topic", None)
                 user.pop("ntfy_username", None)
                 user.pop("ntfy_password", None)
+                user.pop("ntfy_priority", None)
             else:
                 user["notification_service"] = "ntfy"
                 user["ntfy_topic"] = body.ntfy_topic or user.get("ntfy_topic", "")
@@ -602,6 +608,40 @@ async def set_user_notification_service(request: Request, name: str, body: Notif
         raise HTTPException(status_code=404, detail="Config file not found")
 
     return {"message": f"User '{name}' notification service set to '{body.notification_service}'"}
+
+
+class NtfyPriorityUpdate(BaseModel):
+    ntfy_priority: str = Field(..., pattern=r"^(min|low|default|high|max)$")
+
+
+@router.put("/users/{name}/ntfy_priority")
+async def set_user_ntfy_priority(request: Request, name: str, body: NtfyPriorityUpdate):
+    """Set ntfy message priority for a user."""
+    config_path = get_config_path(request)
+
+    try:
+        with exclusive_lock(config_path):
+            config = load_config_exclusive(config_path)
+            users = config.get("users", [])
+            user = next((u for u in users if u.get("name") == name), None)
+            if not user:
+                raise HTTPException(status_code=404, detail=f"User '{name}' not found")
+
+            if user.get("notification_service", "ntfy") != "ntfy":
+                raise HTTPException(status_code=400, detail="ntfy priority is only applicable to ntfy users")
+
+            if body.ntfy_priority == "default":
+                user.pop("ntfy_priority", None)
+            else:
+                user["ntfy_priority"] = body.ntfy_priority
+
+            _write_yaml(config_path, config)
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Config file not found")
+
+    return {"message": f"User '{name}' ntfy priority set to '{body.ntfy_priority}'"}
 
 
 @router.put("/users/{name}/rename")

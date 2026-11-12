@@ -194,6 +194,7 @@ users:
     ntfy_topic: immich-memories-alice
     ntfy_username: alice
     ntfy_password: ${NTFY_PASSWORD_ALICE}
+    ntfy_priority: default      # min, low, default, high, max
     enabled: true
     home_cities: [London]       # Excluded from Trip Highlights
     album_names: [Favorites]    # Album photo notifications

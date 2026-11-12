@@ -51,6 +51,7 @@ class UserInfo(BaseModel):
     """User info with sensitive fields redacted."""
     name: str
     ntfy_topic: str = ""
+    ntfy_priority: str = "default"
     notification_service: str = "ntfy"
     enabled: bool = True
     home_cities: List[str] = Field(default_factory=list)

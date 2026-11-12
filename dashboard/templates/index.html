@@ -1100,6 +1100,14 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        ${service === 'ntfy' ? `
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">ntfy Priority:</label>
+                            <select style="flex: 1; padding: 3px 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary);"
+                                onchange="setNtfyPriority('${jsName}', this.value)">
+                                ${['min','low','default','high','max'].map(p => `<option value="${p}" ${(user.ntfy_priority || 'default') === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            </select>
+                        </div>` : ''}
                         <div style="position: relative; margin-top: 6px;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">Home Cities:</label>
@@ -1478,6 +1486,18 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                 showAlert('add-user-alert', e.message, 'error');
             } finally {
                 btn.disabled = false; btn.textContent = 'Add User';
+            }
+        }
+
+        async function setNtfyPriority(userName, priority) {
+            try {
+                await api(`/settings/users/${encodeURIComponent(userName)}/ntfy_priority`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ ntfy_priority: priority }),
+                });
+            } catch (e) {
+                alert('Failed to set priority: ' + e.message);
+                loadConfig();
             }
         }
 
