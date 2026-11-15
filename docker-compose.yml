@@ -22,7 +22,10 @@
 # DASHBOARD:
 #   - Access at http://localhost:5000
 #   - Set DASHBOARD_TOKEN env var for authentication
-#   - Scheduler runs embedded (crond inside this container)
+#   - Scheduler runs embedded (supercronic inside this container)
+#   - Runs as an unprivileged user; set PUID/PGID in .env to match the
+#     owner of config.yaml / .env / state on the host (default 1000)
+#   - Docker access only through the docker-socket-proxy service
 #
 # ============================================================
 
@@ -33,6 +36,9 @@ services:
   notify:
     build: .
     container_name: immich-memories-notify
+    # On-demand tool only (`docker compose run --rm notify ...`); the "tools"
+    # profile keeps a plain `docker compose up -d` from starting it.
+    profiles: ["tools"]
     volumes:
       - ./notify:/app/notify:ro
       - ./config.yaml:/app/config.yaml:ro
@@ -67,7 +73,6 @@ services:
       - ./VERSION:/app/VERSION:ro
       - ./custom_templates:/app/custom_templates:ro
       - ./.env:/app/.env
-      - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
     environment:
@@ -75,13 +80,40 @@ services:
       - CONFIG_PATH=/app/config.yaml
       - STATE_PATH=/app/state/state.json
       - ENV_PATH=/app/.env
+      - DOCKER_HOST=tcp://127.0.0.1:2375   # via docker-socket-proxy
+      - PUID=${PUID:-1000}                 # owner of config.yaml/.env/state on the host
+      - PGID=${PGID:-1000}
       - DASHBOARD_USER=${DASHBOARD_USER:-admin}
       - DASHBOARD_TOKEN=${DASHBOARD_TOKEN:-}
       - DASHBOARD_PORT=${DASHBOARD_PORT:-5000}
     network_mode: host
     restart: unless-stopped
+    depends_on:
+      - docker-socket-proxy
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ------------------------------------------------------------
+  # Docker socket proxy — the dashboard never sees the raw socket.
+  # Only container inspect/exec (bundled ntfy user management) is allowed.
+  # ------------------------------------------------------------
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    container_name: immich-memories-docker-proxy
+    environment:
+      - CONTAINERS=1   # docker inspect
+      - EXEC=1         # docker exec
+      - POST=1         # exec create/start are POST requests
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:2375:2375"   # loopback only — the dashboard runs with host networking
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

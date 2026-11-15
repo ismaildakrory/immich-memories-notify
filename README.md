@@ -66,14 +66,13 @@ docker run -d \
   -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/state:/app/state \
   -v $(pwd)/.env:/app/.env \
-  -v /var/run/docker.sock:/var/run/docker.sock \
   -v /etc/localtime:/etc/localtime:ro \
   -e TZ=$(cat /etc/timezone 2>/dev/null || echo UTC) \
-  -e CONFIG_PATH=/app/config.yaml \
-  -e STATE_PATH=/app/state/state.json \
-  -e ENV_PATH=/app/.env \
+  -e PUID=$(id -u) -e PGID=$(id -g) \
   ghcr.io/ismaildakrory/immich-memories-notify:latest
 ```
+
+The container runs as an unprivileged user; `PUID`/`PGID` should match the owner of `config.yaml`, `.env` and `state/` on the host. Docker access is only needed if you use the bundled ntfy server and want the dashboard to create ntfy users for you — in that case either run the [socket proxy](docker-compose.yml) and add `-e DOCKER_HOST=tcp://127.0.0.1:2375`, or (less secure) add `-v /var/run/docker.sock:/var/run/docker.sock`.
 
 Then open `http://your-server-ip:5000` — the setup wizard will guide you through the rest.
 
@@ -254,10 +253,13 @@ attachment-expiry-duration: 3h
 
 Set in `.env` to customize the dashboard:
 ```
-DASHBOARD_TOKEN=your-secret-token   # Dashboard password — strongly recommended,
-                                    # the container has Docker access
+DASHBOARD_TOKEN=your-secret-token   # Dashboard password — strongly recommended
 DASHBOARD_PORT=8080                 # Change port (default: 5000)
+PUID=1000                           # Run as this uid/gid inside the container
+PGID=1000                           # (match the owner of config.yaml, .env, state/)
 ```
+
+**Security model:** the dashboard container runs as an unprivileged user and never mounts the Docker socket. The `docker-socket-proxy` service in the compose files exposes only container inspect/exec on `127.0.0.1:2375`, which is all the bundled-ntfy user management needs. If you don't use bundled ntfy you can delete that service and the `DOCKER_HOST` variable.
 
 ## Immich API Key Permissions
 
@@ -286,6 +288,8 @@ If you don't use the Collage, Trip Highlights, or Then & Now features, you can s
 | No person photos | Name your people in Immich, ensure photos older than 30 days exist |
 | Already sent today | Use `--force` flag, or delete `state/state.json` |
 | Dashboard not loading | `docker compose logs dashboard` to check errors |
+| `Permission denied` on config.yaml / state.json | Container user (PUID/PGID, default 1000) can't write the bind-mounted files. The entrypoint chowns them on start; if that fails, set `PUID`/`PGID` in `.env` to the files' owner |
+| Scheduler stopped (`/health` returns 503) | `docker compose restart dashboard` — supercronic is supervised by the container and restarts with it |
 | `mount ... Are you trying to mount a directory onto a file?` | Host `config.yaml` or `.env` was missing at first start, so Docker created a directory. Stop, `rm -rf config.yaml && touch config.yaml` (same for `.env`), start again |
 | `git pull` fails with local changes | `git stash && git pull && git stash pop` — your `.env` and `config.yaml` are preserved |
 

@@ -4,10 +4,10 @@ Immich Memories Notify - Dashboard
 FastAPI web dashboard for managing notifications.
 """
 
+import asyncio
 import logging
 import os
 import secrets as stdlib_secrets
-import subprocess
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -114,22 +114,13 @@ app.include_router(
 # Health endpoint (no auth required)
 @app.get("/health", tags=["health"])
 async def health_check():
-    """Health check endpoint — includes crond liveness."""
-    result = subprocess.run(["pidof", "crond"], capture_output=True, text=True)
-    crond_ok = False
-    if result.returncode == 0:
-        for pid in result.stdout.strip().split():
-            try:
-                stat = Path(f"/proc/{pid}/status").read_text()
-                if "zombie" not in stat.lower():
-                    crond_ok = True
-                    break
-            except (FileNotFoundError, PermissionError):
-                pass
-    if not crond_ok:
+    """Health check endpoint — includes scheduler liveness."""
+    from .crontab import scheduler_running
+
+    if not await asyncio.to_thread(scheduler_running):
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "version": APP_VERSION, "detail": "crond not running"},
+            content={"status": "unhealthy", "version": APP_VERSION, "detail": "scheduler (supercronic) not running"},
         )
     return HealthResponse(status="healthy", version=APP_VERSION)
 

@@ -11,7 +11,9 @@ from notify.defaults import build_default_config
 
 from .utils.envfile import parse_env_line
 
-ENV_FILE = "/app/.cron.env"
+ENV_FILE = os.environ.get("CRON_ENV_PATH", "/app/.cron.env")
+CRONTAB_PATH = os.environ.get("CRONTAB_PATH", "/app/crontab")
+SCHEDULER_BIN = "supercronic"
 
 # Written on first start when config.yaml is missing/empty. Defaults live in notify/defaults.py.
 DEFAULT_CONFIG = build_default_config()
@@ -76,8 +78,9 @@ def dump_env():
             f.write(f"export {key}='{value}'\n")
 
 
-def generate_crontab(config_path: str = "/app/config.yaml"):
-    """Generate /etc/crontabs/root from config.yaml notification windows."""
+def generate_crontab(config_path: str = "/app/config.yaml", crontab_path: str = None):
+    """Generate the supercronic crontab from config.yaml notification windows."""
+    crontab_path = crontab_path or CRONTAB_PATH
     ensure_config(config_path)
     dump_env()
     path = Path(config_path)
@@ -87,18 +90,30 @@ def generate_crontab(config_path: str = "/app/config.yaml"):
     else:
         config = {}
     windows = config.get("settings", {}).get("notification_windows", [])
+    # supercronic runs each line with `sh -c` and streams its output to the container log
     prefix = f". {ENV_FILE} && cd /app"
-    with open("/etc/crontabs/root", "w") as f:
-        for i, w in enumerate(windows, 1):
-            h, m = w.get("start", "08:00").split(":")
-            f.write(f"{int(m)} {int(h)} * * * {prefix} && python -m notify --slot {i} >> /proc/1/fd/1 2>&1\n")
-        f.write(f"0 6 * * * {prefix} && python -m notify --check-updates >> /proc/1/fd/1 2>&1\n")
-        # Missed-run recovery: picks up windows whose run never completed (container restart)
-        f.write(f"*/10 * * * * {prefix} && python -m notify --catch-up >> /proc/1/fd/1 2>&1\n")
+    lines = []
+    for i, w in enumerate(windows, 1):
+        h, m = w.get("start", "08:00").split(":")
+        lines.append(f"{int(m)} {int(h)} * * * {prefix} && python -m notify --slot {i}")
+    lines.append(f"0 6 * * * {prefix} && python -m notify --check-updates")
+    # Missed-run recovery: picks up windows whose run never completed (container restart)
+    lines.append(f"*/10 * * * * {prefix} && python -m notify --catch-up")
+    Path(crontab_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(crontab_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return crontab_path
+
+
+def scheduler_running() -> bool:
+    """True if a supercronic process is alive."""
+    result = subprocess.run(["pidof", SCHEDULER_BIN], capture_output=True, text=True)
+    return result.returncode == 0 and bool(result.stdout.strip())
 
 
 def reload_scheduler(config_path: str = "/app/config.yaml"):
-    """Regenerate crontab and restart crond."""
-    generate_crontab(config_path)
-    subprocess.run(["killall", "crond"], check=False)
-    subprocess.run(["crond", "-l", "2"], check=False)
+    """Regenerate crontab and restart supercronic (it does not watch the file)."""
+    crontab_path = generate_crontab(config_path)
+    subprocess.run(["pkill", "-x", SCHEDULER_BIN], check=False)
+    # Detached so it survives request handling; output inherits the container log
+    subprocess.Popen([SCHEDULER_BIN, "-quiet", crontab_path], start_new_session=True)

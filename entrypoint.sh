@@ -1,22 +1,43 @@
 #!/bin/sh
-# Stop old standalone scheduler if still running (v2.4.x migration)
-if docker inspect --format '{{.State.Running}}' immich-memories-scheduler 2>/dev/null | grep -q true; then
-    echo "[migration] Stopping old scheduler container (now embedded in dashboard)..."
-    docker stop immich-memories-scheduler 2>/dev/null || true
+# Runs as root only long enough to make bind-mounted files writable by the
+# unprivileged `app` user, then drops privileges and hands over to start.sh.
+set -e
+
+PUID="${PUID:-1000}"
+PGID="${PGID:-1000}"
+
+if [ "$(id -u)" = "0" ]; then
+    # Remap the app user to the requested uid/gid (lets host files stay owned by you)
+    if [ "$(id -g app)" != "$PGID" ]; then
+        delgroup app 2>/dev/null || true
+        addgroup -g "$PGID" app 2>/dev/null || addgroup app
+    fi
+    if [ "$(id -u app)" != "$PUID" ]; then
+        deluser app 2>/dev/null || true
+        adduser -D -u "$PUID" -G app -h /app app 2>/dev/null || adduser -D -G app -h /app app
+    fi
+
+    # Writable runtime paths: state, config, secrets, scheduler files
+    mkdir -p /app/state
+    chown app:app /app /app/state 2>/dev/null || true
+    for f in /app/config.yaml /app/.env /app/state/state.json /app/state/state.json.lock /app/config.yaml.lock /app/.env.lock; do
+        [ -e "$f" ] && chown app:app "$f" 2>/dev/null || true
+    done
+    chown -R app:app /app/state 2>/dev/null || true
+
+    # Legacy setups that still mount the Docker socket: grant the socket's group
+    if [ -S /var/run/docker.sock ]; then
+        sock_gid="$(stat -c '%g' /var/run/docker.sock)"
+        if [ "$sock_gid" != "0" ]; then
+            addgroup -g "$sock_gid" dockersock 2>/dev/null || true
+            sock_group="$(getent group "$sock_gid" | cut -d: -f1)"
+            [ -n "$sock_group" ] && addgroup app "$sock_group" 2>/dev/null || true
+        else
+            echo "[entrypoint] docker.sock is root-owned; prefer the docker-socket-proxy service (see docker-compose.yml)"
+        fi
+    fi
+
+    exec su-exec app /app/start.sh
 fi
 
-# Generate crontab from config
-python -c "from dashboard.crontab import generate_crontab; generate_crontab()"
-
-# Start crond in background
-crond -l 2
-
-# Forward signals to uvicorn for graceful shutdown
-trap 'kill $UVICORN_PID; wait $UVICORN_PID' TERM INT
-
-# Start uvicorn in background so shell stays PID 1 (reaps zombies)
-uvicorn dashboard.main:app --host 0.0.0.0 --port ${DASHBOARD_PORT:-5000} &
-UVICORN_PID=$!
-
-# Wait for uvicorn — if it dies, container exits
-wait $UVICORN_PID
+exec /app/start.sh

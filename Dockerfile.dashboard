@@ -1,16 +1,39 @@
 # Immich Memories Notify - Dashboard + Scheduler
-# Single container: FastAPI dashboard + crond scheduler
+# Single container: FastAPI dashboard + supercronic scheduler, running as a
+# non-root user (PUID/PGID adjustable at runtime, default 1000:1000).
 
 FROM python:3.11-alpine
 
-# Install Docker CLI for ntfy management and apply OS patches
-RUN apk add --no-cache docker-cli && apk upgrade --no-cache
+ARG TARGETARCH
+ARG SUPERCRONIC_VERSION=v0.2.33
+# sha256 of supercronic-linux-<arch> for the version above
+ARG SUPERCRONIC_SHA256_AMD64=feefa310da569c81b99e1027b86b27b51e6ee9ab647747b49099645120cfc671
+ARG SUPERCRONIC_SHA256_ARM64=f1f8585c66de020fef494dd636058f99949d108f569fef00016a1c8b9eb145b3
+
+# docker-cli: ntfy user management (talks to the socket proxy or a mounted socket)
+# tini: PID 1 signal handling / zombie reaping; su-exec: drop root after fixing permissions
+RUN apk add --no-cache docker-cli tini su-exec && apk upgrade --no-cache
+
+# supercronic: cron for containers — runs unprivileged, logs job output to stdout
+RUN set -eux; \
+    arch="${TARGETARCH:-amd64}"; \
+    case "$arch" in \
+      amd64) sha="$SUPERCRONIC_SHA256_AMD64" ;; \
+      arm64) sha="$SUPERCRONIC_SHA256_ARM64" ;; \
+      *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
+    esac; \
+    wget -qO /usr/local/bin/supercronic \
+      "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${arch}"; \
+    echo "${sha}  /usr/local/bin/supercronic" | sha256sum -c -; \
+    chmod +x /usr/local/bin/supercronic
 
 # Install Python dependencies
 COPY requirements.txt requirements-dashboard.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements-dashboard.txt && rm /tmp/requirements*.txt
 
-# Create app directory
+# Unprivileged runtime user (uid/gid remapped by entrypoint.sh if PUID/PGID are set)
+RUN addgroup -g 1000 app && adduser -D -u 1000 -G app -h /app app
+
 WORKDIR /app
 
 # Copy application code
@@ -19,14 +42,14 @@ COPY dashboard/ /app/dashboard/
 COPY notify/ /app/notify/
 COPY custom_templates/ /app/custom_templates/
 COPY config.yaml /app/config.yaml
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh && mkdir -p /app/state
+COPY entrypoint.sh start.sh /app/
+RUN chmod +x /app/entrypoint.sh /app/start.sh && mkdir -p /app/state && chown -R app:app /app
 
 # Default port (override with DASHBOARD_PORT env var)
 EXPOSE 5000
 
-# Health check — verifies uvicorn is running
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Health check — verifies uvicorn (and, via /health, the scheduler) is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:${DASHBOARD_PORT:-5000}/health || exit 1
 
-CMD ["/app/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/app/entrypoint.sh"]
