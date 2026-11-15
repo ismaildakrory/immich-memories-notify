@@ -93,6 +93,8 @@ def generate_crontab(config_path: str = "/app/config.yaml"):
             h, m = w.get("start", "08:00").split(":")
             f.write(f"{int(m)} {int(h)} * * * {prefix} && python -m notify --slot {i} >> /proc/1/fd/1 2>&1\n")
         f.write(f"0 6 * * * {prefix} && python -m notify --check-updates >> /proc/1/fd/1 2>&1\n")
+        # Missed-run recovery: picks up windows whose run never completed (container restart)
+        f.write(f"*/10 * * * * {prefix} && python -m notify --catch-up >> /proc/1/fd/1 2>&1\n")
 
 
 def reload_scheduler(config_path: str = "/app/config.yaml"):

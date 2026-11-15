@@ -16,6 +16,7 @@ Usage:
     python -m notify --slot 1 --test # Test mode (uses any available date)
     python -m notify --slot 1 --dry-run # Show what would be sent without sending
     python -m notify --check-updates # Check GitHub for new releases
+    python -m notify --catch-up      # Run any window missed today (container was down)
 """
 
 import argparse
@@ -29,16 +30,21 @@ import requests
 
 from .config import (
     get_assets_sent_today,
+    get_recent_assets,
     get_slots_sent_today,
     get_window_events,
     is_feature_ready,
     load_config,
     load_state,
+    mark_asset_sent_recent,
     mark_feature_fired,
+    mark_run_done,
+    mark_run_started,
     mark_slot_sent,
     mark_special_sent_today,
     save_state,
     setup_logging,
+    slots_due_for_catch_up,
     was_special_sent_today,
 )
 from .defaults import DEFAULT_SETTINGS
@@ -135,8 +141,9 @@ def process_user_window(
 
     logger.info(f"  [{name}] Processing slot {slot}...")
 
-    # Get assets already sent today to avoid duplicates
-    assets_sent = get_assets_sent_today(state, name, target_date)
+    # Avoid repeats: anything sent today plus anything sent within asset_repeat_days
+    repeat_days = settings.get("asset_repeat_days", DEFAULT_SETTINGS["asset_repeat_days"])
+    assets_sent = get_assets_sent_today(state, name, target_date) | get_recent_assets(state, name, target_date, repeat_days)
 
     # Fetch memories with retry
     try:
@@ -343,6 +350,7 @@ def process_user_window(
 
         if not test_mode:
             mark_slot_sent(state, name, target_date, slot, notification.get("asset_id"))
+            mark_asset_sent_recent(state, name, target_date, notification.get("asset_id"), repeat_days)
             # Mark feature cooldowns
             if notification.get("is_trip"):
                 mark_feature_fired(state, name, "last_trip_date", target_date)
@@ -632,6 +640,7 @@ Examples:
   python -m notify --slot 1 --dry-run # Preview window 1 without sending
   python -m notify --slot 1 --force   # Force send even if already sent
   python -m notify --slot 1 --no-delay # Send immediately without random delay
+  python -m notify --catch-up         # Run windows missed today (scheduler calls this periodically)
         """,
     )
     parser.add_argument("--config", default="config.yaml", help="Path to config file")
@@ -643,6 +652,7 @@ Examples:
     parser.add_argument("--no-delay", action="store_true", help="Skip random delay, send immediately")
     parser.add_argument("--date", help="Specific date to check (YYYY-MM-DD)")
     parser.add_argument("--tag-generated", action="store_true", help="Tag existing app-generated assets in Immich (one-time backfill)")
+    parser.add_argument("--catch-up", action="store_true", help="Run any window that was missed today (used by the scheduler every 10 minutes)")
     args = parser.parse_args()
 
     if args.check_updates:
@@ -654,8 +664,8 @@ Examples:
     if args.tag_generated:
         return _tag_existing_generated(args.config)
 
-    if not args.slot:
-        parser.error("--slot is required (unless using --check-updates or --tag-generated)")
+    if not args.slot and not args.catch_up:
+        parser.error("--slot is required (unless using --check-updates, --tag-generated or --catch-up)")
 
     # Load config first to get log settings
     try:
@@ -681,11 +691,39 @@ Examples:
     else:
         target_date = date.today()
 
+    state_file = settings.get("state_file", "state/state.json")
+    notification_windows = settings.get("notification_windows", DEFAULT_SETTINGS["notification_windows"])
+
+    if args.catch_up:
+        return run_catch_up(args, config, notification_windows, state_file, target_date, logger)
+
+    return run_slot(args, config, args.slot, notification_windows, state_file, target_date, logger, use_delay=not args.no_delay)
+
+
+def run_catch_up(args, config: dict, notification_windows: list, state_file: str, target_date: date, logger) -> int:
+    """Run any window whose scheduled run never completed today (see slots_due_for_catch_up)."""
+    state = load_state(state_file)
+    due = slots_due_for_catch_up(notification_windows, state, datetime.now())
+    if not due:
+        logger.debug("Catch-up: nothing due")
+        return 0
+    logger.info(f"Catch-up: window(s) {due} did not complete today — running now")
+    rc = 0
+    for slot in due:
+        rc |= run_slot(args, config, slot, notification_windows, state_file, target_date, logger, use_delay=False)
+    return rc
+
+
+def run_slot(args, config: dict, slot: int, notification_windows: list, state_file: str, target_date: date, logger,
+             use_delay: bool = True) -> int:
+    """Process one window for all enabled users: mark started, wait, process, mark done."""
+    real_run = not (args.test or args.dry_run)
+
     logger.info("=" * 60)
     logger.info("Immich Memories Notify")
     logger.info("=" * 60)
     logger.info(f"Date:    {target_date}")
-    logger.info(f"Slot:    {args.slot}")
+    logger.info(f"Slot:    {slot}")
     logger.info(f"Config:  {args.config}")
 
     if args.test:
@@ -695,13 +733,16 @@ Examples:
     if args.force:
         logger.info("Mode:    FORCE")
 
-    # Get notification windows
-    notification_windows = settings.get("notification_windows", DEFAULT_SETTINGS["notification_windows"])
+    # Record that this run started (before the delay) so --catch-up doesn't double-fire
+    if real_run:
+        state = load_state(state_file)
+        mark_run_started(state, target_date, slot)
+        save_state(state_file, state)
 
     # Calculate and apply random delay for this window
-    if not args.no_delay and not args.dry_run:
-        if args.slot <= len(notification_windows):
-            window = notification_windows[args.slot - 1]
+    if use_delay and not args.dry_run:
+        if slot <= len(notification_windows):
+            window = notification_windows[slot - 1]
             delay_seconds = calculate_random_delay(
                 window["start"],
                 window["end"],
@@ -717,10 +758,9 @@ Examples:
                     logger.info(f"Delay:   ~{delay_minutes} minutes")
                 time.sleep(delay_seconds)
         else:
-            logger.warning(f"No window configured for slot {args.slot}, sending immediately")
+            logger.warning(f"No window configured for slot {slot}, sending immediately")
 
-    # Load state
-    state_file = settings.get("state_file", "state/state.json")
+    # Load state (fresh — another process may have written during the delay)
     state = load_state(state_file)
 
     # One-time migration: tag existing app-generated assets
@@ -736,6 +776,9 @@ Examples:
 
     if not users:
         logger.warning("No enabled users found in config")
+        if real_run:
+            mark_run_done(state, target_date, slot)
+            save_state(state_file, state)
         return 0
 
     # Process each user for this window
@@ -747,7 +790,7 @@ Examples:
             config=config,
             state=state,
             target_date=target_date,
-            slot=args.slot,
+            slot=slot,
             test_mode=args.test,
             dry_run=args.dry_run,
             force=args.force,
@@ -759,6 +802,10 @@ Examples:
         # Save state after each user
         if not args.dry_run:
             save_state(state_file, state)
+
+    if real_run:
+        mark_run_done(state, target_date, slot)
+        save_state(state_file, state)
 
     logger.info("=" * 60)
     logger.info(f"Complete: {success_count}/{len(users)} users successful")

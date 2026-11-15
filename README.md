@@ -139,6 +139,7 @@ All settings are manageable from the **web dashboard**. For manual editing:
 settings:
   top_persons_limit: 5          # Top N named people to feature
   exclude_recent_days: 30       # Skip recent photos for person notifications
+  asset_repeat_days: 60         # Don't send the same photo again for N days (0 = same day only)
   year_range: 20                # How far back to look (collage, trip, TaN)
   include_location: true        # Add city/country context
   include_album: true           # Show album name
@@ -166,6 +167,8 @@ settings:
   collage_album_name: Weekly Highlights
 
   # Notification windows — each window sends one notification per day.
+  # If the container was down when a window started, the scheduler catches
+  # up within 10 minutes (as long as the window ended less than 3 hours ago).
   # Window 1 always sends a memory. Windows 2+ pick from their events
   # list using a layered priority system (specials first, then weighted random).
   notification_windows:

@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -268,3 +268,106 @@ def mark_special_sent_today(state: dict, user_name: str, target_date: date):
     if user_name not in state["users"]:
         state["users"][user_name] = {}
     state["users"][user_name]["special_sent_date"] = target_date.isoformat()
+
+
+# =============================================================================
+# Longer-horizon repeat prevention
+# =============================================================================
+
+def get_recent_assets(state: dict, user_name: str, target_date: date, repeat_days: int) -> set:
+    """Asset IDs sent to this user within the last `repeat_days` days (0 disables)."""
+    if not repeat_days:
+        return set()
+    recent = state.get("users", {}).get(user_name, {}).get("assets_sent_recent", {})
+    out = set()
+    for asset_id, sent_str in recent.items():
+        try:
+            if (target_date - date.fromisoformat(sent_str)).days < repeat_days:
+                out.add(asset_id)
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def mark_asset_sent_recent(state: dict, user_name: str, target_date: date, asset_id: str, repeat_days: int):
+    """Record an asset as sent and prune entries older than `repeat_days`."""
+    if not asset_id or not repeat_days:
+        return
+    user_state = state.setdefault("users", {}).setdefault(user_name, {})
+    recent = user_state.setdefault("assets_sent_recent", {})
+    recent[asset_id] = target_date.isoformat()
+    for key in list(recent):
+        try:
+            if (target_date - date.fromisoformat(recent[key])).days >= repeat_days:
+                del recent[key]
+        except (ValueError, TypeError):
+            del recent[key]
+
+
+# =============================================================================
+# Run markers (missed-run recovery)
+# =============================================================================
+#
+# state["runs"] = {"YYYY-MM-DD": {"<slot>": {"started": iso, "done": bool}}}
+# A slot run marks itself "started" before its random delay and "done" after
+# processing. `--catch-up` uses these to find windows that never ran (container
+# was down at the cron time) or died mid-delay.
+
+RUN_MARKER_KEEP_DAYS = 3
+
+
+def get_run_marker(state: dict, target_date: date, slot: int) -> Optional[dict]:
+    return state.get("runs", {}).get(target_date.isoformat(), {}).get(str(slot))
+
+
+def mark_run_started(state: dict, target_date: date, slot: int, now: datetime = None):
+    runs = state.setdefault("runs", {})
+    runs.setdefault(target_date.isoformat(), {})[str(slot)] = {
+        "started": (now or datetime.now()).isoformat(timespec="seconds"),
+        "done": False,
+    }
+    for day in list(runs):
+        try:
+            if (target_date - date.fromisoformat(day)).days >= RUN_MARKER_KEEP_DAYS:
+                del runs[day]
+        except (ValueError, TypeError):
+            del runs[day]
+
+
+def mark_run_done(state: dict, target_date: date, slot: int):
+    marker = state.setdefault("runs", {}).setdefault(target_date.isoformat(), {}).setdefault(str(slot), {})
+    marker["done"] = True
+
+
+def slots_due_for_catch_up(windows: list, state: dict, now: datetime, max_late_hours: float = 3.0) -> list:
+    """Return 1-indexed slots that should run now because their scheduled run never completed.
+
+    A slot is due when its window has started today, it is not marked done, and
+    either no run was started (cron never fired) or the started run is past
+    the window end (the process died while waiting). Windows whose end is more
+    than `max_late_hours` ago are left alone — nobody wants four stale
+    notifications at once after a day-long outage.
+    """
+    due = []
+    today = now.date()
+    for idx, window in enumerate(windows, 1):
+        try:
+            sh, sm = map(int, window["start"].split(":"))
+            eh, em = map(int, window["end"].split(":"))
+        except (KeyError, ValueError, AttributeError):
+            continue
+        start = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
+        end = now.replace(hour=eh, minute=em, second=0, microsecond=0)
+        if end <= start:
+            end = end + timedelta(days=1)
+        if now < start:
+            continue
+        if (now - end).total_seconds() > max_late_hours * 3600:
+            continue
+        marker = get_run_marker(state, today, idx)
+        if marker and marker.get("done"):
+            continue
+        if marker and now <= end:
+            continue  # a run is still sleeping out its random delay
+        due.append(idx)
+    return due
