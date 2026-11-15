@@ -3,7 +3,7 @@
 import logging
 import random
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import datetime
 from io import BytesIO
 from typing import Optional
 
@@ -118,8 +118,9 @@ def find_then_and_now_candidate(
             pair_key = f"{then_asset_id}:{now_asset_id}"
 
         try:
-            then_details = fetch_asset_details(immich_url, api_key, then_asset_id)
-            now_details = fetch_asset_details(immich_url, api_key, now_asset_id)
+            # Probe both assets (also warms the details cache used by get_asset_people)
+            fetch_asset_details(immich_url, api_key, then_asset_id)
+            fetch_asset_details(immich_url, api_key, now_asset_id)
         except Exception as e:
             if logger:
                 logger.debug(f"  Then & Now: could not fetch details for {pname}: {e}")
@@ -301,7 +302,7 @@ def prepare_then_and_now_notification(
     # send_single_notification builds the deep link automatically
     uploaded_asset_id = None
     if logger:
-        logger.info(f"  Uploading Then & Now composite to Immich…")
+        logger.info("  Uploading Then & Now composite to Immich…")
     try:
         album_id = get_or_create_album(immich_url, api_key, "Then & Now", logger or logging.getLogger())
         if album_id:

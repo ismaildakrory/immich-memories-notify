@@ -300,6 +300,14 @@ If you don't use the Collage, Trip Highlights, or Then & Now features, you can s
 
 Built with AI assistance, manually reviewed and tested. PRs, issues, and feedback welcome!
 
+```bash
+pip install -r requirements-dev.txt
+ruff check notify dashboard tests   # lint
+pytest                              # unit tests (no Immich/ntfy needed)
+```
+
+CI runs the same lint + tests and a Docker build on every pull request.
+
 See [CONTRIBUTORS.md](CONTRIBUTORS.md) for a list of contributors.
 
 ## License

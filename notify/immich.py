@@ -1,13 +1,11 @@
 """Immich API: memories, people, assets, thumbnails, albums, tags."""
 
-import json
 import logging
-import os
 import random
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 
 import requests
 
@@ -74,72 +72,6 @@ def parse_memories(memories: list) -> dict:
     result["years"] = sorted(result["by_year"].keys(), reverse=True)
     result["by_year"] = dict(result["by_year"])
     return result
-
-
-def format_notification_for_year(
-    year: int,
-    year_data: dict,
-    messages: List[str],
-    test_mode: bool = False,
-    target_date: date = None,
-) -> dict:
-    """Format notification for a single year using random message from config."""
-    if not year_data.get("assets"):
-        return {"title": None, "message": None, "has_content": False, "asset_id": None}
-
-    ref_date = target_date or date.today()
-    years_ago = ref_date.year - year
-
-    # Select random message and format it
-    if messages:
-        message_template = random.choice(messages)
-        message = message_template.format(year=year, years_ago=years_ago)
-    else:
-        message = f"You have memories from {year}!"
-
-    title = f"Memories from {year}"
-    if test_mode:
-        title = "[TEST] " + title
-
-    # Get first asset for thumbnail
-    first_asset_id = year_data["assets"][0].get("id") if year_data["assets"] else None
-
-    return {
-        "title": title,
-        "message": message,
-        "has_content": True,
-        "asset_id": first_asset_id,
-    }
-
-
-def format_person_notification(
-    person_name: str,
-    asset: dict,
-    person_messages: List[str],
-    test_mode: bool = False,
-) -> dict:
-    """Format notification for a random person photo."""
-    asset_id = asset.get("id")
-
-    # Select random message and format with person name
-    if person_messages:
-        message_template = random.choice(person_messages)
-        message = message_template.format(person_name=person_name)
-    else:
-        message = f"A lovely moment with {person_name}..."
-
-    title = f"A memory with {person_name}"
-    if test_mode:
-        title = "[TEST] " + title
-
-    return {
-        "title": title,
-        "message": message,
-        "has_content": True,
-        "asset_id": asset_id,
-        "person_name": person_name,
-        "is_person_photo": True,
-    }
 
 
 MAX_THUMBNAIL_BYTES = 20 * 1024 * 1024  # 20 MB
@@ -524,27 +456,27 @@ def select_asset_with_face_preference(
         if group_top_persons:
             chosen = random.choice(group_top_persons)
             if logger:
-                logger.debug(f"Selected group photo with multiple top persons")
+                logger.debug("Selected group photo with multiple top persons")
             return chosen
         elif group_named:
             chosen = random.choice(group_named)
             if logger:
-                logger.debug(f"Selected group photo with multiple named faces")
+                logger.debug("Selected group photo with multiple named faces")
             return chosen
         elif single_top_person:
             chosen = random.choice(single_top_person)
             if logger:
-                logger.debug(f"Selected asset with single top person")
+                logger.debug("Selected asset with single top person")
             return chosen
         elif single_named:
             chosen = random.choice(single_named)
             if logger:
-                logger.debug(f"Selected asset with single named face")
+                logger.debug("Selected asset with single named face")
             return chosen
         else:
             chosen = random.choice(without_face) if without_face else random.choice(available)
             if logger:
-                logger.debug(f"Selected random asset (no face preference available)")
+                logger.debug("Selected random asset (no face preference available)")
             return chosen
     else:
         # Original behavior - combine groups with singles
@@ -554,17 +486,17 @@ def select_asset_with_face_preference(
         if with_top_person:
             chosen = random.choice(with_top_person)
             if logger:
-                logger.debug(f"Selected asset with top person face")
+                logger.debug("Selected asset with top person face")
             return chosen
         elif with_any_face:
             chosen = random.choice(with_any_face)
             if logger:
-                logger.debug(f"Selected asset with named face")
+                logger.debug("Selected asset with named face")
             return chosen
         else:
             chosen = random.choice(without_face) if without_face else random.choice(available)
             if logger:
-                logger.debug(f"Selected random asset (no face preference available)")
+                logger.debug("Selected random asset (no face preference available)")
             return chosen
 
 

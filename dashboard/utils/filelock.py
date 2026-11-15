@@ -1,7 +1,6 @@
 """File locking utility for concurrent access protection."""
 
 import fcntl
-import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator

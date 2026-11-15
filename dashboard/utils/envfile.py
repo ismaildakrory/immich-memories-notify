@@ -2,7 +2,7 @@
 
 The writer wraps values containing special characters in double quotes and
 backslash-escapes \\ " $ ` inside them. Every reader must undo that, otherwise
-secrets with those characters come back corrupted (e.g. pa$s -> pa\$s).
+secrets with those characters come back corrupted (e.g. pa$s -> pa\\$s).
 """
 
 import re

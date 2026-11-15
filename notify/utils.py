@@ -80,17 +80,17 @@ def get_primary_album(asset_details: dict, albums: list = None) -> str | None:
     return None
 
 
-def calculate_random_delay(window_start: str, window_end: str, test_mode: bool = False) -> int:
+def calculate_random_delay(window_start: str, window_end: str, test_mode: bool = False, now: datetime = None) -> int:
     """
     Calculate random delay in seconds within a time window.
     window_start/window_end format: "HH:MM"
-    Returns seconds to sleep.
+    Returns seconds to sleep. `now` is injectable for tests.
     """
     if test_mode:
         # In test mode, use 1-5 second delay
         return random.randint(1, 5)
 
-    now = datetime.now()
+    now = now or datetime.now()
 
     # Parse window times
     start_hour, start_min = map(int, window_start.split(":"))

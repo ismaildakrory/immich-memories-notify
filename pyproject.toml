@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+extend-exclude = ["custom_templates"]
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: import sorting, B: bugbear, UP: pyupgrade (safe subset)
+select = ["E", "F", "W", "I", "B"]
+ignore = [
+  "E501",  # line length — long f-string log lines are fine
+  "B008",  # FastAPI Depends()/Query() in defaults is idiomatic
+  "B904",  # raise ... from err — not worth the churn in HTTP handlers
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["notify", "dashboard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..models import TestTriggerResponse
 from ..utils.envfile import parse_env_line

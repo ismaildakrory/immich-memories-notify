@@ -5,7 +5,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Dict, Optional
 from urllib.parse import urlparse
 
 import requests as http_requests

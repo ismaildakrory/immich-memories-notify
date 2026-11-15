@@ -2,10 +2,10 @@
 
 import os
 import time
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
-from typing import Optional
 
 from ..crontab import reload_scheduler
 

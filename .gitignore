@@ -37,3 +37,7 @@ ntfy_data/
 
 # Local personal config (contains personal data)
 config.yaml.local
+
+# Local test tooling
+.pytest_cache/
+.ruff_cache/

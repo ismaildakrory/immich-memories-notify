@@ -10,7 +10,6 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
-
 # =============================================================================
 # Logging Setup
 # =============================================================================
@@ -200,24 +199,6 @@ def save_state(state_file: str, state: dict):
             tmp_path.replace(path)
         finally:
             fcntl.flock(lock_f, fcntl.LOCK_UN)
-
-
-def was_sent_today(state: dict, user_name: str, target_date: date) -> bool:
-    """Check if notification was already sent to user today."""
-    date_str = target_date.isoformat()
-    user_state = state.get("users", {}).get(user_name, {})
-    return user_state.get("last_sent_date") == date_str
-
-
-def mark_as_sent(state: dict, user_name: str, target_date: date):
-    """Mark notification as sent for user."""
-    date_str = target_date.isoformat()
-    if "users" not in state:
-        state["users"] = {}
-    if user_name not in state["users"]:
-        state["users"][user_name] = {}
-    state["users"][user_name]["last_sent_date"] = date_str
-    state["users"][user_name]["last_sent_time"] = datetime.now().isoformat()
 
 
 def get_slots_sent_today(state: dict, user_name: str, target_date: date) -> list:

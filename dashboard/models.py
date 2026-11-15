@@ -1,6 +1,7 @@
 """Pydantic models for the dashboard API."""
 
-from typing import List, Optional, Dict, Any
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 

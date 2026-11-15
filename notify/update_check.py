@@ -5,7 +5,7 @@ from pathlib import Path
 
 import requests
 
-from .config import load_state, save_state, load_config
+from .config import load_config, load_state, save_state
 
 GITHUB_REPO = "ismaildakrory/immich-memories-notify"
 RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"

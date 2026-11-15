@@ -1,6 +1,5 @@
 """Settings management API endpoints."""
 
-import json
 import os
 import re
 from pathlib import Path
@@ -11,18 +10,18 @@ import yaml
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from ..crontab import reload_scheduler
 from ..models import (
     FullConfig,
+    MessagesUpdate,
     NotificationWindow,
     Settings,
     SettingsUpdate,
+    UserEnabledUpdate,
     UserInfo,
     WindowsUpdate,
-    MessagesUpdate,
-    UserEnabledUpdate,
 )
 from ..utils.filelock import exclusive_lock, read_lock, write_lock
-from ..crontab import reload_scheduler
 
 router = APIRouter()
 
@@ -49,12 +48,12 @@ def save_config(config_path: str, config: dict):
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
-def load_config_exclusive(config_path: str) -> tuple:
-    """Load config under exclusive lock for read-modify-write. Returns (config, lock_context).
+def load_config_exclusive(config_path: str) -> dict:
+    """Read config without acquiring a lock — caller must hold exclusive_lock(config_path).
 
     Usage:
         with exclusive_lock(config_path):
-            config = _read_yaml(config_path)
+            config = load_config_exclusive(config_path)
             # modify config...
             _write_yaml(config_path, config)
     """
@@ -451,7 +450,7 @@ async def set_user_home_cities(request: Request, name: str, body: dict):
 
 def _resolve_user_api_key(user: dict) -> str:
     """Resolve a user's Immich API key from env var reference."""
-    from .secrets import load_env_file, ENV_PATH
+    from .secrets import ENV_PATH, load_env_file
     ref = user.get("immich_api_key", "")
     match = re.match(r'\$\{(\w+)\}', ref)
     if match:

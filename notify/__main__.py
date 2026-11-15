@@ -20,7 +20,6 @@ Usage:
 
 import argparse
 import logging
-import os
 import random
 import sys
 import time
@@ -42,6 +41,7 @@ from .config import (
     setup_logging,
     was_special_sent_today,
 )
+from .dispatcher import send_notification
 from .features.albums import prepare_album_notification
 from .features.birthday import find_birthday_people, prepare_birthday_notification
 from .features.memories import prepare_memory_notification
@@ -55,9 +55,7 @@ from .immich import (
     get_top_persons,
     parse_memories,
 )
-from .dispatcher import send_notification
 from .utils import calculate_random_delay, with_retry
-
 
 ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"]
 SPECIAL_EVENTS = {"then_and_now", "trip_highlights", "collage"}
@@ -126,19 +124,10 @@ def process_user_window(
     retry_config = config["settings"]["retry"]
     settings = config["settings"]
 
-    messages = config.get("messages", [])
+    # Templates for the person-photo fallback; everything else lives in _execute_event
     person_messages = config.get("person_messages", [])
-    video_messages = config.get("video_messages", [])
     video_person_messages = config.get("video_person_messages", [])
-    memory_titles = config.get("memory_titles", [])
     person_titles = config.get("person_titles", [])
-    album_messages = config.get("album_messages", [])
-    video_album_messages = config.get("video_album_messages", [])
-    album_titles = config.get("album_titles", [])
-    tan_messages = config.get("then_and_now_messages", [])
-    tan_titles = config.get("then_and_now_titles", [])
-    trip_messages = config.get("trip_highlights_messages", [])
-    trip_titles = config.get("trip_highlights_titles", [])
 
     top_persons_limit = settings.get("top_persons_limit", 5)
     exclude_recent_days = settings.get("exclude_recent_days", 30)

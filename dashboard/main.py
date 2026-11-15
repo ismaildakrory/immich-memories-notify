@@ -10,13 +10,13 @@ import secrets as stdlib_secrets
 import subprocess
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 
 from .models import HealthResponse
-from .routers import settings, state, test, secrets, restart, ntfy
+from .routers import ntfy, restart, secrets, settings, state, test
 
 # App configuration
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "/app/config.yaml")
