@@ -136,12 +136,11 @@ def send_single_notification(
     retry_config = config["settings"]["retry"]
     api_key = user["immich_api_key"]
 
-    # Fetch thumbnail with retry
-    # If a thumbnail_override is provided and preferred (e.g. Then & Now composite), use it directly.
-    # Otherwise fetch from Immich and fall back to override on failure.
+    # Thumbnail: a composite we just rendered (Then & Now, Trip, Collage) is used
+    # directly — Immich has not generated a preview for the fresh upload yet, so
+    # fetching it would only 404 and burn the retry budget.
     thumbnail_data = None
-    if thumbnail_override and not asset_id:
-        # No asset to fetch — use override directly (Then & Now, failed collage upload, etc.)
+    if thumbnail_override:
         thumbnail_data = thumbnail_override
     elif asset_id:
         try:
@@ -154,11 +153,6 @@ def send_single_notification(
             logger.debug(f"  [{name}] Thumbnail: {len(thumbnail_data):,} bytes")
         except Exception as e:
             logger.warning(f"  [{name}] Could not fetch thumbnail: {e}")
-            if thumbnail_override:
-                thumbnail_data = thumbnail_override
-                logger.debug(f"  [{name}] Using fallback thumbnail: {len(thumbnail_data):,} bytes")
-    elif thumbnail_override:
-        thumbnail_data = thumbnail_override
 
     # Send notification with retry
     try:

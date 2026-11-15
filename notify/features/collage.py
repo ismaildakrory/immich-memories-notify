@@ -133,6 +133,27 @@ def load_custom_templates(templates_dir: str = "custom_templates"):
 load_custom_templates()
 
 
+def resolve_template_name(template_name: str, logger: logging.Logger) -> Optional[str]:
+    """Map a configured template name to a loaded template key.
+
+    Accepts "random", an exact key (e.g. "grid_custom") or a base name
+    ("grid") which resolves to "<base>_custom". Returns None if unavailable.
+    """
+    if not COLLAGE_TEMPLATES:
+        logger.error("No collage templates available. Check custom_templates/ directory.")
+        return None
+    if not template_name or template_name == "random":
+        chosen = random.choice(sorted(COLLAGE_TEMPLATES.keys()))
+        logger.debug(f"Random template selected: {chosen}")
+        return chosen
+    if template_name in COLLAGE_TEMPLATES:
+        return template_name
+    if f"{template_name}_custom" in COLLAGE_TEMPLATES:
+        return f"{template_name}_custom"
+    logger.error(f"Template '{template_name}' not found. Available: {sorted(COLLAGE_TEMPLATES.keys())}")
+    return None
+
+
 def get_template_photo_count(template_name: str, logger: logging.Logger) -> Optional[int]:
     """Get the number of photos a collage template needs from its layout JSON."""
     # Layout files use base name without _custom suffix (e.g. mosaic_layout.json, not mosaic_custom_layout.json)
@@ -200,13 +221,9 @@ def generate_weekly_collage(
             return None
 
         # Resolve template name early so we know how many photos are needed
-        template_name = settings.get("collage_template", "grid")
-        if not COLLAGE_TEMPLATES:
-            logger.error("No collage templates available. Check custom_templates/ directory.")
+        template_name = resolve_template_name(settings.get("collage_template", "random"), logger)
+        if not template_name:
             return None
-        if template_name == "random":
-            template_name = random.choice(list(COLLAGE_TEMPLATES.keys()))
-            logger.debug(f"Random template selected: {template_name}")
 
         # Fill additional slots if the template needs more photos than people
         needed = get_template_photo_count(template_name, logger)
@@ -340,19 +357,10 @@ def create_collage_image(
             # No face data available, templates will use center crop
             faces_list = [[] for _ in pil_images]
 
-        # Select template (random if requested)
-        if not COLLAGE_TEMPLATES:
-            logger.error("No collage templates available. Check custom_templates/ directory.")
+        template_name = resolve_template_name(template_name, logger)
+        if not template_name:
             return None
-
-        if template_name == "random":
-            template_name = random.choice(list(COLLAGE_TEMPLATES.keys()))
-            logger.debug(f"Random template selected: {template_name}")
-
-        render_fn = COLLAGE_TEMPLATES.get(template_name)
-        if not render_fn:
-            logger.error(f"Template '{template_name}' not found. Available: {list(COLLAGE_TEMPLATES.keys())}")
-            return None
+        render_fn = COLLAGE_TEMPLATES[template_name]
 
         # Check if template accepts faces_list parameter (backward compatibility)
         sig = inspect.signature(render_fn)

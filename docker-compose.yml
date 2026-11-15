@@ -9,9 +9,11 @@
 #   docker compose run --rm notify --slot 1 --no-delay   # Skip random delay
 #   docker compose up -d dashboard                       # Start app
 #
-# SLOTS:
-#   Slot 1-3: Memory notifications (if memories exist) or person photos
-#   Slot 4-5: Person photo notifications
+# WINDOWS:
+#   One notification per configured window per day. Window 1 always sends
+#   a memory (birthday pre-empts). Windows 2+ pick from their events list:
+#   specials (Then & Now / Trip / Collage) first, then memory/person/album.
+#   Logs are rotated (3 x 10 MB) so `docker compose logs` stays usable.
 #
 # CONFIGURATION:
 #   - Secrets (API keys, passwords): .env
@@ -43,6 +45,11 @@ services:
       - TZ=${TZ:-UTC}
     network_mode: host
     restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ------------------------------------------------------------
   # Dashboard + Scheduler (single container)
@@ -56,6 +63,7 @@ services:
       - ./config.yaml:/app/config.yaml
       - ./state:/app/state
       - ./notify:/app/notify:ro
+      - ./dashboard:/app/dashboard:ro
       - ./VERSION:/app/VERSION:ro
       - ./custom_templates:/app/custom_templates:ro
       - ./.env:/app/.env
@@ -72,3 +80,8 @@ services:
       - DASHBOARD_PORT=${DASHBOARD_PORT:-5000}
     network_mode: host
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

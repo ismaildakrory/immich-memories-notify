@@ -105,7 +105,7 @@ async def get_settings(request: Request):
         collage_person_limit=settings_data.get("collage_person_limit", 5),
         year_range=settings_data.get("year_range",
                    settings_data.get("collage_year_range", 5)),
-        collage_template=settings_data.get("collage_template", "grid"),
+        collage_template=settings_data.get("collage_template", "random"),
         collage_album_name=settings_data.get("collage_album_name", "Weekly Highlights"),
         then_and_now_enabled=settings_data.get("then_and_now_enabled", True),
         then_and_now_cooldown_days=settings_data.get("then_and_now_cooldown_days", 7),

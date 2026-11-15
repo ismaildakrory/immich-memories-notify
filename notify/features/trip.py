@@ -14,33 +14,24 @@ from ..immich import (
     get_album_assets,
     get_asset_people,
     get_or_create_album,
+    is_generated_search_item,
+    search_metadata_all,
     upload_collage_to_album,
 )
 from .collage import cover_crop_image
 
 
-def fetch_month_assets(immich_url: str, api_key: str, year: int, month: int, timeout: int = 30, size: int = 500) -> list:
-    """Fetch IMAGE assets for a specific year+month using the search API."""
+def fetch_month_assets(immich_url: str, api_key: str, year: int, month: int, timeout: int = 30, size: int = 1000) -> list:
+    """Fetch all IMAGE assets for a specific year+month using the search API (paginated)."""
     import calendar
-    headers = {"Accept": "application/json", "x-api-key": api_key}
     last_day = calendar.monthrange(year, month)[1]
     payload = {
         "takenAfter":  f"{year}-{month:02d}-01T00:00:00.000Z",
         "takenBefore": f"{year}-{month:02d}-{last_day:02d}T23:59:59.999Z",
         "type": "IMAGE",
-        "size": size,
         "withExif": True,
     }
-    response = requests.post(
-        f"{immich_url}/api/search/metadata",
-        headers=headers,
-        json=payload,
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    data = response.json()
-    assets = data.get("assets", [])
-    return assets.get("items", []) if isinstance(assets, dict) else assets
+    return search_metadata_all(immich_url, api_key, payload, timeout=timeout, page_size=size)
 
 
 def _normalize_city(name: str) -> str:
@@ -222,9 +213,7 @@ def prepare_trip_notification(
         existing_album = get_album_assets(immich_url, api_key, album_name, _logger)
         if existing_album:
             for a in existing_album.get("assets", []):
-                if (str(a.get("originalFileName", "")).startswith("memnotify-collage")
-                        or a.get("deviceId") == "memnotify"
-                        or str(a.get("deviceAssetId", "")).startswith("memnotify-collage")):
+                if is_generated_search_item(a):
                     uploaded_asset_id = a.get("id")
                     _logger.info(f"  Reusing existing collage in album '{album_name}'")
                     break

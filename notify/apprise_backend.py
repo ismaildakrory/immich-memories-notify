@@ -33,9 +33,9 @@ def send_single_notification(
     retry_config = config["settings"]["retry"]
     api_key = user["immich_api_key"]
 
-    # Fetch thumbnail
+    # Thumbnail: use a freshly rendered composite directly (no preview exists yet in Immich)
     thumbnail_data = None
-    if thumbnail_override and not asset_id:
+    if thumbnail_override:
         thumbnail_data = thumbnail_override
     elif asset_id:
         try:
@@ -48,13 +48,13 @@ def send_single_notification(
             logger.debug(f"  [{name}] Thumbnail: {len(thumbnail_data):,} bytes")
         except Exception as e:
             logger.warning(f"  [{name}] Could not fetch thumbnail: {e}")
-            if thumbnail_override:
-                thumbnail_data = thumbnail_override
-    elif thumbnail_override:
-        thumbnail_data = thumbnail_override
 
-    # Build message body — append click URL since Apprise has no Click header
+    # Build message body — append click URL since Apprise has no Click header.
+    # App-scheme deep links (immich://...) only work inside the Immich app, so
+    # for Telegram/Discord/email use a plain web link instead.
     click_url = notification.get("click_url")
+    if click_url and not click_url.startswith(("http://", "https://")):
+        click_url = None
     if not click_url and click_base:
         if asset_id:
             click_url = f"{click_base}/photos/{asset_id}"

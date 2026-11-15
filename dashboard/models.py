@@ -35,7 +35,7 @@ class Settings(BaseModel):
     weekly_collage_enabled: bool = False
     collage_cooldown_days: int = Field(7, ge=1, le=365)
     collage_person_limit: int = Field(5, ge=1, le=20)
-    collage_template: str = Field("grid", max_length=64)
+    collage_template: str = Field("random", max_length=64)
     collage_album_name: str = Field("Weekly Highlights", max_length=128)
     then_and_now_enabled: bool = True
     then_and_now_cooldown_days: int = Field(7, ge=0, le=365)

@@ -170,96 +170,130 @@ def fetch_thumbnail(immich_url: str, api_key: str, asset_id: str, timeout: int =
 # =============================================================================
 
 def fetch_people(immich_url: str, api_key: str, timeout: int = 10) -> list:
-    """Fetch all recognized people from Immich API."""
+    """Fetch all recognized people from Immich API (follows hasNextPage)."""
     headers = {"Accept": "application/json", "x-api-key": api_key}
-    response = requests.get(f"{immich_url}/api/people", headers=headers, timeout=timeout)
-    response.raise_for_status()
-    data = response.json()
-    # API returns {"people": [...], "total": N} or just a list
-    if isinstance(data, dict) and "people" in data:
-        return data["people"]
-    return data if isinstance(data, list) else []
+    people = []
+    page = 1
+    while page <= MAX_SEARCH_PAGES:
+        response = requests.get(
+            f"{immich_url}/api/people", headers=headers, params={"page": page, "size": 500}, timeout=timeout
+        )
+        response.raise_for_status()
+        data = response.json()
+        # API returns {"people": [...], "total": N, "hasNextPage": bool} or just a list
+        if not isinstance(data, dict) or "people" not in data:
+            return data if isinstance(data, list) else []
+        people.extend(data["people"])
+        if not data.get("hasNextPage"):
+            break
+        page += 1
+    return people
+
+
+MAX_SEARCH_PAGES = 20  # 20 x 1000 assets per person is plenty; guards against runaway paging
+
+
+def search_metadata_all(
+    immich_url: str,
+    api_key: str,
+    payload: dict,
+    timeout: int = 30,
+    page_size: int = 1000,
+    max_pages: int = MAX_SEARCH_PAGES,
+) -> list:
+    """Run a search/metadata query and follow nextPage until all items are collected.
+
+    Immich caps a single page at 1000 items and sorts newest first, so without
+    paging only the most recent photos are ever seen.
+    """
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    all_items = []
+    page = 1
+    for _ in range(max_pages):
+        body = {**payload, "size": page_size, "page": page}
+        response = requests.post(f"{immich_url}/api/search/metadata", headers=headers, json=body, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+        assets = data.get("assets", [])
+        if not isinstance(assets, dict):
+            # Legacy flat list response — no paging available
+            all_items.extend(assets)
+            break
+        items = assets.get("items", [])
+        all_items.extend(items)
+        next_page = assets.get("nextPage")
+        if not next_page or not items:
+            break
+        try:
+            page = int(next_page)
+        except (TypeError, ValueError):
+            break
+    return all_items
 
 
 def fetch_person_assets(immich_url: str, api_key: str, person_id: str, timeout: int = 30, size: int = 1000) -> list:
-    """Fetch assets for a specific person using search API."""
+    """Fetch all assets for a specific person (follows pagination)."""
+    return search_metadata_all(immich_url, api_key, {"personIds": [person_id]}, timeout=timeout, page_size=size)
+
+
+def count_person_assets(immich_url: str, api_key: str, person_id: str, timeout: int = 10) -> int:
+    """Count a person's assets.
+
+    Uses POST /api/search/statistics (cheap, exact). Older Immich versions
+    without that endpoint fall back to the search 'total' field, which on
+    those versions still holds the full count.
+    """
     headers = {"Accept": "application/json", "x-api-key": api_key}
-    payload = {
-        "personIds": [person_id],
-        "size": size,
-    }
+    response = requests.post(
+        f"{immich_url}/api/search/statistics",
+        headers=headers,
+        json={"personIds": [person_id]},
+        timeout=timeout,
+    )
+    if response.status_code == 200:
+        total = response.json().get("total")
+        if isinstance(total, int):
+            return total
+    if response.status_code not in (404, 405):
+        response.raise_for_status()
+
     response = requests.post(
         f"{immich_url}/api/search/metadata",
         headers=headers,
-        json=payload,
-        timeout=timeout
+        json={"personIds": [person_id], "size": 1},
+        timeout=timeout,
     )
     response.raise_for_status()
-    data = response.json()
-
-    # Response format: {"albums": [...], "assets": {"items": [...], ...}} or {"assets": [...]}
-    assets = data.get("assets", [])
-    if isinstance(assets, dict):
-        return assets.get("items", [])
-    return assets
+    assets_data = response.json().get("assets", {})
+    if isinstance(assets_data, dict):
+        return int(assets_data.get("total") or len(assets_data.get("items", [])))
+    return len(assets_data)
 
 
 def get_top_persons(immich_url: str, api_key: str, limit: int = 5, logger=None, people: list = None) -> list:
     """
-    Get top N persons by photo count, filtered to only those with names.
-    Queries asset count for each named person using search API.
+    Get top N persons by photo count, filtered to named, non-hidden people.
     Returns list of dicts with 'id', 'name', and 'asset_count'.
     """
     if people is None:
         people = fetch_people(immich_url, api_key)
 
-    # Filter to only people with names
-    named_people = [p for p in people if p.get("name")]
+    named_people = [p for p in people if p.get("name") and not p.get("isHidden")]
 
     if logger:
         logger.debug(f"Found {len(named_people)} named people, counting assets...")
 
-    # Query asset count for each named person
-    headers = {"Accept": "application/json", "x-api-key": api_key}
     person_counts = []
-
     for person in named_people:
         person_id = person["id"]
         person_name = person["name"]
-
         try:
-            # Use search API with size=1 to get total count efficiently
-            payload = {"personIds": [person_id], "size": 1}
-            response = requests.post(
-                f"{immich_url}/api/search/metadata",
-                headers=headers,
-                json=payload,
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            assets_data = data.get("assets", {})
-            if isinstance(assets_data, dict):
-                # 'total' field contains the full count
-                count = assets_data.get("total", len(assets_data.get("items", [])))
-            else:
-                count = len(assets_data)
-
-            person_counts.append({
-                "id": person_id,
-                "name": person_name,
-                "asset_count": count
-            })
+            count = count_person_assets(immich_url, api_key, person_id)
         except Exception as e:
             if logger:
                 logger.warning(f"Could not count assets for {person_name}: {e}")
-            # Still include them with 0 count
-            person_counts.append({
-                "id": person_id,
-                "name": person_name,
-                "asset_count": 0
-            })
+            count = 0
+        person_counts.append({"id": person_id, "name": person_name, "asset_count": count})
 
     # Sort by asset count descending
     person_counts.sort(key=lambda x: x["asset_count"], reverse=True)
@@ -302,7 +336,9 @@ def get_random_person_photo(
         try:
             assets = fetch_person_assets(immich_url, api_key, person_id)
 
-            # Filter out recent photos, already-used, and app-generated assets
+            # Filter out recent photos, already-used, and app-generated assets.
+            # The generated check here uses the filename prefix present in the
+            # search result, so it costs no extra API calls.
             valid_assets = []
             for asset in assets:
                 asset_id = asset.get("id")
@@ -319,15 +355,20 @@ def get_random_person_photo(
                     except (ValueError, TypeError):
                         pass
 
-                # Skip app-generated assets
-                details = fetch_asset_details(immich_url, api_key, asset_id)
-                if is_generated_asset(details):
+                if is_generated_search_item(asset):
                     continue
 
                 valid_assets.append(asset)
 
-            if valid_assets:
-                chosen = random.choice(valid_assets)
+            # Pick randomly; confirm the tag on the chosen asset only (one call),
+            # re-rolling a few times if it turns out to be app-generated.
+            random.shuffle(valid_assets)
+            for chosen in valid_assets[:5]:
+                try:
+                    if is_generated_asset(fetch_asset_details(immich_url, api_key, chosen.get("id"))):
+                        continue
+                except Exception:
+                    pass  # Details unavailable — trust the filename check
                 if logger:
                     logger.debug(f"Selected random photo of {person_name}")
                 return {
@@ -597,30 +638,7 @@ def _fetch_album_assets_by_search(
     immich_url: str, api_key: str, album_id: str, timeout: int = 30
 ) -> list:
     """Fetch album assets via search/metadata (works with Immich v2 and v3)."""
-    headers = {"Accept": "application/json", "x-api-key": api_key}
-    all_assets = []
-    page = 1
-    while True:
-        payload = {"albumIds": [album_id], "size": 1000, "page": page}
-        response = requests.post(
-            f"{immich_url}/api/search/metadata",
-            headers=headers,
-            json=payload,
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
-        assets = data.get("assets", [])
-        if isinstance(assets, dict):
-            items = assets.get("items", [])
-            all_assets.extend(items)
-            if len(items) < 1000:
-                break
-        else:
-            all_assets.extend(assets)
-            break
-        page += 1
-    return all_assets
+    return search_metadata_all(immich_url, api_key, {"albumIds": [album_id]}, timeout=timeout)
 
 
 def fetch_asset_albums(immich_url: str, api_key: str, asset_id: str, timeout: int = 10) -> list:
@@ -723,9 +741,21 @@ def tag_asset_as_generated(immich_url: str, api_key: str, asset_id: str, logger:
         logger.debug(f"Could not tag asset {asset_id}: {e}")
 
 
+GENERATED_FILENAME_PREFIX = "memnotify-collage"
+
+
+def is_generated_search_item(asset: dict) -> bool:
+    """Cheap check usable on search results (no tags there): filename prefix or legacy device id."""
+    return (
+        str(asset.get("originalFileName", "")).startswith(GENERATED_FILENAME_PREFIX)
+        or asset.get("deviceId") == "memnotify"
+        or str(asset.get("deviceAssetId", "")).startswith(GENERATED_FILENAME_PREFIX)
+    )
+
+
 def is_generated_asset(asset: dict) -> bool:
-    """Check if an asset was generated by the app (has the memnotify-generated tag)."""
+    """Check if an asset was generated by the app (tag, or filename prefix as fallback)."""
     for tag in asset.get("tags", []):
         if tag.get("name") == GENERATED_TAG_NAME:
             return True
-    return False
+    return is_generated_search_item(asset)
