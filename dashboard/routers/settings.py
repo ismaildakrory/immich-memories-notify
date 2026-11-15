@@ -10,6 +10,8 @@ import yaml
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from notify.defaults import DEFAULT_SETTINGS, DEFAULT_TEMPLATES
+
 from ..crontab import reload_scheduler
 from ..models import (
     FullConfig,
@@ -24,6 +26,20 @@ from ..models import (
 from ..utils.filelock import exclusive_lock, read_lock, write_lock
 
 router = APIRouter()
+
+
+def build_settings_model(settings_data: dict) -> Settings:
+    """Merge stored settings over the shared defaults and validate.
+
+    Handles the legacy collage_year_range key and drops unknown keys so a
+    stray field in config.yaml can't break the dashboard.
+    """
+    data = dict(settings_data)
+    if "collage_year_range" in data and "year_range" not in data:
+        data["year_range"] = data.pop("collage_year_range")
+    merged = {**DEFAULT_SETTINGS, **{k: v for k, v in data.items() if k in DEFAULT_SETTINGS}}
+    merged["notification_windows"] = [NotificationWindow(**w) for w in merged.get("notification_windows") or []]
+    return Settings(**merged)
 
 
 def get_config_path(request: Request) -> str:
@@ -83,38 +99,7 @@ async def get_settings(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading config: {str(e)}")
 
-    # Build settings
-    settings_data = config.get("settings", {})
-    settings = Settings(
-        retry=settings_data.get("retry", {}),
-        state_file=settings_data.get("state_file", "state/state.json"),
-        log_level=settings_data.get("log_level", "INFO"),
-        top_persons_limit=settings_data.get("top_persons_limit", 5),
-        exclude_recent_days=settings_data.get("exclude_recent_days", 30),
-        include_location=settings_data.get("include_location", True),
-        include_album=settings_data.get("include_album", True),
-        video_emoji=settings_data.get("video_emoji", True),
-        prefer_group_photos=settings_data.get("prefer_group_photos", True),
-        min_group_size=settings_data.get("min_group_size", 2),
-        notification_windows=[
-            NotificationWindow(**w) for w in settings_data.get("notification_windows", [])
-        ],
-        weekly_collage_enabled=settings_data.get("weekly_collage_enabled", False),
-        collage_cooldown_days=settings_data.get("collage_cooldown_days", 7),
-        collage_person_limit=settings_data.get("collage_person_limit", 5),
-        year_range=settings_data.get("year_range",
-                   settings_data.get("collage_year_range", 5)),
-        collage_template=settings_data.get("collage_template", "random"),
-        collage_album_name=settings_data.get("collage_album_name", "Weekly Highlights"),
-        then_and_now_enabled=settings_data.get("then_and_now_enabled", True),
-        then_and_now_cooldown_days=settings_data.get("then_and_now_cooldown_days", 7),
-        then_and_now_min_gap=settings_data.get("then_and_now_min_gap", 3),
-        trip_highlights_enabled=settings_data.get("trip_highlights_enabled", True),
-        trip_highlights_cooldown_days=settings_data.get("trip_highlights_cooldown_days", 7),
-        trip_highlights_min_photos=settings_data.get("trip_highlights_min_photos", 5),
-        trip_highlights_repeat_days=settings_data.get("trip_highlights_repeat_days", 90),
-        birthday_enabled=settings_data.get("birthday_enabled", True),
-    )
+    settings = build_settings_model(config.get("settings") or {})
 
     # Redact sensitive user info
     users = [
@@ -130,26 +115,8 @@ async def get_settings(request: Request):
         for u in config.get("users", [])
     ]
 
-    return FullConfig(
-        settings=settings,
-        users=users,
-        messages=config.get("messages", []),
-        person_messages=config.get("person_messages", []),
-        video_messages=config.get("video_messages", []),
-        video_person_messages=config.get("video_person_messages", []),
-        then_and_now_messages=config.get("then_and_now_messages", []),
-        trip_highlights_messages=config.get("trip_highlights_messages", []),
-        album_messages=config.get("album_messages", []),
-        video_album_messages=config.get("video_album_messages", []),
-        memory_titles=config.get("memory_titles", []),
-        person_titles=config.get("person_titles", []),
-        collage_titles=config.get("collage_titles", []),
-        then_and_now_titles=config.get("then_and_now_titles", []),
-        trip_highlights_titles=config.get("trip_highlights_titles", []),
-        album_titles=config.get("album_titles", []),
-        birthday_messages=config.get("birthday_messages", []),
-        birthday_titles=config.get("birthday_titles", []),
-    )
+    templates = {key: config.get(key, list(default)) for key, default in DEFAULT_TEMPLATES.items()}
+    return FullConfig(settings=settings, users=users, **templates)
 
 
 @router.get("/windows", response_model=List[NotificationWindow])
@@ -198,24 +165,7 @@ async def get_messages(request: Request):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Config file not found")
 
-    return {
-        "messages": config.get("messages", []),
-        "person_messages": config.get("person_messages", []),
-        "video_messages": config.get("video_messages", []),
-        "video_person_messages": config.get("video_person_messages", []),
-        "then_and_now_messages": config.get("then_and_now_messages", []),
-        "trip_highlights_messages": config.get("trip_highlights_messages", []),
-        "album_messages": config.get("album_messages", []),
-        "video_album_messages": config.get("video_album_messages", []),
-        "memory_titles": config.get("memory_titles", []),
-        "person_titles": config.get("person_titles", []),
-        "collage_titles": config.get("collage_titles", []),
-        "then_and_now_titles": config.get("then_and_now_titles", []),
-        "trip_highlights_titles": config.get("trip_highlights_titles", []),
-        "album_titles": config.get("album_titles", []),
-        "birthday_messages": config.get("birthday_messages", []),
-        "birthday_titles": config.get("birthday_titles", []),
-    }
+    return {key: config.get(key, list(default)) for key, default in DEFAULT_TEMPLATES.items()}
 
 
 @router.put("/messages")
@@ -226,38 +176,8 @@ async def update_messages(request: Request, update: MessagesUpdate):
     try:
         with exclusive_lock(config_path):
             config = load_config_exclusive(config_path)
-            if update.messages is not None:
-                config["messages"] = update.messages
-            if update.person_messages is not None:
-                config["person_messages"] = update.person_messages
-            if update.video_messages is not None:
-                config["video_messages"] = update.video_messages
-            if update.video_person_messages is not None:
-                config["video_person_messages"] = update.video_person_messages
-            if update.then_and_now_messages is not None:
-                config["then_and_now_messages"] = update.then_and_now_messages
-            if update.trip_highlights_messages is not None:
-                config["trip_highlights_messages"] = update.trip_highlights_messages
-            if update.album_messages is not None:
-                config["album_messages"] = update.album_messages
-            if update.video_album_messages is not None:
-                config["video_album_messages"] = update.video_album_messages
-            if update.memory_titles is not None:
-                config["memory_titles"] = update.memory_titles
-            if update.person_titles is not None:
-                config["person_titles"] = update.person_titles
-            if update.collage_titles is not None:
-                config["collage_titles"] = update.collage_titles
-            if update.then_and_now_titles is not None:
-                config["then_and_now_titles"] = update.then_and_now_titles
-            if update.trip_highlights_titles is not None:
-                config["trip_highlights_titles"] = update.trip_highlights_titles
-            if update.album_titles is not None:
-                config["album_titles"] = update.album_titles
-            if update.birthday_messages is not None:
-                config["birthday_messages"] = update.birthday_messages
-            if update.birthday_titles is not None:
-                config["birthday_titles"] = update.birthday_titles
+            for key, value in update.model_dump(exclude_none=True).items():
+                config[key] = value
             _write_yaml(config_path, config)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Config file not found")

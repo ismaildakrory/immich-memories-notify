@@ -1,3 +1,6 @@
+# Immich Memories Notify — configuration
+# Defaults generated from notify/defaults.py. Secrets come from .env via ${VAR}.
+# Users are added through the dashboard; this file ships with none.
 immich:
   url: ${IMMICH_URL}
   external_url: ${IMMICH_EXTERNAL_URL}
@@ -11,42 +14,74 @@ settings:
     delay_seconds: 5
   state_file: state/state.json
   log_level: INFO
-  memory_notifications: 3
-  person_notifications: 2
-  fallback_notifications: 4
   top_persons_limit: 5
   exclude_recent_days: 30
+  asset_repeat_days: 60
   include_location: true
   include_album: true
   video_emoji: true
   prefer_group_photos: true
   min_group_size: 2
-  weekly_collage_enabled: true
-  weekly_collage_day: 6
-  weekly_collage_slots: 2
-  collage_person_limit: 5
   year_range: 20
+  weekly_collage_enabled: true
+  collage_cooldown_days: 7
+  collage_person_limit: 5
   collage_template: random
   collage_album_name: Weekly Highlights
   then_and_now_enabled: true
   then_and_now_min_gap: 3
-  then_and_now_slot: 0
   then_and_now_cooldown_days: 7
   trip_highlights_enabled: true
   trip_highlights_cooldown_days: 7
   trip_highlights_min_photos: 5
   trip_highlights_repeat_days: 90
+  birthday_enabled: true
   notification_windows:
-  - start: '08:00'
-    end: '09:00'
+  - start: 08:00
+    end: 09:00
+    events:
+    - memory
+    - person
+    - album
+    - then_and_now
+    - trip_highlights
+    - collage
   - start: '10:00'
     end: '12:00'
+    events:
+    - memory
+    - person
+    - album
+    - then_and_now
+    - trip_highlights
+    - collage
   - start: '13:00'
     end: '15:00'
+    events:
+    - memory
+    - person
+    - album
+    - then_and_now
+    - trip_highlights
+    - collage
   - start: '17:00'
     end: '19:00'
+    events:
+    - memory
+    - person
+    - album
+    - then_and_now
+    - trip_highlights
+    - collage
   - start: '20:00'
     end: '22:00'
+    events:
+    - memory
+    - person
+    - album
+    - then_and_now
+    - trip_highlights
+    - collage
 messages:
 - A little trip back to {year}...
 - Remember this day {years_ago} years ago?
@@ -101,12 +136,19 @@ video_album_messages:
 memory_titles:
 - '{years_ago} years ago today'
 person_titles:
-- 'A memory with {person_name}'
+- A memory with {person_name}
 collage_titles:
-- 'Weekly Highlights'
+- Weekly Highlights
 then_and_now_titles:
-- 'Then & Now — {person_name}'
+- Then & Now — {person_name}
 trip_highlights_titles:
-- 'Trip Highlights'
+- Trip Highlights
 album_titles:
 - '{album_name}'
+birthday_messages:
+- Happy Birthday, {person_name}! 🎂
+- It's {person_name}'s special day! 🎉
+- Wishing {person_name} a wonderful birthday! 🎁
+- Cheers to {person_name} on their birthday! 🥳
+birthday_titles:
+- Happy Birthday, {person_name}! 🎉

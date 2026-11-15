@@ -10,6 +10,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
+from .defaults import ALL_EVENTS, DEPRECATED_SETTINGS, apply_setting_defaults, apply_template_defaults
+
 # =============================================================================
 # Logging Setup
 # =============================================================================
@@ -91,26 +93,15 @@ def load_config(config_path: str = "config.yaml") -> dict:
     config = expand_env_vars(config)
 
     # Set defaults for settings
-    if "settings" not in config:
+    if "settings" not in config or config["settings"] is None:
         config["settings"] = {}
 
     settings = config["settings"]
-    settings.setdefault("retry", {"max_attempts": 3, "delay_seconds": 5})
-    settings.setdefault("state_file", "state/state.json")
-    settings.setdefault("log_level", "INFO")
-    settings.setdefault("then_and_now_enabled", True)
-    settings.setdefault("then_and_now_min_gap", 3)
-    settings.setdefault("trip_highlights_enabled", True)
-    settings.setdefault("then_and_now_cooldown_days", 7)
-    settings.setdefault("trip_highlights_cooldown_days", 7)
     # Migrate old collage_year_range → year_range
     if "collage_year_range" in settings and "year_range" not in settings:
         settings["year_range"] = settings.pop("collage_year_range")
-    settings.setdefault("year_range", 5)
-    # Migrate weekly_collage_day → collage_cooldown_days
-    if "weekly_collage_day" in settings:
-        settings.pop("weekly_collage_day")
-    settings.setdefault("collage_cooldown_days", 7)
+    apply_setting_defaults(settings)
+    apply_template_defaults(config)
 
     # Migrate windows: ensure each window has an 'events' list
     _migrate_window_events(config)
@@ -122,9 +113,6 @@ def load_config(config_path: str = "config.yaml") -> dict:
     return config
 
 
-ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"]
-
-
 def _migrate_window_events(config: dict):
     """Add events field to windows that don't have it. Remove deprecated slot-count fields."""
     settings = config.get("settings", {})
@@ -134,8 +122,7 @@ def _migrate_window_events(config: dict):
             window["events"] = list(ALL_EVENTS)
 
     # Remove deprecated fields (they're no longer used by the engine)
-    for old_field in ["memory_notifications", "person_notifications",
-                      "fallback_notifications", "then_and_now_slot", "weekly_collage_slots"]:
+    for old_field in DEPRECATED_SETTINGS:
         settings.pop(old_field, None)
 
 

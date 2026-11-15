@@ -4,48 +4,55 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from notify.defaults import ALL_EVENTS, DEFAULT_SETTINGS
 
 # Settings Models
+D = DEFAULT_SETTINGS
+
+
 class RetrySettings(BaseModel):
-    max_attempts: int = 3
-    delay_seconds: int = 5
+    max_attempts: int = D["retry"]["max_attempts"]
+    delay_seconds: int = D["retry"]["delay_seconds"]
 
 
 class NotificationWindow(BaseModel):
     start: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="Start time (HH:MM)")
     end: str = Field(..., pattern=r"^\d{2}:\d{2}$", description="End time (HH:MM)")
     events: List[str] = Field(
-        default=["memory", "person", "album", "then_and_now", "trip_highlights", "collage"],
+        default_factory=lambda: list(ALL_EVENTS),
         description="Event types this window can send",
     )
 
 
 class Settings(BaseModel):
+    """Full settings block. Defaults come from notify/defaults.py; bounds are enforced here."""
+
     retry: RetrySettings = Field(default_factory=RetrySettings)
-    state_file: str = Field("state/state.json", max_length=256)
-    log_level: str = Field("INFO", max_length=10)
-    top_persons_limit: int = Field(5, ge=1, le=50)
-    exclude_recent_days: int = Field(30, ge=0, le=3650)
-    include_location: bool = True
-    include_album: bool = True
-    video_emoji: bool = True
-    prefer_group_photos: bool = True
-    min_group_size: int = Field(2, ge=1, le=20)
-    year_range: int = Field(5, ge=1, le=50)
+    state_file: str = Field(D["state_file"], max_length=256)
+    log_level: str = Field(D["log_level"], max_length=10)
+    top_persons_limit: int = Field(D["top_persons_limit"], ge=1, le=50)
+    exclude_recent_days: int = Field(D["exclude_recent_days"], ge=0, le=3650)
+    asset_repeat_days: int = Field(D["asset_repeat_days"], ge=0, le=3650)
+    include_location: bool = D["include_location"]
+    include_album: bool = D["include_album"]
+    video_emoji: bool = D["video_emoji"]
+    prefer_group_photos: bool = D["prefer_group_photos"]
+    min_group_size: int = Field(D["min_group_size"], ge=1, le=20)
+    year_range: int = Field(D["year_range"], ge=1, le=100)
     notification_windows: List[NotificationWindow] = Field(default_factory=list)
-    weekly_collage_enabled: bool = False
-    collage_cooldown_days: int = Field(7, ge=1, le=365)
-    collage_person_limit: int = Field(5, ge=1, le=20)
-    collage_template: str = Field("random", max_length=64)
-    collage_album_name: str = Field("Weekly Highlights", max_length=128)
-    then_and_now_enabled: bool = True
-    then_and_now_cooldown_days: int = Field(7, ge=0, le=365)
-    then_and_now_min_gap: int = Field(3, ge=1, le=50)
-    trip_highlights_enabled: bool = True
-    trip_highlights_cooldown_days: int = Field(7, ge=0, le=365)
-    trip_highlights_min_photos: int = Field(5, ge=1, le=100)
-    trip_highlights_repeat_days: int = Field(90, ge=0, le=3650)
-    birthday_enabled: bool = True
+    weekly_collage_enabled: bool = D["weekly_collage_enabled"]
+    collage_cooldown_days: int = Field(D["collage_cooldown_days"], ge=1, le=365)
+    collage_person_limit: int = Field(D["collage_person_limit"], ge=1, le=20)
+    collage_template: str = Field(D["collage_template"], max_length=64)
+    collage_album_name: str = Field(D["collage_album_name"], max_length=128)
+    then_and_now_enabled: bool = D["then_and_now_enabled"]
+    then_and_now_cooldown_days: int = Field(D["then_and_now_cooldown_days"], ge=0, le=365)
+    then_and_now_min_gap: int = Field(D["then_and_now_min_gap"], ge=1, le=50)
+    trip_highlights_enabled: bool = D["trip_highlights_enabled"]
+    trip_highlights_cooldown_days: int = Field(D["trip_highlights_cooldown_days"], ge=0, le=365)
+    trip_highlights_min_photos: int = Field(D["trip_highlights_min_photos"], ge=1, le=100)
+    trip_highlights_repeat_days: int = Field(D["trip_highlights_repeat_days"], ge=0, le=3650)
+    birthday_enabled: bool = D["birthday_enabled"]
 
 
 class UserInfo(BaseModel):
@@ -109,12 +116,13 @@ class SettingsUpdate(BaseModel):
     """Partial settings update."""
     top_persons_limit: Optional[int] = Field(None, ge=1, le=50)
     exclude_recent_days: Optional[int] = Field(None, ge=0, le=3650)
+    asset_repeat_days: Optional[int] = Field(None, ge=0, le=3650)
     include_location: Optional[bool] = None
     include_album: Optional[bool] = None
     video_emoji: Optional[bool] = None
     prefer_group_photos: Optional[bool] = None
     min_group_size: Optional[int] = Field(None, ge=1, le=20)
-    year_range: Optional[int] = Field(None, ge=1, le=50)
+    year_range: Optional[int] = Field(None, ge=1, le=100)
     weekly_collage_enabled: Optional[bool] = None
     collage_cooldown_days: Optional[int] = Field(None, ge=1, le=365)
     collage_person_limit: Optional[int] = Field(None, ge=1, le=20)

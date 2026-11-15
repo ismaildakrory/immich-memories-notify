@@ -41,6 +41,7 @@ from .config import (
     setup_logging,
     was_special_sent_today,
 )
+from .defaults import DEFAULT_SETTINGS
 from .dispatcher import send_notification
 from .features.albums import prepare_album_notification
 from .features.birthday import find_birthday_people, prepare_birthday_notification
@@ -57,7 +58,6 @@ from .immich import (
 )
 from .utils import calculate_random_delay, with_retry
 
-ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"]
 SPECIAL_EVENTS = {"then_and_now", "trip_highlights", "collage"}
 REGULAR_EVENTS = {"memory", "person", "album"}
 
@@ -696,12 +696,7 @@ Examples:
         logger.info("Mode:    FORCE")
 
     # Get notification windows
-    notification_windows = settings.get("notification_windows", [
-        {"start": "08:00", "end": "10:00"},
-        {"start": "12:00", "end": "14:00"},
-        {"start": "16:00", "end": "18:00"},
-        {"start": "19:00", "end": "20:00"},
-    ])
+    notification_windows = settings.get("notification_windows", DEFAULT_SETTINGS["notification_windows"])
 
     # Calculate and apply random delay for this window
     if not args.no_delay and not args.dry_run:
