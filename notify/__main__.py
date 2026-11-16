@@ -143,7 +143,8 @@ def process_user_window(
 
     # Avoid repeats: anything sent today plus anything sent within asset_repeat_days
     repeat_days = settings.get("asset_repeat_days", DEFAULT_SETTINGS["asset_repeat_days"])
-    assets_sent = get_assets_sent_today(state, name, target_date) | get_recent_assets(state, name, target_date, repeat_days)
+    assets_sent_today = get_assets_sent_today(state, name, target_date)
+    assets_sent = assets_sent_today | get_recent_assets(state, name, target_date, repeat_days)
 
     # Fetch memories with retry
     try:
@@ -243,7 +244,7 @@ def process_user_window(
                 notification = _execute_event(
                     "memory", user=user, config=config, state=state,
                     target_date=target_date, slot=slot, parsed=parsed,
-                    assets_sent=assets_sent, top_persons=top_persons,
+                    assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                     top_person_ids=top_person_ids, test_mode=test_mode,
                     logger=logger, click_base=click_base,
                 )
@@ -275,7 +276,7 @@ def process_user_window(
                     notification = _execute_event(
                         selected_special, user=user, config=config, state=state,
                         target_date=target_date, slot=slot, parsed=parsed,
-                        assets_sent=assets_sent, top_persons=top_persons,
+                        assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                         top_person_ids=top_person_ids, test_mode=test_mode,
                         logger=logger, click_base=click_base,
                     )
@@ -294,7 +295,7 @@ def process_user_window(
                     notification = _execute_event(
                         selected, user=user, config=config, state=state,
                         target_date=target_date, slot=slot, parsed=parsed,
-                        assets_sent=assets_sent, top_persons=top_persons,
+                        assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                         top_person_ids=top_person_ids, test_mode=test_mode,
                         logger=logger, click_base=click_base,
                     )
@@ -404,6 +405,7 @@ def _execute_event(
     test_mode: bool,
     logger: logging.Logger,
     click_base: str,
+    assets_sent_today: set = None,
 ) -> dict:
     """Execute a specific event type and return notification dict or None."""
     immich_url = config["immich"]["url"]
@@ -443,6 +445,7 @@ def _execute_event(
             video_messages=video_messages,
             target_date=target_date,
             title_templates=memory_titles,
+            assets_sent_today=assets_sent_today,
         )
 
     elif event_type == "person":

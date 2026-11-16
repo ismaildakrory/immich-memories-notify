@@ -450,54 +450,38 @@ def select_asset_with_face_preference(
                 logger.debug(f"Could not check faces for asset {asset_id}: {e}")
             without_face.append(asset)
 
-    # Select by priority
+    # Weighted choice across buckets: better buckets are favoured but never
+    # monopolise. Strict priority meant the same 2-3 group shots were sent on
+    # every occurrence while face-less photos were never shown at all.
     if prefer_groups:
-        # Group preference enabled - use new priority order
-        if group_top_persons:
-            chosen = random.choice(group_top_persons)
-            if logger:
-                logger.debug("Selected group photo with multiple top persons")
-            return chosen
-        elif group_named:
-            chosen = random.choice(group_named)
-            if logger:
-                logger.debug("Selected group photo with multiple named faces")
-            return chosen
-        elif single_top_person:
-            chosen = random.choice(single_top_person)
-            if logger:
-                logger.debug("Selected asset with single top person")
-            return chosen
-        elif single_named:
-            chosen = random.choice(single_named)
-            if logger:
-                logger.debug("Selected asset with single named face")
-            return chosen
-        else:
-            chosen = random.choice(without_face) if without_face else random.choice(available)
-            if logger:
-                logger.debug("Selected random asset (no face preference available)")
-            return chosen
+        buckets = [
+            ("group photo with multiple top persons", group_top_persons, 8),
+            ("group photo with multiple named faces", group_named, 5),
+            ("single top person", single_top_person, 4),
+            ("single named face", single_named, 2),
+            ("no recognised face", without_face, 1),
+        ]
     else:
-        # Original behavior - combine groups with singles
-        with_top_person = group_top_persons + single_top_person
-        with_any_face = group_named + single_named
+        buckets = [
+            ("top person face", group_top_persons + single_top_person, 6),
+            ("named face", group_named + single_named, 3),
+            ("no recognised face", without_face, 1),
+        ]
+    chosen, label = _weighted_bucket_choice(buckets)
+    if chosen is None:
+        chosen, label = random.choice(available), "random asset"
+    if logger:
+        logger.debug(f"Selected asset ({label})")
+    return chosen
 
-        if with_top_person:
-            chosen = random.choice(with_top_person)
-            if logger:
-                logger.debug("Selected asset with top person face")
-            return chosen
-        elif with_any_face:
-            chosen = random.choice(with_any_face)
-            if logger:
-                logger.debug("Selected asset with named face")
-            return chosen
-        else:
-            chosen = random.choice(without_face) if without_face else random.choice(available)
-            if logger:
-                logger.debug("Selected random asset (no face preference available)")
-            return chosen
+
+def _weighted_bucket_choice(buckets: list) -> tuple:
+    """buckets: [(label, assets, weight)] → (asset, label) drawn from a non-empty bucket by weight."""
+    non_empty = [(label, assets, weight) for label, assets, weight in buckets if assets]
+    if not non_empty:
+        return None, None
+    label, assets, _ = random.choices(non_empty, weights=[w for _, _, w in non_empty], k=1)[0]
+    return random.choice(assets), label
 
 
 # =============================================================================

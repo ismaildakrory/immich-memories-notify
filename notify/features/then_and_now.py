@@ -41,7 +41,10 @@ def find_then_and_now_candidate(
     target_month = target_date.month
     target_year = target_date.year
     min_year = target_year - year_range
-    used = set(used_person_ids or [])
+    # "Recently used" = the last few people, not the whole history: with the full
+    # history every top person is soon "used" and the largest-gap person wins forever.
+    recent_window = max(1, len(top_persons) // 2)
+    used = set((used_person_ids or [])[-recent_window:])
     used_pair_set = set(used_pairs or [])
 
     candidates = []
@@ -85,12 +88,14 @@ def find_then_and_now_candidate(
             continue
 
         years = sorted(year_assets.keys())
-        gap = max(years) - min(years)
-        if gap < min_gap:
-            continue
-
-        then_year = min(years)
         now_year = max(years)
+        # Any earlier year at least min_gap back qualifies as "then"; pick one at
+        # random so the same person doesn't always get the same two years.
+        then_choices = [y for y in years if now_year - y >= min_gap]
+        if not then_choices:
+            continue
+        then_year = random.choice(then_choices)
+        gap = now_year - then_year
 
         # Try random combos, skip already-used pairs
         then_options = year_assets[then_year][:]
@@ -147,9 +152,10 @@ def find_then_and_now_candidate(
             logger.debug(f"  No Then & Now candidate found (need same person in same month across {min_gap}+ years)")
         return None
 
-    # Sort: prefer unused persons first, then largest gap
-    candidates.sort(key=lambda c: (c["person_id"] not in used, c["gap"]), reverse=True)
-    best = candidates[0]
+    # Prefer people not used in the last few rounds; among those, weight by gap
+    # so big time jumps are favoured without always winning.
+    fresh = [c for c in candidates if c["person_id"] not in used] or candidates
+    best = random.choices(fresh, weights=[max(1, c["gap"]) for c in fresh], k=1)[0]
 
     if logger:
         logger.info(f"  Then & Now candidate: {best['person_name']} ({best['then_year']} → {best['now_year']}, {best['gap']} years)")

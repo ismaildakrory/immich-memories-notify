@@ -14,6 +14,27 @@ from ..immich import (
 from ..utils import format_location, get_primary_album
 
 
+def choose_memory_year(parsed: dict, excluded_assets: set, assets_sent_today: set) -> Optional[int]:
+    """Pick a memory year at random, giving every year an equal chance.
+
+    Years whose photos were all sent already are skipped; years that already
+    produced a notification today are only used when nothing else is left.
+    (Picking by window position starved older years: window 1 always got the
+    newest year, so a date with 6 memory years only ever showed the first 3.)
+    """
+    excluded_assets = excluded_assets or set()
+    assets_sent_today = assets_sent_today or set()
+    usable = []
+    for year in parsed["years"]:
+        ids = [a.get("id") for a in parsed["by_year"].get(year, {}).get("assets", [])]
+        if any(i and i not in excluded_assets for i in ids):
+            usable.append((year, any(i in assets_sent_today for i in ids)))
+    if not usable:
+        return None
+    fresh = [y for y, sent_today in usable if not sent_today]
+    return random.choice(fresh or [y for y, _ in usable])
+
+
 def prepare_memory_notification(
     parsed: dict,
     slot: int,
@@ -28,8 +49,9 @@ def prepare_memory_notification(
     video_messages: list = None,
     target_date: date = None,
     title_templates: list = None,
+    assets_sent_today: set = None,
 ) -> Optional[dict]:
-    """Prepare a memory notification for a specific slot, preferring faces."""
+    """Prepare a memory notification, preferring faces and rotating fairly across years."""
     years = parsed["years"]
     if not years:
         return None
@@ -39,9 +61,9 @@ def prepare_memory_notification(
     if video_messages is None:
         video_messages = []
 
-    # Select year for this slot (cycle through available years)
-    year_index = (slot - 1) % len(years)
-    year = years[year_index]
+    year = choose_memory_year(parsed, assets_sent, assets_sent_today if assets_sent_today is not None else assets_sent)
+    if year is None:
+        return None
     year_data = parsed["by_year"].get(year, {})
     assets = year_data.get("assets", [])
     memory_id = year_data.get("memory_id")
