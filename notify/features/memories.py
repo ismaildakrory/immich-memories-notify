@@ -11,7 +11,7 @@ from ..immich import (
     is_generated_asset,
     select_asset_with_face_preference,
 )
-from ..utils import format_location, get_primary_album
+from ..utils import fix_plurals, format_location, get_primary_album
 
 
 def choose_memory_year(parsed: dict, excluded_assets: set, assets_sent_today: set) -> Optional[int]:
@@ -168,6 +168,7 @@ def prepare_memory_notification(
     if is_video and video_emoji:
         title = f"\U0001F3AC {title}"
 
+    title, message = fix_plurals(title), fix_plurals(message)
     if test_mode:
         title = "[TEST] " + title
 

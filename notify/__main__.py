@@ -246,7 +246,7 @@ def process_user_window(
                     target_date=target_date, slot=slot, parsed=parsed,
                     assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                     top_person_ids=top_person_ids, test_mode=test_mode,
-                    logger=logger, click_base=click_base,
+                    logger=logger, click_base=click_base, dry_run=dry_run,
                 )
         else:
             # Layer 2: Special priority (one per day, windows 2+)
@@ -278,7 +278,7 @@ def process_user_window(
                         target_date=target_date, slot=slot, parsed=parsed,
                         assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                         top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base,
+                        logger=logger, click_base=click_base, dry_run=dry_run,
                     )
 
             # Layer 3: Regular events (memory/person/album)
@@ -297,7 +297,7 @@ def process_user_window(
                         target_date=target_date, slot=slot, parsed=parsed,
                         assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                         top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base,
+                        logger=logger, click_base=click_base, dry_run=dry_run,
                     )
                     if notification:
                         break
@@ -406,8 +406,11 @@ def _execute_event(
     logger: logging.Logger,
     click_base: str,
     assets_sent_today: set = None,
+    dry_run: bool = False,
 ) -> dict:
     """Execute a specific event type and return notification dict or None."""
+    # Test/dry-run runs must not write to the Immich library (albums, uploads)
+    upload = not (test_mode or dry_run)
     immich_url = config["immich"]["url"]
     api_key = user["immich_api_key"]
     settings = config["settings"]
@@ -505,6 +508,7 @@ def _execute_event(
                     test_mode=test_mode,
                     logger=logger,
                     title_templates=tan_titles,
+                    upload=upload,
                 )
                 if notification:
                     logger.info(f"  [{name}] Sending Then & Now ({candidate['then_year']} → {candidate['now_year']})")
@@ -541,6 +545,7 @@ def _execute_event(
                     logger=logger,
                     title_templates=trip_titles,
                     click_base=click_base,
+                    upload=upload,
                 )
                 if notification:
                     logger.info(f"  [{name}] Sending Trip Highlights ({trip['city']}, {trip['year']})")
@@ -559,6 +564,7 @@ def _execute_event(
                 settings=settings,
                 logger=logger,
                 test_mode=test_mode,
+                upload=upload,
             )
             if collage_notification and collage_notification.get("has_content"):
                 collage_notification["is_collage"] = True

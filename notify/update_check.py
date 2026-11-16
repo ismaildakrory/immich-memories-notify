@@ -6,6 +6,7 @@ from pathlib import Path
 import requests
 
 from .config import load_config, load_state, save_state
+from .dispatcher import send_notification
 
 GITHUB_REPO = "ismaildakrory/immich-memories-notify"
 RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
@@ -71,22 +72,13 @@ def check_for_updates(config_path: str = "config.yaml", logger: logging.Logger =
         logger.info(f"Update v{latest_version} available but already notified")
         return
 
-    # New version available — notify the first user
+    # New version available — notify the first enabled user via their own
+    # backend (ntfy or Apprise), same path as every other notification
     users = config.get("users", [])
     admin = next((u for u in users if u.get("enabled", True)), None)
     if not admin:
         logger.warning("No enabled users to notify about update")
         return
-
-    ntfy_url = config.get("ntfy", {}).get("url", "")
-    if not ntfy_url:
-        logger.warning("ntfy URL not configured, cannot send update notification")
-        return
-
-    topic = admin.get("ntfy_topic", "")
-    ntfy_user = admin.get("ntfy_username")
-    ntfy_pass = admin.get("ntfy_password")
-    auth = (ntfy_user, ntfy_pass) if ntfy_user and ntfy_pass else None
 
     title = f"Update Available: v{latest_version}"
     message = (
@@ -96,35 +88,21 @@ def check_for_updates(config_path: str = "config.yaml", logger: logging.Logger =
     )
     if release_name and release_name != latest_tag:
         message += f"Release: {release_name}\n"
-    message += f"\nhttps://github.com/{GITHUB_REPO}/releases/latest"
+    release_url = f"https://github.com/{GITHUB_REPO}/releases/latest"
+    message += f"\n{release_url}"
 
-    try:
-        title_encoded = title
-        try:
-            title.encode('ascii')
-        except UnicodeEncodeError:
-            import base64
-            title_encoded = f"=?UTF-8?B?{base64.b64encode(title.encode('utf-8')).decode('ascii')}?="
-
-        headers = {
-            "Title": title_encoded,
-            "Tags": "arrow_up,package",
-            "Priority": "default",
-            "Click": f"https://github.com/{GITHUB_REPO}/releases/latest",
-        }
-
-        resp = requests.post(
-            f"{ntfy_url}/{topic}",
-            headers=headers,
-            data=message.encode("utf-8"),
-            auth=auth,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        logger.info(f"Update notification sent to {admin['name']} (v{current_version} -> v{latest_version})")
-    except Exception as e:
-        logger.error(f"Failed to send update notification: {e}")
+    notification = {
+        "title": title,
+        "message": message,
+        "has_content": True,
+        "asset_id": None,
+        "click_url": release_url,
+        "tags": "arrow_up,package",
+    }
+    if not send_notification(admin, notification, config, logger):
+        logger.error("Failed to send update notification")
         return
+    logger.info(f"Update notification sent to {admin['name']} (v{current_version} -> v{latest_version})")
 
     # Mark as notified so we don't spam
     state["update_notified_version"] = latest_version

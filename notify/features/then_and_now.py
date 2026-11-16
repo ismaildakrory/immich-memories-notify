@@ -17,6 +17,7 @@ from ..immich import (
     get_or_create_album,
     upload_collage_to_album,
 )
+from ..utils import fix_plurals
 from .collage import cover_crop_image
 
 
@@ -251,6 +252,7 @@ def prepare_then_and_now_notification(
     test_mode: bool,
     logger=None,
     title_templates: list = None,
+    upload: bool = True,
 ) -> Optional[dict]:
     """
     Fetch preview thumbnails, compose a high-res split image, upload it to the
@@ -301,21 +303,26 @@ def prepare_then_and_now_notification(
             title = f"Then & Now — {person_name}"
     else:
         title = f"Then & Now — {person_name}"
+    title, message = fix_plurals(title), fix_plurals(message)
     if test_mode:
         title = "[TEST] " + title
 
     # Upload composite to "Then & Now" album; click_url left unset so
-    # send_single_notification builds the deep link automatically
+    # send_single_notification builds the deep link automatically.
+    # Skipped in test/dry-run so test clicks don't fill the library.
     uploaded_asset_id = None
-    if logger:
-        logger.info("  Uploading Then & Now composite to Immich…")
-    try:
-        album_id = get_or_create_album(immich_url, api_key, "Then & Now", logger or logging.getLogger())
-        if album_id:
-            uploaded_asset_id = upload_collage_to_album(immich_url, api_key, composite, album_id, logger or logging.getLogger())
-    except Exception as e:
+    if upload:
         if logger:
-            logger.warning(f"  Could not upload Then & Now composite: {e}")
+            logger.info("  Uploading Then & Now composite to Immich…")
+        try:
+            album_id = get_or_create_album(immich_url, api_key, "Then & Now", logger or logging.getLogger())
+            if album_id:
+                uploaded_asset_id = upload_collage_to_album(immich_url, api_key, composite, album_id, logger or logging.getLogger())
+        except Exception as e:
+            if logger:
+                logger.warning(f"  Could not upload Then & Now composite: {e}")
+    elif logger:
+        logger.info("  Test/dry-run: Then & Now composite not uploaded to Immich")
 
     return {
         "title": title,

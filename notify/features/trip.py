@@ -18,6 +18,7 @@ from ..immich import (
     search_metadata_all,
     upload_collage_to_album,
 )
+from ..utils import fix_plurals
 from .collage import cover_crop_image
 
 
@@ -191,6 +192,7 @@ def prepare_trip_notification(
     logger=None,
     title_templates: list = None,
     click_base: str = "",
+    upload: bool = True,
 ) -> Optional[dict]:
     """
     Build a collage from up to 4 trip photos, upload to a per-trip album, and
@@ -274,18 +276,22 @@ def prepare_trip_notification(
             return None
 
         # Create/find per-trip album, add originals, upload the new collage
-        try:
-            album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
-            if album_id:
-                headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
-                add_url = f"{immich_url}/api/albums/{album_id}/assets"
-                add_body = {"ids": asset_ids}
-                resp = requests.post(add_url, headers=headers, json=add_body, timeout=30)
-                if resp.status_code in (404, 405):
-                    requests.put(add_url, headers=headers, json=add_body, timeout=30)
-                uploaded_asset_id = upload_collage_to_album(immich_url, api_key, collage, album_id, _logger)
-        except Exception as e:
-            _logger.warning(f"  Could not upload Trip Highlights to album: {e}")
+        # (skipped in test/dry-run so test clicks don't create albums)
+        if upload:
+            try:
+                album_id = get_or_create_album(immich_url, api_key, album_name, _logger)
+                if album_id:
+                    headers = {"Accept": "application/json", "x-api-key": api_key, "Content-Type": "application/json"}
+                    add_url = f"{immich_url}/api/albums/{album_id}/assets"
+                    add_body = {"ids": asset_ids}
+                    resp = requests.post(add_url, headers=headers, json=add_body, timeout=30)
+                    if resp.status_code in (404, 405):
+                        requests.put(add_url, headers=headers, json=add_body, timeout=30)
+                    uploaded_asset_id = upload_collage_to_album(immich_url, api_key, collage, album_id, _logger)
+            except Exception as e:
+                _logger.warning(f"  Could not upload Trip Highlights to album: {e}")
+        else:
+            _logger.info("  Test/dry-run: trip album and collage not written to Immich")
 
     # Build message
     if messages:
@@ -305,6 +311,7 @@ def prepare_trip_notification(
             title = f"Trip to {city} \U0001f30d"
     else:
         title = f"Trip to {city} \U0001f30d"
+    title, message = fix_plurals(title), fix_plurals(message)
     if test_mode:
         title = "[TEST] " + title
 

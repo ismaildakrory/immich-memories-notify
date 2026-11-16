@@ -176,7 +176,8 @@ def generate_weekly_collage(
     target_date: date,
     settings: dict,
     logger: logging.Logger,
-    test_mode: bool = False
+    test_mode: bool = False,
+    upload: bool = True,
 ) -> Optional[dict]:
     """Generate a collage of top people's photos for weekly notification."""
     try:
@@ -277,18 +278,21 @@ def generate_weekly_collage(
             logger.warning(f"Failed to create collage for user {user['name']}")
             return None
 
-        # Upload collage to Immich album
+        # Upload collage to Immich album (skipped in test/dry-run)
         album_name = settings.get("collage_album_name", "Weekly Highlights")
         asset_id = None
 
-        try:
-            album_id = get_or_create_album(immich_url, api_key, album_name, logger)
-            if album_id:
-                asset_id = upload_collage_to_album(immich_url, api_key, collage_bytes, album_id, logger)
-                if asset_id:
-                    logger.info(f"Collage uploaded to album '{album_name}' with asset ID: {asset_id}")
-        except Exception as e:
-            logger.warning(f"Failed to upload collage to album: {e}")
+        if upload:
+            try:
+                album_id = get_or_create_album(immich_url, api_key, album_name, logger)
+                if album_id:
+                    asset_id = upload_collage_to_album(immich_url, api_key, collage_bytes, album_id, logger)
+                    if asset_id:
+                        logger.info(f"Collage uploaded to album '{album_name}' with asset ID: {asset_id}")
+            except Exception as e:
+                logger.warning(f"Failed to upload collage to album: {e}")
+        else:
+            logger.info("Test/dry-run: collage not uploaded to Immich")
 
         names_str = ", ".join(person_names[:3])
         if len(person_names) > 3:

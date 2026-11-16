@@ -2,6 +2,7 @@
 
 import io
 import random
+import re
 import time
 from datetime import datetime, timedelta
 
@@ -34,6 +35,16 @@ def ensure_jpeg(data: bytes) -> bytes:
     out = io.BytesIO()
     Image.open(io.BytesIO(data)).convert("RGB").save(out, "JPEG", quality=85)
     return out.getvalue()
+
+
+_PLURAL_RE = re.compile(r"\b1 (years|months|weeks|days|photos|moments|memories)\b")
+
+
+def fix_plurals(text: str) -> str:
+    """Turn '1 years ago' into '1 year ago' after template formatting."""
+    if not text:
+        return text
+    return _PLURAL_RE.sub(lambda m: "1 " + ("memory" if m.group(1) == "memories" else m.group(1)[:-1]), text)
 
 
 def format_location(exif_info: dict) -> dict:

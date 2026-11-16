@@ -70,14 +70,15 @@ def send_notification(
     is_video: bool = False,
     ntfy_external_url: str = None,
     priority: str = "default",
+    tags: str = None,
 ) -> bool:
     """Send a notification to ntfy."""
     topic = _sanitize_header(topic)
     title = _sanitize_header(title)
     url = f"{ntfy_url}/{topic}"
 
-    # Use different tags for videos
-    tags = "movie,calendar" if is_video else "camera,calendar"
+    # Use different tags for videos unless the caller supplied its own
+    tags = _sanitize_header(tags) if tags else ("movie,calendar" if is_video else "camera,calendar")
 
     # Encode title for HTTP header (RFC 2047 for non-ASCII)
     try:
@@ -177,6 +178,7 @@ def send_single_notification(
                 is_video=is_video,
                 ntfy_external_url=ntfy_external_url,
                 priority=priority,
+                tags=notification.get("tags"),
             ),
             max_attempts=retry_config["max_attempts"],
             delay=retry_config["delay_seconds"],
