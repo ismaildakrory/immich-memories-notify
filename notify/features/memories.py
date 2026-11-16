@@ -187,6 +187,6 @@ def prepare_memory_notification(
     }
 
     if memory_id:
-        result["click_url"] = f"immich://memory?id={memory_id}"
+        result["app_click_url"] = f"immich://memory?id={memory_id}"  # whole memory lane in the app
 
     return result

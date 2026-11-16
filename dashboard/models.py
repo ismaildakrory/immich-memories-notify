@@ -34,6 +34,7 @@ class Settings(BaseModel):
     exclude_recent_days: int = Field(D["exclude_recent_days"], ge=0, le=3650)
     asset_repeat_days: int = Field(D["asset_repeat_days"], ge=0, le=3650)
     skip_screenshots: bool = D["skip_screenshots"]
+    click_links: str = Field(D["click_links"], pattern=r"^(app|web)$")
     include_location: bool = D["include_location"]
     include_album: bool = D["include_album"]
     video_emoji: bool = D["video_emoji"]
@@ -119,6 +120,7 @@ class SettingsUpdate(BaseModel):
     exclude_recent_days: Optional[int] = Field(None, ge=0, le=3650)
     asset_repeat_days: Optional[int] = Field(None, ge=0, le=3650)
     skip_screenshots: Optional[bool] = None
+    click_links: Optional[str] = Field(None, pattern=r"^(app|web)$")
     include_location: Optional[bool] = None
     include_album: Optional[bool] = None
     video_emoji: Optional[bool] = None

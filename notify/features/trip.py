@@ -212,11 +212,13 @@ def prepare_trip_notification(
     # Detection: check originalFileName prefix (v3) or legacy deviceId/deviceAssetId (v2).
     album_name = f"Trip to {city}, {country} ({year})"
     uploaded_asset_id = None
+    album_id = None
     collage = None
     valid_ids = []
     try:
         existing_album = get_album_assets(immich_url, api_key, album_name, _logger)
         if existing_album:
+            album_id = existing_album.get("album_id")
             for a in existing_album.get("assets", []):
                 if is_generated_search_item(a):
                     uploaded_asset_id = a.get("id")
@@ -326,6 +328,7 @@ def prepare_trip_notification(
         "has_content": True,
         "asset_id": uploaded_asset_id,
         "click_url": f"{click_base}/photos/{click_asset}" if click_base else None,
+        "app_click_url": f"immich://album?id={album_id}" if album_id else None,  # whole trip album in the app
         "is_trip": True,
         "is_video": False,
         "collage_data": collage,

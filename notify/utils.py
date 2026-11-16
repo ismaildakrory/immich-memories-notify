@@ -128,3 +128,34 @@ def calculate_random_delay(window_start: str, window_end: str, test_mode: bool =
         delay_to_start = int((window_start_time - now).total_seconds())
         random_offset = random.randint(0, window_duration)
         return delay_to_start + random_offset
+
+
+def normalize_click_base(external_url: str) -> str:
+    """Ensure the external URL has a scheme (users often omit it)."""
+    base = (external_url or "").strip().rstrip("/")
+    if base and not base.startswith(("http://", "https://")):
+        base = f"https://{base}"
+    return base
+
+
+def build_click_url(notification: dict, click_base: str, mode: str = "app") -> str | None:
+    """Pick the tap target for a notification.
+
+    mode "app": Immich app deep links (immich://asset|album|memory?id=...), which
+    open the mobile app directly. Features may set `app_click_url` for a
+    better target (memory lane, trip album); otherwise the asset itself.
+    mode "web": plain https links on the external URL (Apprise always uses
+    this, since Telegram/email can't open app schemes).
+    """
+    asset_id = notification.get("asset_id")
+    if mode == "app":
+        if notification.get("app_click_url"):
+            return notification["app_click_url"]
+        if asset_id:
+            return f"immich://asset?id={asset_id}"
+    web = notification.get("click_url")
+    if web and web.startswith(("http://", "https://")):
+        return web
+    if click_base:
+        return f"{click_base}/photos/{asset_id}" if asset_id else f"{click_base}/"
+    return None

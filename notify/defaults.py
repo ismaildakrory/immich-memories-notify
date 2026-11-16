@@ -24,6 +24,7 @@ DEFAULT_SETTINGS = {
     "exclude_recent_days": 30,
     "asset_repeat_days": 60,
     "skip_screenshots": True,
+    "click_links": "app",
     "include_location": True,
     "include_album": True,
     "video_emoji": True,

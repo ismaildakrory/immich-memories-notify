@@ -769,6 +769,13 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                         <input type="text" id="collage_album_name" value="Weekly Highlights">
                     </div>
                     <div class="form-group">
+                        <label>Tap opens</label>
+                        <select id="click_links">
+                            <option value="app">Immich app (deep link)</option>
+                            <option value="web">Web (external URL)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Collage Template</label>
                         <select id="collage_template">
                             <option value="random">Random (Surprise me!)</option>
@@ -1250,6 +1257,7 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                 document.getElementById('min_group_size').value = data.settings.min_group_size;
                 document.getElementById('include_location').checked = data.settings.include_location;
                 document.getElementById('skip_screenshots').checked = data.settings.skip_screenshots !== false;
+                document.getElementById('click_links').value = data.settings.click_links || 'app';
                 document.getElementById('include_album').checked = data.settings.include_album;
                 document.getElementById('video_emoji').checked = data.settings.video_emoji;
                 document.getElementById('prefer_group_photos').checked = data.settings.prefer_group_photos;
@@ -1392,6 +1400,7 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                 min_group_size: parseInt(document.getElementById('min_group_size').value),
                 include_location: document.getElementById('include_location').checked,
                 skip_screenshots: document.getElementById('skip_screenshots').checked,
+                click_links: document.getElementById('click_links').value,
                 include_album: document.getElementById('include_album').checked,
                 video_emoji: document.getElementById('video_emoji').checked,
                 prefer_group_photos: document.getElementById('prefer_group_photos').checked,

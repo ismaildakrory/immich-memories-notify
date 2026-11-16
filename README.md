@@ -141,6 +141,7 @@ settings:
   exclude_recent_days: 30       # Skip recent photos for person notifications
   asset_repeat_days: 60         # Don't send the same photo again for N days (0 = same day only)
   skip_screenshots: true        # Ignore screenshots, screen recordings, PNG/GIF graphics
+  click_links: app              # app = immich:// deep links (open the mobile app); web = IMMICH_EXTERNAL_URL links
   year_range: 20                # How far back to look (trip, Then & Now). Installs older than 3.4 may have 5 saved — raise it
   include_location: true        # Add city/country context
   include_album: true           # Show album name
@@ -284,7 +285,7 @@ If you don't use the Collage, Trip Highlights, or Then & Now features, you can s
 
 | Problem | Fix |
 |---------|-----|
-| Clicking notification doesn't open Immich app | Set `IMMICH_EXTERNAL_URL=https://my.immich.app` in `.env` — the Immich mobile app only handles links from this domain |
+| Clicking notification doesn't open Immich app | Notifications use `immich://` deep links by default (needs Immich app + server 1.136+). If you read notifications on a device without the app, set *Tap opens* to **Web** in Settings → General and `IMMICH_EXTERNAL_URL` in `.env` |
 | No notifications | `docker compose run --rm notify --slot 1 --dry-run --no-delay` to check for memories |
 | No thumbnails | Run with `--test --force`, look for upload warnings in output |
 | No person photos | Name your people in Immich, ensure photos older than 30 days exist |

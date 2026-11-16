@@ -7,7 +7,7 @@ import tempfile
 import apprise
 
 from .immich import fetch_thumbnail
-from .utils import ensure_jpeg, with_retry
+from .utils import build_click_url, ensure_jpeg, normalize_click_base, with_retry
 
 
 def send_single_notification(
@@ -27,9 +27,7 @@ def send_single_notification(
         return False
 
     immich_url = config["immich"]["url"]
-    click_base = config["immich"].get("external_url") or ""
-    if click_base and not click_base.startswith(("http://", "https://")):
-        click_base = f"https://{click_base}"
+    click_base = normalize_click_base(config["immich"].get("external_url"))
     retry_config = config["settings"]["retry"]
     api_key = user["immich_api_key"]
 
@@ -52,14 +50,7 @@ def send_single_notification(
     # Build message body — append click URL since Apprise has no Click header.
     # App-scheme deep links (immich://...) only work inside the Immich app, so
     # for Telegram/Discord/email use a plain web link instead.
-    click_url = notification.get("click_url")
-    if click_url and not click_url.startswith(("http://", "https://")):
-        click_url = None
-    if not click_url and click_base:
-        if asset_id:
-            click_url = f"{click_base}/photos/{asset_id}"
-        else:
-            click_url = f"{click_base}/"
+    click_url = build_click_url(notification, click_base, mode="web")
 
     body = notification["message"]
     if click_url:

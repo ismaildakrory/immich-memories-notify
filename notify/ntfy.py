@@ -6,7 +6,7 @@ import uuid
 import requests
 
 from .immich import fetch_thumbnail
-from .utils import ensure_jpeg, with_retry
+from .utils import build_click_url, ensure_jpeg, normalize_click_base, with_retry
 
 
 def upload_image_to_ntfy(ntfy_url: str, image_data: bytes, auth: tuple = None, timeout: int = 30, ntfy_external_url: str = None) -> str | None:
@@ -127,9 +127,8 @@ def send_single_notification(
     asset_id = notification.get("asset_id")
 
     immich_url = config["immich"]["url"]
-    click_base = config["immich"].get("external_url") or ""
-    if click_base and not click_base.startswith(("http://", "https://")):
-        click_base = f"https://{click_base}"
+    click_base = normalize_click_base(config["immich"].get("external_url"))
+    click_mode = config.get("settings", {}).get("click_links", "app")
     ntfy_url = config["ntfy"]["url"]
     ntfy_external_url = config["ntfy"].get("external_url") or ""
     topic = user["ntfy_topic"]
@@ -157,14 +156,7 @@ def send_single_notification(
 
     # Send notification with retry
     try:
-        # Use pre-built click_url from notification (e.g. Then & Now links to "now" photo)
-        # or build from asset_id
-        click_url = notification.get("click_url")
-        if not click_url and click_base:
-            if asset_id:
-                click_url = f"{click_base}/photos/{asset_id}"
-            else:
-                click_url = f"{click_base}/"
+        click_url = build_click_url(notification, click_base, click_mode)
         is_video = notification.get("is_video", False)
         success = with_retry(
             lambda: send_notification(
