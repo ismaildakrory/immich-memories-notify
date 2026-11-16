@@ -141,7 +141,7 @@ settings:
   exclude_recent_days: 30       # Skip recent photos for person notifications
   asset_repeat_days: 60         # Don't send the same photo again for N days (0 = same day only)
   skip_screenshots: true        # Ignore screenshots, screen recordings, PNG/GIF graphics
-  year_range: 20                # How far back to look (collage, trip, TaN)
+  year_range: 20                # How far back to look (trip, Then & Now). Installs older than 3.4 may have 5 saved — raise it
   include_location: true        # Add city/country context
   include_album: true           # Show album name
   video_emoji: true             # Add film emoji for videos
