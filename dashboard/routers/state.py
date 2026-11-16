@@ -1,10 +1,13 @@
 """State management API endpoints."""
 
 import json
+import os
+import re
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+import requests as http_requests
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from ..models import StateResponse, UserSlotState
 from ..utils.filelock import read_lock, write_lock
@@ -155,3 +158,73 @@ async def get_today_summary(request: Request):
             }
 
     return summary
+
+
+# =============================================================================
+# Sent history (dashboard History tab)
+# =============================================================================
+
+_UUID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
+
+
+@router.get("/history")
+async def get_history(
+    request: Request,
+    user: str = Query(None, description="Filter by user name"),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Most recent sent notifications across users (newest first), with repeat markers."""
+    state_path = get_state_path(request)
+    try:
+        state = load_state(state_path)
+    except json.JSONDecodeError:
+        return {"items": [], "users": []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading state: {str(e)}")
+
+    users_state = state.get("users", {})
+    items = []
+    for name, user_state in users_state.items():
+        if user and name != user:
+            continue
+        seen_before = set()
+        for rec in user_state.get("history", []):  # oldest → newest
+            asset_id = rec.get("asset_id")
+            items.append({**rec, "user": name, "repeat": bool(asset_id) and asset_id in seen_before})
+            if asset_id:
+                seen_before.add(asset_id)
+    items.sort(key=lambda r: r.get("time") or "", reverse=True)
+    return {"items": items[:limit], "users": sorted(users_state)}
+
+
+@router.get("/thumbnail/{user}/{asset_id}")
+def get_history_thumbnail(request: Request, user: str, asset_id: str):
+    """Proxy an Immich thumbnail using the user's own API key (the browser never sees the key)."""
+    from .settings import _resolve_user_api_key, load_config
+
+    if not _UUID_RE.match(asset_id):
+        raise HTTPException(status_code=400, detail="Invalid asset id")
+    config = load_config(request.app.state.config_path)
+    user_cfg = next((u for u in config.get("users", []) if u.get("name") == user), None)
+    if not user_cfg:
+        raise HTTPException(status_code=404, detail="User not found")
+    api_key = _resolve_user_api_key(user_cfg)
+    immich_url = os.environ.get("IMMICH_URL", "").rstrip("/")
+    if not api_key or not immich_url:
+        raise HTTPException(status_code=400, detail="Immich not configured for this user")
+    try:
+        resp = http_requests.get(
+            f"{immich_url}/api/assets/{asset_id}/thumbnail",
+            headers={"x-api-key": api_key},
+            params={"size": "thumbnail"},
+            timeout=15,
+        )
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not reach Immich")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail="Thumbnail not available")
+    return Response(
+        content=resp.content,
+        media_type=resp.headers.get("content-type", "image/jpeg"),
+        headers={"Cache-Control": "private, max-age=86400"},
+    )

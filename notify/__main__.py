@@ -29,7 +29,9 @@ from datetime import date, datetime
 import requests
 
 from .config import (
+    append_history,
     get_assets_sent_today,
+    get_ever_sent_assets,
     get_recent_assets,
     get_slots_sent_today,
     get_window_events,
@@ -56,6 +58,7 @@ from .features.persons import prepare_person_notification
 from .features.then_and_now import find_then_and_now_candidate, prepare_then_and_now_notification
 from .features.trip import find_trip_candidate, prepare_trip_notification
 from .immich import (
+    PickPolicy,
     fetch_memories,
     fetch_people,
     filter_todays_memories,
@@ -145,6 +148,11 @@ def process_user_window(
     repeat_days = settings.get("asset_repeat_days", DEFAULT_SETTINGS["asset_repeat_days"])
     assets_sent_today = get_assets_sent_today(state, name, target_date)
     assets_sent = assets_sent_today | get_recent_assets(state, name, target_date, repeat_days)
+    # Picking policy: favour never-sent photos and favourites, skip screenshots
+    policy = PickPolicy(
+        seen_ids=get_ever_sent_assets(state, name),
+        skip_screenshots=settings.get("skip_screenshots", DEFAULT_SETTINGS["skip_screenshots"]),
+    )
 
     # Fetch memories with retry
     try:
@@ -228,6 +236,7 @@ def process_user_window(
                     title_templates=birthday_titles,
                     exclude_asset_ids=assets_sent,
                     exclude_days=exclude_recent_days,
+                    policy=policy,
                 )
                 if notification:
                     logger.info(f"  [{name}] Sending birthday notification for {person['name']}")
@@ -246,7 +255,7 @@ def process_user_window(
                     target_date=target_date, slot=slot, parsed=parsed,
                     assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                     top_person_ids=top_person_ids, test_mode=test_mode,
-                    logger=logger, click_base=click_base, dry_run=dry_run,
+                    logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
                 )
         else:
             # Layer 2: Special priority (one per day, windows 2+)
@@ -278,7 +287,7 @@ def process_user_window(
                         target_date=target_date, slot=slot, parsed=parsed,
                         assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                         top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base, dry_run=dry_run,
+                        logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
                     )
 
             # Layer 3: Regular events (memory/person/album)
@@ -297,7 +306,7 @@ def process_user_window(
                         target_date=target_date, slot=slot, parsed=parsed,
                         assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                         top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base, dry_run=dry_run,
+                        logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
                     )
                     if notification:
                         break
@@ -317,6 +326,7 @@ def process_user_window(
                 settings=settings,
                 video_person_messages=video_person_messages,
                 title_templates=person_titles,
+                policy=policy,
             )
 
     if not notification or not notification.get("has_content"):
@@ -351,7 +361,18 @@ def process_user_window(
 
         if not test_mode:
             mark_slot_sent(state, name, target_date, slot, notification.get("asset_id"))
-            mark_asset_sent_recent(state, name, target_date, notification.get("asset_id"), repeat_days)
+            mark_asset_sent_recent(state, name, target_date, notification.get("asset_id"))
+            append_history(state, name, {
+                "date": target_date.isoformat(),
+                "time": datetime.now().isoformat(timespec="seconds"),
+                "slot": slot,
+                "kind": _notification_kind(notification),
+                "asset_id": notification.get("asset_id"),
+                "title": notification.get("title"),
+                "person": notification.get("person_name"),
+                "year": notification.get("year"),
+                "video": bool(notification.get("is_video")),
+            })
             # Mark feature cooldowns
             if notification.get("is_trip"):
                 mark_feature_fired(state, name, "last_trip_date", target_date)
@@ -407,6 +428,7 @@ def _execute_event(
     click_base: str,
     assets_sent_today: set = None,
     dry_run: bool = False,
+    policy: PickPolicy = None,
 ) -> dict:
     """Execute a specific event type and return notification dict or None."""
     # Test/dry-run runs must not write to the Immich library (albums, uploads)
@@ -449,6 +471,7 @@ def _execute_event(
             target_date=target_date,
             title_templates=memory_titles,
             assets_sent_today=assets_sent_today,
+            policy=policy,
         )
 
     elif event_type == "person":
@@ -464,6 +487,7 @@ def _execute_event(
             settings=settings,
             video_person_messages=video_person_messages,
             title_templates=person_titles,
+            policy=policy,
         )
 
     elif event_type == "album":
@@ -479,6 +503,7 @@ def _execute_event(
             video_album_messages=video_album_messages,
             title_templates=album_titles,
             target_date=target_date,
+            policy=policy,
         )
 
     elif event_type == "then_and_now":
@@ -498,6 +523,7 @@ def _execute_event(
                 logger=logger,
                 used_person_ids=used_persons,
                 used_pairs=used_pairs,
+                policy=policy,
             )
             if candidate:
                 notification = prepare_then_and_now_notification(
@@ -534,6 +560,7 @@ def _execute_event(
                 logger=logger,
                 used_trips=trips_shown,
                 repeat_days=trip_repeat_days,
+                policy=policy,
             )
             if trip:
                 notification = prepare_trip_notification(
@@ -565,6 +592,7 @@ def _execute_event(
                 logger=logger,
                 test_mode=test_mode,
                 upload=upload,
+                policy=policy,
             )
             if collage_notification and collage_notification.get("has_content"):
                 collage_notification["is_collage"] = True
@@ -575,6 +603,14 @@ def _execute_event(
         return None
 
     return None
+
+
+def _notification_kind(notification: dict) -> str:
+    for flag, kind in (("is_birthday", "birthday"), ("is_then_and_now", "then_and_now"), ("is_trip", "trip"),
+                       ("is_collage", "collage"), ("is_album_photo", "album"), ("is_person_photo", "person")):
+        if notification.get(flag):
+            return kind
+    return "memory"
 
 
 def _tag_existing_generated(config_path: str):

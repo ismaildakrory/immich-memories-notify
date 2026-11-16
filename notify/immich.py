@@ -4,12 +4,75 @@ import logging
 import random
 import time
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Optional
 
 import requests
 
 GENERATED_TAG_NAME = "memnotify-generated"
+
+# Formats a camera never produces — in practice screenshots, stickers, downloaded graphics
+SCREENSHOT_MIME_TYPES = {"image/png", "image/gif", "image/bmp", "image/webp", "image/svg+xml"}
+SCREENSHOT_NAME_HINTS = ("screenshot", "screen_shot", "screen shot", "screenrecord", "screen_record", "screen recording")
+
+
+def is_screenshot_like(asset: dict) -> bool:
+    """Heuristic: screenshots / screen recordings / non-photo graphics (works on search results and memory assets)."""
+    name = f"{asset.get('originalFileName', '')} {asset.get('originalPath', '')}".lower()
+    if any(hint in name for hint in SCREENSHOT_NAME_HINTS):
+        return True
+    return asset.get("type") == "IMAGE" and (asset.get("originalMimeType") or "").lower() in SCREENSHOT_MIME_TYPES
+
+
+@dataclass
+class PickPolicy:
+    """How to choose among candidate assets.
+
+    - never picks app-generated assets
+    - optionally skips screenshot-like assets
+    - weights never-sent photos (unseen_weight) and favourites (favorite_weight)
+      so the long tail of the library surfaces and favourites show up more often
+    """
+
+    seen_ids: set = field(default_factory=set)
+    skip_screenshots: bool = True
+    unseen_weight: float = 4.0
+    favorite_weight: float = 3.0
+
+    def allowed(self, asset: dict) -> bool:
+        if is_generated_search_item(asset):
+            return False
+        if self.skip_screenshots and is_screenshot_like(asset):
+            return False
+        return True
+
+    def weight(self, asset: dict) -> float:
+        w = 1.0
+        if asset.get("id") not in self.seen_ids:
+            w *= self.unseen_weight
+        if asset.get("isFavorite"):
+            w *= self.favorite_weight
+        return w
+
+    def choose(self, assets: list) -> Optional[dict]:
+        """One weighted draw."""
+        if not assets:
+            return None
+        return random.choices(assets, weights=[self.weight(a) for a in assets], k=1)[0]
+
+    def ordered(self, assets: list, limit: int = 5) -> list:
+        """Up to `limit` distinct assets drawn by weight without replacement (for verify-and-re-roll loops)."""
+        pool = list(assets)
+        out = []
+        while pool and len(out) < limit:
+            pick = self.choose(pool)
+            out.append(pick)
+            pool.remove(pick)
+        return out
+
+
+DEFAULT_POLICY = PickPolicy()
 
 
 # =============================================================================
@@ -245,6 +308,7 @@ def get_random_person_photo(
     exclude_days: int = 30,
     exclude_asset_ids: set = None,
     logger=None,
+    policy: PickPolicy = None,
 ) -> Optional[dict]:
     """
     Get a random photo from one of the top persons, excluding recent photos.
@@ -255,6 +319,7 @@ def get_random_person_photo(
 
     if exclude_asset_ids is None:
         exclude_asset_ids = set()
+    policy = policy or DEFAULT_POLICY
 
     cutoff_date = datetime.now() - timedelta(days=exclude_days)
 
@@ -287,15 +352,14 @@ def get_random_person_photo(
                     except (ValueError, TypeError):
                         pass
 
-                if is_generated_search_item(asset):
+                if not policy.allowed(asset):
                     continue
 
                 valid_assets.append(asset)
 
-            # Pick randomly; confirm the tag on the chosen asset only (one call),
-            # re-rolling a few times if it turns out to be app-generated.
-            random.shuffle(valid_assets)
-            for chosen in valid_assets[:5]:
+            # Weighted pick (unseen / favourites first); confirm the tag on the
+            # chosen asset only (one call), re-rolling if it is app-generated.
+            for chosen in policy.ordered(valid_assets, 5):
                 try:
                     if is_generated_asset(fetch_asset_details(immich_url, api_key, chosen.get("id"))):
                         continue
@@ -377,6 +441,7 @@ def select_asset_with_face_preference(
     logger=None,
     prefer_groups: bool = False,
     min_group_size: int = 2,
+    policy: PickPolicy = None,
 ) -> Optional[dict]:
     """
     Select an asset preferring those with recognized faces from top persons.
@@ -399,9 +464,10 @@ def select_asset_with_face_preference(
 
     if exclude_asset_ids is None:
         exclude_asset_ids = set()
+    policy = policy or DEFAULT_POLICY
 
-    # Filter out already-used assets
-    available = [a for a in assets if a.get("id") not in exclude_asset_ids]
+    # Filter out already-used, generated and (optionally) screenshot-like assets
+    available = [a for a in assets if a.get("id") not in exclude_asset_ids and policy.allowed(a)]
     if not available:
         return None
 
@@ -467,21 +533,21 @@ def select_asset_with_face_preference(
             ("named face", group_named + single_named, 3),
             ("no recognised face", without_face, 1),
         ]
-    chosen, label = _weighted_bucket_choice(buckets)
+    chosen, label = _weighted_bucket_choice(buckets, policy.choose)
     if chosen is None:
-        chosen, label = random.choice(available), "random asset"
+        chosen, label = policy.choose(available), "random asset"
     if logger:
         logger.debug(f"Selected asset ({label})")
     return chosen
 
 
-def _weighted_bucket_choice(buckets: list) -> tuple:
-    """buckets: [(label, assets, weight)] → (asset, label) drawn from a non-empty bucket by weight."""
+def _weighted_bucket_choice(buckets: list, chooser=random.choice) -> tuple:
+    """buckets: [(label, assets, weight)] → (asset, label): pick a non-empty bucket by weight, then an asset via chooser."""
     non_empty = [(label, assets, weight) for label, assets, weight in buckets if assets]
     if not non_empty:
         return None, None
     label, assets, _ = random.choices(non_empty, weights=[w for _, _, w in non_empty], k=1)[0]
-    return random.choice(assets), label
+    return chooser(assets), label
 
 
 # =============================================================================
@@ -658,6 +724,7 @@ def tag_asset_as_generated(immich_url: str, api_key: str, asset_id: str, logger:
 
 
 GENERATED_FILENAME_PREFIX = "memnotify-collage"
+
 
 
 def is_generated_search_item(asset: dict) -> bool:

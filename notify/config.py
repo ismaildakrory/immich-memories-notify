@@ -289,19 +289,35 @@ def get_recent_assets(state: dict, user_name: str, target_date: date, repeat_day
     return out
 
 
-def mark_asset_sent_recent(state: dict, user_name: str, target_date: date, asset_id: str, repeat_days: int):
-    """Record an asset as sent and prune entries older than `repeat_days`."""
-    if not asset_id or not repeat_days:
+MAX_SENT_HISTORY = 5000   # per user; ~3 years at 4 notifications/day
+MAX_HISTORY_RECORDS = 500  # per user; shown in the dashboard History tab
+
+
+def mark_asset_sent_recent(state: dict, user_name: str, target_date: date, asset_id: str, repeat_days: int = None):
+    """Record an asset as sent. Entries are kept (oldest pruned past MAX_SENT_HISTORY) so
+    `get_ever_sent_assets` can steer picks toward photos never shown before."""
+    if not asset_id:
         return
     user_state = state.setdefault("users", {}).setdefault(user_name, {})
     recent = user_state.setdefault("assets_sent_recent", {})
     recent[asset_id] = target_date.isoformat()
-    for key in list(recent):
-        try:
-            if (target_date - date.fromisoformat(recent[key])).days >= repeat_days:
-                del recent[key]
-        except (ValueError, TypeError):
+    if len(recent) > MAX_SENT_HISTORY:
+        for key in sorted(recent, key=lambda k: recent[k])[: len(recent) - MAX_SENT_HISTORY]:
             del recent[key]
+
+
+def get_ever_sent_assets(state: dict, user_name: str) -> set:
+    """Every asset ID this user has ever been sent (bounded by MAX_SENT_HISTORY)."""
+    return set(state.get("users", {}).get(user_name, {}).get("assets_sent_recent", {}))
+
+
+def append_history(state: dict, user_name: str, record: dict):
+    """Append a sent-notification record for the dashboard History tab (newest last, bounded)."""
+    user_state = state.setdefault("users", {}).setdefault(user_name, {})
+    history = user_state.setdefault("history", [])
+    history.append(record)
+    if len(history) > MAX_HISTORY_RECORDS:
+        del history[: len(history) - MAX_HISTORY_RECORDS]
 
 
 # =============================================================================

@@ -242,6 +242,21 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
   .wizard-card{padding:24px 20px}
   .wizard-nav{gap:10px}
 }
+        /* History tab */
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+        .history-card { display: flex; gap: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+        .history-thumb { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; background: var(--border); }
+        .history-thumb.empty { display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--text-muted); text-align: center; }
+        .history-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+        .history-top { display: flex; flex-wrap: wrap; gap: 4px; }
+        .history-badge { font-size: 0.68rem; padding: 1px 7px; border-radius: 10px; background: var(--border); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+        .history-badge.repeat { background: var(--warning, #d97706); color: #fff; }
+        .history-badge.kind-memory { background: var(--accent); color: #fff; }
+        .history-badge.kind-then_and_now, .history-badge.kind-trip, .history-badge.kind-collage { background: #7c3aed; color: #fff; }
+        .history-badge.kind-birthday { background: #db2777; color: #fff; }
+        .history-title { font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .history-sub { font-size: 0.8rem; color: var(--text-muted); }
+        .history-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: auto; }
     </style>
 <script>(function(){try{var t=localStorage.getItem('imn-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 </head>
@@ -454,6 +469,10 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <span>Today's Status</span>
                 </button>
+                <button class="tab-btn" data-tab="history">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 15l4.5-4.5 3.5 3.5 3-3L20 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.5" cy="9" r="1.3" fill="currentColor"/></svg>
+                    <span>History</span>
+                </button>
                 <button class="tab-btn" data-tab="settings">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8h9M18 8h1M5 16h1M10 16h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="8" r="2.4" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="16" r="2.4" stroke="currentColor" stroke-width="1.8"/></svg>
                     <span>Settings</span>
@@ -508,6 +527,29 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                 </div>
                 <div class="btn-group" style="margin-top: 20px;">
                     <button onclick="refreshState()">Refresh</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content">
+            <div class="card">
+                <h2>Sent History</h2>
+                <p class="setup-sub">Everything that was sent, newest first. A <span class="history-badge repeat">repeat</span> badge means the same photo was sent to that user before.</p>
+                <div id="history-alert"></div>
+                <div class="btn-group" style="margin: 12px 0 16px; align-items: center; gap: 10px;">
+                    <select id="history-user" onchange="loadHistory()" style="max-width: 220px;">
+                        <option value="">All users</option>
+                    </select>
+                    <select id="history-limit" onchange="loadHistory()" style="max-width: 140px;">
+                        <option value="50">Last 50</option>
+                        <option value="100" selected>Last 100</option>
+                        <option value="300">Last 300</option>
+                    </select>
+                    <button class="secondary" onclick="loadHistory()">Refresh</button>
+                </div>
+                <div id="history-grid" class="history-grid">
+                    <div class="loading-state"><span class="loading"></span>Loading…</div>
                 </div>
             </div>
         </div>
@@ -640,6 +682,13 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                         <span class="feature-text"><strong>Location</strong><span>Show where a memory was taken</span></span>
                         <span class="toggle-switch">
                             <input type="checkbox" id="include_location">
+                            <span class="toggle-slider"></span>
+                        </span>
+                    </label>
+                    <label class="feature-card">
+                        <span class="feature-text"><strong>Skip screenshots</strong><span>Ignore screenshots, screen recordings and PNG/GIF graphics</span></span>
+                        <span class="toggle-switch">
+                            <input type="checkbox" id="skip_screenshots">
                             <span class="toggle-slider"></span>
                         </span>
                     </label>
@@ -996,6 +1045,54 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
             const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
             if (btn) btn.classList.add('active');
             document.getElementById(tabName + '-tab').classList.add('active');
+            if (tabName === 'history') loadHistory();
+        }
+
+        // History tab
+        const KIND_LABELS = { memory: 'Memory', person: 'Person', album: 'Album', birthday: 'Birthday',
+                              then_and_now: 'Then & Now', trip: 'Trip', collage: 'Collage' };
+        async function loadHistory() {
+            const grid = document.getElementById('history-grid');
+            const userSel = document.getElementById('history-user');
+            const limit = document.getElementById('history-limit').value;
+            try {
+                const q = new URLSearchParams({ limit });
+                if (userSel.value) q.set('user', userSel.value);
+                const data = await api('/state/history?' + q.toString());
+                if (userSel.options.length <= 1) {
+                    data.users.forEach(u => {
+                        const o = document.createElement('option');
+                        o.value = u; o.textContent = u; userSel.appendChild(o);
+                    });
+                }
+                if (!data.items.length) {
+                    grid.innerHTML = '<p style="color: var(--text-muted)">Nothing sent yet. History starts with the first notification after this version.</p>';
+                    return;
+                }
+                grid.innerHTML = data.items.map(it => {
+                    const when = it.time ? new Date(it.time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : it.date;
+                    const thumb = it.asset_id
+                        ? `<img class="history-thumb" loading="lazy" src="/api/state/thumbnail/${encodeURIComponent(it.user)}/${encodeURIComponent(it.asset_id)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'history-thumb empty',textContent:'no preview'}))">`
+                        : '<div class="history-thumb empty">no preview</div>';
+                    const sub = [it.person ? escapeHtml(it.person) : '', it.year ? String(it.year) : ''].filter(Boolean).join(' · ');
+                    return `
+                    <div class="history-card">
+                        ${thumb}
+                        <div class="history-body">
+                            <div class="history-top">
+                                <span class="history-badge kind-${escapeHtml(it.kind)}">${KIND_LABELS[it.kind] || escapeHtml(it.kind)}</span>
+                                ${it.video ? '<span class="history-badge">video</span>' : ''}
+                                ${it.repeat ? '<span class="history-badge repeat">repeat</span>' : ''}
+                            </div>
+                            <div class="history-title">${escapeHtml(it.title || '')}</div>
+                            ${sub ? `<div class="history-sub">${sub}</div>` : ''}
+                            <div class="history-meta">${escapeHtml(it.user)} · ${escapeHtml(when)} · window ${it.slot}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                showAlert('history-alert', e.message, 'error');
+            }
         }
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -1152,6 +1249,7 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                 document.getElementById('asset_repeat_days').value = data.settings.asset_repeat_days ?? 60;
                 document.getElementById('min_group_size').value = data.settings.min_group_size;
                 document.getElementById('include_location').checked = data.settings.include_location;
+                document.getElementById('skip_screenshots').checked = data.settings.skip_screenshots !== false;
                 document.getElementById('include_album').checked = data.settings.include_album;
                 document.getElementById('video_emoji').checked = data.settings.video_emoji;
                 document.getElementById('prefer_group_photos').checked = data.settings.prefer_group_photos;
@@ -1293,6 +1391,7 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
                 asset_repeat_days: parseInt(document.getElementById('asset_repeat_days').value),
                 min_group_size: parseInt(document.getElementById('min_group_size').value),
                 include_location: document.getElementById('include_location').checked,
+                skip_screenshots: document.getElementById('skip_screenshots').checked,
                 include_album: document.getElementById('include_album').checked,
                 video_emoji: document.getElementById('video_emoji').checked,
                 prefer_group_photos: document.getElementById('prefer_group_photos').checked,

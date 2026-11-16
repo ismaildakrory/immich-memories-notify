@@ -33,6 +33,7 @@ class Settings(BaseModel):
     top_persons_limit: int = Field(D["top_persons_limit"], ge=1, le=50)
     exclude_recent_days: int = Field(D["exclude_recent_days"], ge=0, le=3650)
     asset_repeat_days: int = Field(D["asset_repeat_days"], ge=0, le=3650)
+    skip_screenshots: bool = D["skip_screenshots"]
     include_location: bool = D["include_location"]
     include_album: bool = D["include_album"]
     video_emoji: bool = D["video_emoji"]
@@ -117,6 +118,7 @@ class SettingsUpdate(BaseModel):
     top_persons_limit: Optional[int] = Field(None, ge=1, le=50)
     exclude_recent_days: Optional[int] = Field(None, ge=0, le=3650)
     asset_repeat_days: Optional[int] = Field(None, ge=0, le=3650)
+    skip_screenshots: Optional[bool] = None
     include_location: Optional[bool] = None
     include_album: Optional[bool] = None
     video_emoji: Optional[bool] = None

@@ -23,6 +23,7 @@ DEFAULT_SETTINGS = {
     "top_persons_limit": 5,
     "exclude_recent_days": 30,
     "asset_repeat_days": 60,
+    "skip_screenshots": True,
     "include_location": True,
     "include_album": True,
     "video_emoji": True,

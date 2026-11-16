@@ -20,6 +20,7 @@ def prepare_person_notification(
     settings: dict = None,
     video_person_messages: list = None,
     title_templates: list = None,
+    policy=None,
 ) -> Optional[dict]:
     """Prepare a random person photo notification."""
     if not top_persons:
@@ -39,6 +40,7 @@ def prepare_person_notification(
         exclude_days=exclude_days,
         exclude_asset_ids=assets_sent,
         logger=logger,
+        policy=policy,
     )
 
     if not result:

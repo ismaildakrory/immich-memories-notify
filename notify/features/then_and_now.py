@@ -31,6 +31,7 @@ def find_then_and_now_candidate(
     logger=None,
     used_person_ids: list = None,
     used_pairs: list = None,
+    policy=None,
 ) -> Optional[dict]:
     """
     Search top persons for the same person appearing in the same calendar month
@@ -69,7 +70,7 @@ def find_then_and_now_candidate(
             if asset.get("type") == "VIDEO":
                 continue
             asset_id = asset.get("id")
-            if not asset_id:
+            if not asset_id or (policy and not policy.allowed(asset)):
                 continue
             raw_date = asset.get("localDateTime") or asset.get("fileCreatedAt") or asset.get("createdAt")
             if not raw_date:

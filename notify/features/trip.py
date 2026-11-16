@@ -99,6 +99,7 @@ def find_trip_candidate(
     logger=None,
     used_trips: dict = None,
     repeat_days: int = 90,
+    policy=None,
 ) -> Optional[dict]:
     """
     Scan past years (limited by year_range) for the same calendar month.
@@ -130,6 +131,8 @@ def find_trip_candidate(
         try:
             assets = fetch_month_assets(immich_url, api_key, year, target_month)
             for asset in assets:
+                if policy and not policy.allowed(asset):
+                    continue
                 exif = asset.get("exifInfo") or {}
                 city = (exif.get("city") or "").strip()
                 country = (exif.get("country") or "").strip()

@@ -178,6 +178,7 @@ def generate_weekly_collage(
     logger: logging.Logger,
     test_mode: bool = False,
     upload: bool = True,
+    policy=None,
 ) -> Optional[dict]:
     """Generate a collage of top people's photos for weekly notification."""
     try:
@@ -204,6 +205,7 @@ def generate_weekly_collage(
                 top_persons=[person],
                 exclude_days=exclude_days,
                 logger=logger,
+                policy=policy,
             )
             if result:
                 asset_id = result["asset"].get("id")
@@ -248,6 +250,7 @@ def generate_weekly_collage(
                     exclude_days=exclude_days,
                     exclude_asset_ids=used_asset_ids,
                     logger=logger,
+                    policy=policy,
                 )
                 if result:
                     asset_id = result["asset"].get("id")

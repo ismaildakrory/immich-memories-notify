@@ -5,16 +5,32 @@ from notify import config as cfg
 W = [{"start": "08:00", "end": "10:00"}, {"start": "12:00", "end": "14:00"}, {"start": "22:00", "end": "01:00"}]
 
 
-def test_recent_assets_tracks_and_prunes():
+def test_recent_assets_window_and_ever_sent():
     state = {}
-    cfg.mark_asset_sent_recent(state, "A", date(2026, 1, 1), "old", repeat_days=30)
-    cfg.mark_asset_sent_recent(state, "A", date(2026, 1, 20), "mid", repeat_days=30)
+    cfg.mark_asset_sent_recent(state, "A", date(2026, 1, 1), "old")
+    cfg.mark_asset_sent_recent(state, "A", date(2026, 1, 20), "mid")
     today = date(2026, 2, 5)
-    assert cfg.get_recent_assets(state, "A", today, 30) == {"mid"}
-    cfg.mark_asset_sent_recent(state, "A", today, "new", repeat_days=30)
-    assert set(state["users"]["A"]["assets_sent_recent"]) == {"mid", "new"}  # 'old' pruned
+    assert cfg.get_recent_assets(state, "A", today, 30) == {"mid"}  # 'old' outside the repeat window
+    assert cfg.get_ever_sent_assets(state, "A") == {"old", "mid"}  # but still remembered as seen
     assert cfg.get_recent_assets(state, "A", today, 0) == set()  # disabled
-    cfg.mark_asset_sent_recent(state, "A", today, None, 30)  # no-op
+    cfg.mark_asset_sent_recent(state, "A", today, None)  # no-op
+    assert cfg.get_ever_sent_assets(state, "B") == set()
+
+
+def test_sent_history_is_bounded(monkeypatch):
+    monkeypatch.setattr(cfg, "MAX_SENT_HISTORY", 3)
+    state = {}
+    for i, day in enumerate([1, 2, 3, 4, 5]):
+        cfg.mark_asset_sent_recent(state, "A", date(2026, 1, day), f"a{i}")
+    assert cfg.get_ever_sent_assets(state, "A") == {"a2", "a3", "a4"}  # oldest pruned
+
+
+def test_append_history_bounded(monkeypatch):
+    monkeypatch.setattr(cfg, "MAX_HISTORY_RECORDS", 2)
+    state = {}
+    for i in range(4):
+        cfg.append_history(state, "A", {"n": i})
+    assert [r["n"] for r in state["users"]["A"]["history"]] == [2, 3]
 
 
 def test_run_markers_lifecycle_and_pruning():

@@ -26,7 +26,8 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - **Birthdays & Albums** — Birthday greetings for people with a birth date in Immich, plus surprise photos from albums you pick
 - **Apprise Support** — Send via Telegram, Discord, Slack, email, and [100+ other services](https://github.com/caronc/apprise/wiki) per-user choice alongside ntfy
 - **Smart Scheduling** — Layered priority engine with per-window event control — choose which notification types each time window can send
-- **Web Dashboard** — Modern UI with sidebar navigation, light/dark theme, settings management, and test notifications
+- **Web Dashboard** — Modern UI with sidebar navigation, light/dark theme, settings management, test notifications, and a sent-history view with thumbnails
+- **Smart Picking** — Never-sent photos and favourites are preferred, screenshots are skipped, the same photo is not repeated for weeks, and memory years rotate fairly
 - **Multi-User** — Each user gets personalized notifications from their own library
 - **Guided Setup** — `setup.sh` + first-run wizard, with an optional bundled ntfy server
 - **Privacy First** — Everything runs on your network
@@ -139,6 +140,7 @@ settings:
   top_persons_limit: 5          # Top N named people to feature
   exclude_recent_days: 30       # Skip recent photos for person notifications
   asset_repeat_days: 60         # Don't send the same photo again for N days (0 = same day only)
+  skip_screenshots: true        # Ignore screenshots, screen recordings, PNG/GIF graphics
   year_range: 20                # How far back to look (collage, trip, TaN)
   include_location: true        # Add city/country context
   include_album: true           # Show album name

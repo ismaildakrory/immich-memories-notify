@@ -54,6 +54,7 @@ def prepare_birthday_notification(
     title_templates: list = None,
     exclude_asset_ids: set = None,
     exclude_days: int = 0,
+    policy=None,
 ) -> Optional[dict]:
     """Pick a photo of the birthday person and build the notification."""
     person_name = birthday_person["name"]
@@ -67,6 +68,7 @@ def prepare_birthday_notification(
         exclude_days=exclude_days,
         exclude_asset_ids=exclude_asset_ids,
         logger=logger,
+        policy=policy,
     )
 
     if not result:

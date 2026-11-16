@@ -50,6 +50,7 @@ def prepare_memory_notification(
     target_date: date = None,
     title_templates: list = None,
     assets_sent_today: set = None,
+    policy=None,
 ) -> Optional[dict]:
     """Prepare a memory notification, preferring faces and rotating fairly across years."""
     years = parsed["years"]
@@ -84,16 +85,17 @@ def prepare_memory_notification(
         logger=logger,
         prefer_groups=prefer_groups,
         min_group_size=min_group_size,
+        policy=policy,
     )
 
     if not selected_asset:
-        # Fallback to first available, skip already sent and app-generated
+        # Fallback: anything not sent, not generated (policy filters are deliberately relaxed here)
         available = [a for a in assets if a.get("id") not in assets_sent]
         available = [a for a in available
                      if not is_generated_asset(fetch_asset_details(immich_url, api_key, a["id"]))]
         if not available:
             return None
-        selected_asset = available[0]
+        selected_asset = random.choice(available)
 
     asset_id = selected_asset.get("id")
 

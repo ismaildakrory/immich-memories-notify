@@ -6,6 +6,7 @@ from datetime import date
 from typing import Optional
 
 from ..immich import (
+    DEFAULT_POLICY,
     fetch_asset_albums,
     fetch_asset_details,
     get_album_assets,
@@ -26,6 +27,7 @@ def prepare_album_notification(
     video_album_messages: list = None,
     title_templates: list = None,
     target_date: date = None,
+    policy=None,
 ) -> Optional[dict]:
     """Prepare a notification from a user's configured albums.
 
@@ -40,6 +42,7 @@ def prepare_album_notification(
         video_album_messages = []
     if target_date is None:
         target_date = date.today()
+    policy = policy or DEFAULT_POLICY
 
     shuffled = list(album_names)
     random.shuffle(shuffled)
@@ -68,15 +71,14 @@ def prepare_album_notification(
         # Use "on this day" if available, otherwise all assets
         candidates = on_this_day if on_this_day else all_assets
 
-        # Exclude already-sent assets
-        candidates = [a for a in candidates if a.get("id") not in assets_sent]
+        # Exclude already-sent, generated and screenshot-like assets
+        candidates = [a for a in candidates if a.get("id") not in assets_sent and policy.allowed(a)]
         if not candidates:
             continue
 
-        # Pick randomly, re-roll if generated (avoids O(n) API calls)
-        random.shuffle(candidates)
+        # Weighted pick (unseen / favourites first), re-roll if generated (avoids O(n) API calls)
         asset = None
-        for candidate in candidates:
+        for candidate in policy.ordered(candidates, 5):
             details = fetch_asset_details(immich_url, api_key, candidate["id"])
             if not is_generated_asset(details):
                 asset = candidate
