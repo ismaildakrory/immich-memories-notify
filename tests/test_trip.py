@@ -4,12 +4,12 @@ from notify.features.trip import _cluster_trip_dates, _is_home_city, _normalize_
 
 
 def test_normalize_city_strips_diacritics_and_case():
-    assert _normalize_city("Al Finţās") == "al fintas"
+    assert _normalize_city("São Paulo") == "sao paulo"
     assert _normalize_city("  GIZA ") == "giza"
 
 
 def test_is_home_city_exact_fuzzy_and_containment():
-    assert _is_home_city("Al Fintas", ["Al Finţās"])
+    assert _is_home_city("Sao Paulo", ["São Paulo"])
     assert _is_home_city("Giza", "Giza")  # legacy string form
     assert _is_home_city("Greater London", ["London"])
     assert not _is_home_city("Cairo", ["Giza", "London"])
