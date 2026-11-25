@@ -33,7 +33,7 @@ class FakeResponse:
 
 @pytest.fixture
 def fake_requests(monkeypatch):
-    """Patch requests.get/post/put inside notify.immich with a router keyed by (method, path-suffix).
+    """Patch requests.get/post/put/delete inside notify.immich with a router keyed by (method, path-suffix).
 
     Usage: fake_requests.route("POST", "/api/search/statistics", lambda body: FakeResponse({...}))
     Handlers receive the JSON body (or None) and return a FakeResponse. The
@@ -65,6 +65,7 @@ def fake_requests(monkeypatch):
     monkeypatch.setattr(immich.requests, "get", lambda url, **kw: router._dispatch("GET", url, **kw))
     monkeypatch.setattr(immich.requests, "post", lambda url, **kw: router._dispatch("POST", url, **kw))
     monkeypatch.setattr(immich.requests, "put", lambda url, **kw: router._dispatch("PUT", url, **kw))
+    monkeypatch.setattr(immich.requests, "delete", lambda url, **kw: router._dispatch("DELETE", url, **kw))
     immich._asset_details_cache.clear()
     return router
 

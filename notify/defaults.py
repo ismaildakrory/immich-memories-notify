@@ -5,7 +5,7 @@ the first-run config written by the dashboard. Change a default here and every
 layer picks it up.
 """
 
-ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"]
+ALL_EVENTS = ["memory", "person", "album", "context", "then_and_now", "trip_highlights", "collage"]
 
 DEFAULT_WINDOWS = [
     {"start": "08:00", "end": "09:00", "events": ["memory"]},
@@ -44,6 +44,9 @@ DEFAULT_SETTINGS = {
     "trip_highlights_min_photos": 5,
     "trip_highlights_repeat_days": 90,
     "birthday_enabled": True,
+    "context_themes": [],  # off until themes are set, e.g. ["sunset", "beach", "snow"]
+    "lane_photos": 8,
+    "lane_keep_days": 7,
     "notification_windows": DEFAULT_WINDOWS,
 }
 
@@ -124,6 +127,14 @@ DEFAULT_TEMPLATES = {
     "then_and_now_titles": ["Then & Now — {person_name}"],
     "trip_highlights_titles": ["Trip Highlights"],
     "album_titles": ["{album_name}"],
+    "context_messages": [
+        "{count} photos of {theme}, from {first_year} to {last_year}",
+        "Your {theme} moments, {first_year} to {last_year}",
+        "A little {theme} collection for you",
+        "{theme_title} through the years",
+        "Swipe through {count} {theme} photos",
+    ],
+    "context_titles": ["{theme_title}, across the years"],
     "birthday_messages": [
         "Happy Birthday, {person_name}! \U0001f382",
         "It's {person_name}'s special day! \U0001f389",

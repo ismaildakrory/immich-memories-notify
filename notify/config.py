@@ -322,6 +322,37 @@ def append_history(state: dict, user_name: str, record: dict):
 
 
 # =============================================================================
+# Context themes and memory lanes
+# =============================================================================
+
+MAX_TRACKED_LANES = 50  # per user; lanes are deleted after lane_keep_days, this only bounds a stuck backlog
+
+
+def get_context_last_used(state: dict, user_name: str) -> dict:
+    """{theme: ISO date} of the last time each context theme was sent to this user."""
+    return dict(state.get("users", {}).get(user_name, {}).get("context_last_used", {}))
+
+
+def mark_context_used(state: dict, user_name: str, theme: str, target_date: date):
+    """Record that a context theme was sent today."""
+    user_state = state.setdefault("users", {}).setdefault(user_name, {})
+    user_state.setdefault("context_last_used", {})[theme] = target_date.isoformat()
+
+
+def get_lane_ids(state: dict, user_name: str) -> set:
+    """Ids of the memory lanes this app created for the user (still tracked)."""
+    return {lane.get("id") for lane in state.get("users", {}).get(user_name, {}).get("lanes", [])}
+
+
+def record_lane(state: dict, user_name: str, memory_id: str, target_date: date):
+    """Remember a memory lane created by this app so it can be cleaned up later."""
+    user_state = state.setdefault("users", {}).setdefault(user_name, {})
+    lanes = user_state.setdefault("lanes", [])
+    lanes.append({"id": memory_id, "created": target_date.isoformat()})
+    del lanes[:-MAX_TRACKED_LANES]
+
+
+# =============================================================================
 # Run markers (missed-run recovery)
 # =============================================================================
 #
