@@ -643,6 +643,7 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
             <div class="settings-section" data-section="schedule" style="display:none;">
             <div class="card">
                 <h2>Notification Time:</h2>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">Each window sends one notification a day, picked from its ticked events. Window 1 sends a memory by default; tick more events to let it vary.</p>
                 <div id="windows-list">
                     <div class="loading-state"><span class="loading"></span>Loading…</div>
                 </div>
@@ -1308,17 +1309,12 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
 
         function renderWindows(windows) {
             document.getElementById('windows-list').innerHTML = windows.map((w, i) => {
-                let eventsRow;
-                if (i === 0) {
-                    eventsRow = `<span style="font-size:0.8rem;color:var(--text-muted);font-style:italic;">Memory only</span>`;
-                } else {
-                    const events = w.events || ALL_EVENTS;
-                    eventsRow = ALL_EVENTS.map(ev => `
-                        <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;">
-                            <input type="checkbox" class="window-event" data-event="${ev}" ${events.includes(ev) ? 'checked' : ''}>
-                            ${EVENT_LABELS[ev]}
-                        </label>`).join('');
-                }
+                const events = w.events || ALL_EVENTS;
+                const eventsRow = ALL_EVENTS.map(ev => `
+                    <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;">
+                        <input type="checkbox" class="window-event" data-event="${ev}" ${events.includes(ev) ? 'checked' : ''}>
+                        ${EVENT_LABELS[ev]}
+                    </label>`).join('');
                 return `
                 <div class="window-row" data-index="${i}">
                     <span>Window ${i + 1}:</span>
@@ -1368,10 +1364,8 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
 
         async function saveWindows() {
             const rows = document.querySelectorAll('#windows-list .window-row');
-            const windows = Array.from(rows).map((row, i) => {
-                const events = i === 0
-                    ? ["memory"]
-                    : Array.from(row.querySelectorAll('.window-event:checked')).map(cb => cb.dataset.event);
+            const windows = Array.from(rows).map(row => {
+                const events = Array.from(row.querySelectorAll('.window-event:checked')).map(cb => cb.dataset.event);
                 return {
                     start: row.querySelector('.window-start').value,
                     end: row.querySelector('.window-end').value,
@@ -1885,9 +1879,7 @@ button.danger:hover{background:rgba(214,69,69,0.13)}
             document.getElementById('test-slots').innerHTML = Array.from({length: _windowCount}, (_, i) => {
                 const row = rows[i];
                 let eventsLabel;
-                if (i === 0) {
-                    eventsLabel = 'Memory only';
-                } else if (row) {
+                if (row) {
                     const checked = Array.from(row.querySelectorAll('.window-event:checked')).map(cb => EVENT_LABELS[cb.dataset.event]);
                     eventsLabel = (checked.length > 0 && checked.length < ALL_EVENTS.length) ? checked.join(', ') : 'All events';
                 } else {
