@@ -117,9 +117,10 @@ def _migrate_window_events(config: dict):
     """Add events field to windows that don't have it. Remove deprecated slot-count fields."""
     settings = config.get("settings", {})
     windows = settings.get("notification_windows", [])
-    for window in windows:
+    for i, window in enumerate(windows):
         if "events" not in window:
-            window["events"] = list(ALL_EVENTS)
+            # Window 1 used to send only memories whatever it listed: keep that for old configs
+            window["events"] = ["memory"] if i == 0 else list(ALL_EVENTS)
 
     # Remove deprecated fields (they're no longer used by the engine)
     for old_field in DEPRECATED_SETTINGS:

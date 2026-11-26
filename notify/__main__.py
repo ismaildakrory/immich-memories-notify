@@ -3,12 +3,13 @@ Immich Memories Notify
 ======================
 Sends daily memory notifications to all configured users.
 
-Layered priority system:
-  1. Window 1 always sends a memory (birthday pre-empts).
-  2. Windows 2+: pending specials (T&N/Trip/Collage) claim the
-     first eligible window. One special per day per user.
-  3. Otherwise: pick from regular events (memory/person/album)
-     with memory getting a 10% weight boost.
+Layered priority system (birthday pre-empts window 1):
+  1. Pending specials (T&N/Trip/Collage) claim the first eligible
+     window that lists them. One special per day per user.
+  2. Otherwise: pick from the window's regular events
+     (memory/person/album) with memory getting a 10% weight boost.
+Every window works the same way; window 1 lists only `memory` by default,
+add more events to it to let it vary.
 Fallback is always a person photo.
 
 Usage:
@@ -96,10 +97,10 @@ def process_user_window(
     """
     Process a single notification window for a user.
 
-    Layer 1: Window 1 always sends memory (birthday pre-empts).
-    Layer 2: Windows 2+ — if a special (T&N/Trip/Collage) is pending,
-             it claims the window. One special per day per user.
-    Layer 3: Otherwise, pick from regular events (memory/person/album)
+    Birthday pre-empts window 1.
+    Layer 1: If a special (T&N/Trip/Collage) is pending and listed in the
+             window's events, it claims the window. One special per day per user.
+    Layer 2: Otherwise, pick from the window's regular events (memory/person/album)
              with memory getting a 10% boost.
     Fallback is always a person photo.
 
@@ -247,70 +248,59 @@ def process_user_window(
     if not notification:
         window_events = get_window_events(config, slot)
 
-        # Layer 1: Window 1 always sends memory
-        if slot == 1:
-            if has_memories:
+        # Layer 1: Special priority (one per day)
+        tan_enabled = settings.get("then_and_now_enabled", True)
+        trip_enabled = settings.get("trip_highlights_enabled", True)
+        collage_enabled = settings.get("weekly_collage_enabled", False)
+        tan_cooldown = settings.get("then_and_now_cooldown_days", 7)
+        trip_cooldown = settings.get("trip_highlights_cooldown_days", 7)
+        collage_cooldown = settings.get("collage_cooldown_days", 7)
+        tan_ready = tan_enabled and (test_mode or is_feature_ready(state, name, "last_tan_date", tan_cooldown, target_date))
+        trip_ready = trip_enabled and (test_mode or is_feature_ready(state, name, "last_trip_date", trip_cooldown, target_date))
+        collage_ready = collage_enabled and (test_mode or is_feature_ready(state, name, "last_collage_date", collage_cooldown, target_date))
+
+        special_already_sent = not test_mode and was_special_sent_today(state, name, target_date)
+
+        if not special_already_sent:
+            pending = []
+            if tan_ready and "then_and_now" in window_events:
+                pending.append("then_and_now")
+            if trip_ready and "trip_highlights" in window_events:
+                pending.append("trip_highlights")
+            if collage_ready and "collage" in window_events:
+                pending.append("collage")
+
+            if pending:
+                selected_special = random.choice(pending)
                 notification = _execute_event(
-                    "memory", user=user, config=config, state=state,
+                    selected_special, user=user, config=config, state=state,
                     target_date=target_date, slot=slot, parsed=parsed,
                     assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                     top_person_ids=top_person_ids, test_mode=test_mode,
                     logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
                 )
-        else:
-            # Layer 2: Special priority (one per day, windows 2+)
-            tan_enabled = settings.get("then_and_now_enabled", True)
-            trip_enabled = settings.get("trip_highlights_enabled", True)
-            collage_enabled = settings.get("weekly_collage_enabled", False)
-            tan_cooldown = settings.get("then_and_now_cooldown_days", 7)
-            trip_cooldown = settings.get("trip_highlights_cooldown_days", 7)
-            collage_cooldown = settings.get("collage_cooldown_days", 7)
-            tan_ready = tan_enabled and (test_mode or is_feature_ready(state, name, "last_tan_date", tan_cooldown, target_date))
-            trip_ready = trip_enabled and (test_mode or is_feature_ready(state, name, "last_trip_date", trip_cooldown, target_date))
-            collage_ready = collage_enabled and (test_mode or is_feature_ready(state, name, "last_collage_date", collage_cooldown, target_date))
 
-            special_already_sent = not test_mode and was_special_sent_today(state, name, target_date)
+        # Layer 2: Regular events (memory/person/album)
+        if not notification:
+            eligible = [e for e in window_events
+                        if e in REGULAR_EVENTS
+                        and not (e == "memory" and not has_memories)
+                        and not (e == "album" and not user_album_names)]
 
-            if not special_already_sent:
-                pending = []
-                if tan_ready and "then_and_now" in window_events:
-                    pending.append("then_and_now")
-                if trip_ready and "trip_highlights" in window_events:
-                    pending.append("trip_highlights")
-                if collage_ready and "collage" in window_events:
-                    pending.append("collage")
-
-                if pending:
-                    selected_special = random.choice(pending)
-                    notification = _execute_event(
-                        selected_special, user=user, config=config, state=state,
-                        target_date=target_date, slot=slot, parsed=parsed,
-                        assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
-                        top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
-                    )
-
-            # Layer 3: Regular events (memory/person/album)
-            if not notification:
-                eligible = [e for e in window_events
-                            if e in REGULAR_EVENTS
-                            and not (e == "memory" and not has_memories)
-                            and not (e == "album" and not user_album_names)]
-
-                for _attempt in range(3):
-                    if not eligible:
-                        break
-                    selected = select_event_type(eligible)
-                    notification = _execute_event(
-                        selected, user=user, config=config, state=state,
-                        target_date=target_date, slot=slot, parsed=parsed,
-                        assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
-                        top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
-                    )
-                    if notification:
-                        break
-                    eligible.remove(selected)
+            for _attempt in range(3):
+                if not eligible:
+                    break
+                selected = select_event_type(eligible)
+                notification = _execute_event(
+                    selected, user=user, config=config, state=state,
+                    target_date=target_date, slot=slot, parsed=parsed,
+                    assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
+                    top_person_ids=top_person_ids, test_mode=test_mode,
+                    logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
+                )
+                if notification:
+                    break
+                eligible.remove(selected)
 
         # Fallback: person photo
         if not notification:

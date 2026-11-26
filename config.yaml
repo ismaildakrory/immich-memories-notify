@@ -41,11 +41,6 @@ settings:
     end: 09:00
     events:
     - memory
-    - person
-    - album
-    - then_and_now
-    - trip_highlights
-    - collage
   - start: '10:00'
     end: '12:00'
     events:

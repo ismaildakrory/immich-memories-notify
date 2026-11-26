@@ -171,8 +171,10 @@ settings:
   # Notification windows — each window sends one notification per day.
   # If the container was down when a window started, the scheduler catches
   # up within 10 minutes (as long as the window ended less than 3 hours ago).
-  # Window 1 always sends a memory. Windows 2+ pick from their events
-  # list using a layered priority system (specials first, then weighted random).
+  # Every window picks from its own events list using a layered priority system
+  # (specials first, then weighted random). Window 1 lists only `memory` by default;
+  # add more events to it (e.g. [memory, person, album]) to let it vary, which is
+  # handy if you only want one window a day.
   notification_windows:
     - start: "08:00"
       end: "10:00"

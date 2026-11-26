@@ -8,7 +8,7 @@ layer picks it up.
 ALL_EVENTS = ["memory", "person", "album", "then_and_now", "trip_highlights", "collage"]
 
 DEFAULT_WINDOWS = [
-    {"start": "08:00", "end": "09:00", "events": list(ALL_EVENTS)},
+    {"start": "08:00", "end": "09:00", "events": ["memory"]},
     {"start": "10:00", "end": "12:00", "events": list(ALL_EVENTS)},
     {"start": "13:00", "end": "15:00", "events": list(ALL_EVENTS)},
     {"start": "17:00", "end": "19:00", "events": list(ALL_EVENTS)},
