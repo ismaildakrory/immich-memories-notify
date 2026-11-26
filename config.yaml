@@ -36,22 +36,21 @@ settings:
   trip_highlights_min_photos: 5
   trip_highlights_repeat_days: 90
   birthday_enabled: true
+  context_themes: []
+  lane_photos: 8
+  lane_keep_days: 7
   notification_windows:
   - start: 08:00
     end: 09:00
     events:
     - memory
-    - person
-    - album
-    - then_and_now
-    - trip_highlights
-    - collage
   - start: '10:00'
     end: '12:00'
     events:
     - memory
     - person
     - album
+    - context
     - then_and_now
     - trip_highlights
     - collage
@@ -61,6 +60,7 @@ settings:
     - memory
     - person
     - album
+    - context
     - then_and_now
     - trip_highlights
     - collage
@@ -70,6 +70,7 @@ settings:
     - memory
     - person
     - album
+    - context
     - then_and_now
     - trip_highlights
     - collage
@@ -79,6 +80,7 @@ settings:
     - memory
     - person
     - album
+    - context
     - then_and_now
     - trip_highlights
     - collage
@@ -145,6 +147,14 @@ trip_highlights_titles:
 - Trip Highlights
 album_titles:
 - '{album_name}'
+context_messages:
+- '{count} photos of {theme}, from {first_year} to {last_year}'
+- Your {theme} moments, {first_year} to {last_year}
+- A little {theme} collection for you
+- '{theme_title} through the years'
+- Swipe through {count} {theme} photos
+context_titles:
+- '{theme_title}, across the years'
 birthday_messages:
 - Happy Birthday, {person_name}! 🎂
 - It's {person_name}'s special day! 🎉

@@ -23,6 +23,7 @@ Daily "On This Day" push notifications from your [Immich](https://immich.app/) s
 - **Then & Now** — Side-by-side comparison of the same person across years
 - **Trip Highlights** — Collage from a past trip (same city, same month), with smart date clustering
 - **Collages** — 12 template combinations (Grid, Mosaic, Polaroid, Strip) with face-based smart cropping
+- **Themed Memories** — Opens a real Immich memory lane built from a theme you choose (sunsets, snow, beach…), found with Immich's context search and spread across the years
 - **Birthdays & Albums** — Birthday greetings for people with a birth date in Immich, plus surprise photos from albums you pick
 - **Apprise Support** — Send via Telegram, Discord, Slack, email, and [100+ other services](https://github.com/caronc/apprise/wiki) per-user choice alongside ntfy
 - **Smart Scheduling** — Layered priority engine with per-window event control — choose which notification types each time window can send
@@ -150,6 +151,15 @@ settings:
   min_group_size: 2             # Min faces for "group photo"
   birthday_enabled: true        # Birthday greetings (pre-empts window 1)
 
+  # Themed memories (event type `context`): the best matches of a context search, spread over the
+  # years, become an Immich memory lane and the notification opens it. Off until you list themes;
+  # at most one a day. Needs Immich's machine learning (context search) and the memory.create and
+  # memory.delete API key permissions. The lane also shows in the app's memory bar for about three
+  # days, titled "N years ago" (Immich has no other memory type).
+  context_themes: [sunset, beach, snow, mountains, food, flowers]  # any search Immich understands; [] = off
+  lane_photos: 8                # Photos per lane (3-20)
+  lane_keep_days: 7             # Delete lanes this app created after N days (lanes you saved are kept)
+
   # Then & Now
   then_and_now_enabled: true
   then_and_now_cooldown_days: 7
@@ -171,15 +181,17 @@ settings:
   # Notification windows — each window sends one notification per day.
   # If the container was down when a window started, the scheduler catches
   # up within 10 minutes (as long as the window ended less than 3 hours ago).
-  # Window 1 always sends a memory. Windows 2+ pick from their events
-  # list using a layered priority system (specials first, then weighted random).
+  # Every window picks from its own events list using a layered priority system
+  # (specials first, then weighted random). Window 1 lists only `memory` by default;
+  # add more events to it (e.g. [memory, person, album]) to let it vary, which is
+  # handy if you only want one window a day.
   notification_windows:
     - start: "08:00"
       end: "10:00"
       events: [memory]                          # Window 1: memory only
     - start: "12:00"
       end: "14:00"
-      events: [memory, person, album, then_and_now, trip_highlights, collage]
+      events: [memory, person, album, context, then_and_now, trip_highlights, collage]
     - start: "20:00"
       end: "22:00"
       events: [person, album, trip_highlights, collage]
@@ -231,9 +243,11 @@ then_and_now_messages:       # {person_name} {then_year} {now_year} {gap}
   - "Then and now — {person_name}, {gap} years apart"
 trip_highlights_messages:    # {city} {country} {year} {gap}
   - "Remember this trip to {city}? Back in {year}!"
+context_messages:            # {theme} {theme_title} {count} {first_year} {last_year}
+  - "{count} photos of {theme}, from {first_year} to {last_year}"
 ```
 
-Memory, person, and album messages also have `video_*` variants (used when a video is picked), and every type has a `*_titles` list for notification titles (e.g. `memory_titles`, `person_titles`, `album_titles`) with the same core placeholders.
+Memory, person, and album messages also have `video_*` variants (used when a video is picked), and every type has a `*_titles` list for notification titles (e.g. `memory_titles`, `person_titles`, `album_titles`, `context_titles`) with the same core placeholders.
 
 </details>
 
@@ -278,8 +292,10 @@ When creating an API key in Immich, grant these permissions:
 | `album.read` | Album notifications |
 | `album.create` | Creating the collage album |
 | `albumAsset.create` | Adding collages to the album |
+| `memory.create` | Themed memories: creating the lane |
+| `memory.delete` | Themed memories: removing old lanes |
 
-If you don't use the Collage, Trip Highlights, or Then & Now features, you can skip `asset.upload`, `album.create`, and `albumAsset.create` (all three features upload their composites to albums).
+If you don't use the Collage, Trip Highlights, or Then & Now features, you can skip `asset.upload`, `album.create`, and `albumAsset.create` (all three features upload their composites to albums). If you don't use Themed Memories, you can skip `memory.create` and `memory.delete`. Without `memory.create` a themed notification opens its cover photo instead of a lane; without `memory.delete` old lanes are not removed (a warning is logged on each run).
 
 ## Troubleshooting
 

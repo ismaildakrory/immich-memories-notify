@@ -3,12 +3,13 @@ Immich Memories Notify
 ======================
 Sends daily memory notifications to all configured users.
 
-Layered priority system:
-  1. Window 1 always sends a memory (birthday pre-empts).
-  2. Windows 2+: pending specials (T&N/Trip/Collage) claim the
-     first eligible window. One special per day per user.
-  3. Otherwise: pick from regular events (memory/person/album)
-     with memory getting a 10% weight boost.
+Layered priority system (birthday pre-empts window 1):
+  1. Pending specials (T&N/Trip/Collage) claim the first eligible
+     window that lists them. One special per day per user.
+  2. Otherwise: pick from the window's regular events
+     (memory/person/album) with memory getting a 10% weight boost.
+Every window works the same way; window 1 lists only `memory` by default,
+add more events to it to let it vary.
 Fallback is always a person photo.
 
 Usage:
@@ -31,7 +32,9 @@ import requests
 from .config import (
     append_history,
     get_assets_sent_today,
+    get_context_last_used,
     get_ever_sent_assets,
+    get_lane_ids,
     get_recent_assets,
     get_slots_sent_today,
     get_window_events,
@@ -39,11 +42,13 @@ from .config import (
     load_config,
     load_state,
     mark_asset_sent_recent,
+    mark_context_used,
     mark_feature_fired,
     mark_run_done,
     mark_run_started,
     mark_slot_sent,
     mark_special_sent_today,
+    record_lane,
     save_state,
     setup_logging,
     slots_due_for_catch_up,
@@ -53,6 +58,7 @@ from .defaults import DEFAULT_SETTINGS
 from .dispatcher import send_notification
 from .features.albums import prepare_album_notification
 from .features.birthday import find_birthday_people, prepare_birthday_notification
+from .features.context import cleanup_lanes, prepare_context_notification
 from .features.memories import prepare_memory_notification
 from .features.persons import prepare_person_notification
 from .features.then_and_now import find_then_and_now_candidate, prepare_then_and_now_notification
@@ -68,7 +74,7 @@ from .immich import (
 from .utils import calculate_random_delay, with_retry
 
 SPECIAL_EVENTS = {"then_and_now", "trip_highlights", "collage"}
-REGULAR_EVENTS = {"memory", "person", "album"}
+REGULAR_EVENTS = {"memory", "person", "album", "context"}
 
 MEMORY_WEIGHT = 1.1
 NORMAL_WEIGHT = 1.0
@@ -96,10 +102,10 @@ def process_user_window(
     """
     Process a single notification window for a user.
 
-    Layer 1: Window 1 always sends memory (birthday pre-empts).
-    Layer 2: Windows 2+ — if a special (T&N/Trip/Collage) is pending,
-             it claims the window. One special per day per user.
-    Layer 3: Otherwise, pick from regular events (memory/person/album)
+    Birthday pre-empts window 1.
+    Layer 1: If a special (T&N/Trip/Collage) is pending and listed in the
+             window's events, it claims the window. One special per day per user.
+    Layer 2: Otherwise, pick from the window's regular events (memory/person/album)
              with memory getting a 10% boost.
     Fallback is always a person photo.
 
@@ -166,6 +172,10 @@ def process_user_window(
         logger.error(f"  [{name}] Failed to fetch memories: {e}")
         result["success"] = False
         return result
+
+    # Lanes this app created are memories too: never read them back as "on this day"
+    lane_ids = get_lane_ids(state, name)
+    memories = [m for m in memories if m.get("id") not in lane_ids]
 
     # Filter for today
     todays = filter_todays_memories(memories, target_date)
@@ -243,74 +253,76 @@ def process_user_window(
         except Exception as e:
             logger.warning(f"  [{name}] Birthday check failed: {e}")
 
+    # --- Housekeeping: remove old memory lanes this app created (real runs only) ---
+    if not (test_mode or dry_run):
+        try:
+            lane_keep_days = settings.get("lane_keep_days", DEFAULT_SETTINGS["lane_keep_days"])
+            cleanup_lanes(immich_url, api_key, state, name, lane_keep_days, target_date, logger)
+        except Exception as e:
+            logger.warning(f"  [{name}] Memory lane cleanup failed: {e}")
+
     # --- Layered event selection ---
     if not notification:
         window_events = get_window_events(config, slot)
 
-        # Layer 1: Window 1 always sends memory
-        if slot == 1:
-            if has_memories:
+        # Layer 1: Special priority (one per day)
+        tan_enabled = settings.get("then_and_now_enabled", True)
+        trip_enabled = settings.get("trip_highlights_enabled", True)
+        collage_enabled = settings.get("weekly_collage_enabled", False)
+        tan_cooldown = settings.get("then_and_now_cooldown_days", 7)
+        trip_cooldown = settings.get("trip_highlights_cooldown_days", 7)
+        collage_cooldown = settings.get("collage_cooldown_days", 7)
+        tan_ready = tan_enabled and (test_mode or is_feature_ready(state, name, "last_tan_date", tan_cooldown, target_date))
+        trip_ready = trip_enabled and (test_mode or is_feature_ready(state, name, "last_trip_date", trip_cooldown, target_date))
+        collage_ready = collage_enabled and (test_mode or is_feature_ready(state, name, "last_collage_date", collage_cooldown, target_date))
+
+        special_already_sent = not test_mode and was_special_sent_today(state, name, target_date)
+
+        if not special_already_sent:
+            pending = []
+            if tan_ready and "then_and_now" in window_events:
+                pending.append("then_and_now")
+            if trip_ready and "trip_highlights" in window_events:
+                pending.append("trip_highlights")
+            if collage_ready and "collage" in window_events:
+                pending.append("collage")
+
+            if pending:
+                selected_special = random.choice(pending)
                 notification = _execute_event(
-                    "memory", user=user, config=config, state=state,
+                    selected_special, user=user, config=config, state=state,
                     target_date=target_date, slot=slot, parsed=parsed,
                     assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
                     top_person_ids=top_person_ids, test_mode=test_mode,
                     logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
                 )
-        else:
-            # Layer 2: Special priority (one per day, windows 2+)
-            tan_enabled = settings.get("then_and_now_enabled", True)
-            trip_enabled = settings.get("trip_highlights_enabled", True)
-            collage_enabled = settings.get("weekly_collage_enabled", False)
-            tan_cooldown = settings.get("then_and_now_cooldown_days", 7)
-            trip_cooldown = settings.get("trip_highlights_cooldown_days", 7)
-            collage_cooldown = settings.get("collage_cooldown_days", 7)
-            tan_ready = tan_enabled and (test_mode or is_feature_ready(state, name, "last_tan_date", tan_cooldown, target_date))
-            trip_ready = trip_enabled and (test_mode or is_feature_ready(state, name, "last_trip_date", trip_cooldown, target_date))
-            collage_ready = collage_enabled and (test_mode or is_feature_ready(state, name, "last_collage_date", collage_cooldown, target_date))
 
-            special_already_sent = not test_mode and was_special_sent_today(state, name, target_date)
+        # Layer 2: Regular events (memory/person/album/context)
+        if not notification:
+            # At most one themed memory a day: each one creates a lane in Immich
+            context_ready = bool(settings.get("context_themes")) and (
+                target_date.isoformat() not in get_context_last_used(state, name).values()
+            )
+            eligible = [e for e in window_events
+                        if e in REGULAR_EVENTS
+                        and not (e == "memory" and not has_memories)
+                        and not (e == "album" and not user_album_names)
+                        and not (e == "context" and not context_ready)]
 
-            if not special_already_sent:
-                pending = []
-                if tan_ready and "then_and_now" in window_events:
-                    pending.append("then_and_now")
-                if trip_ready and "trip_highlights" in window_events:
-                    pending.append("trip_highlights")
-                if collage_ready and "collage" in window_events:
-                    pending.append("collage")
-
-                if pending:
-                    selected_special = random.choice(pending)
-                    notification = _execute_event(
-                        selected_special, user=user, config=config, state=state,
-                        target_date=target_date, slot=slot, parsed=parsed,
-                        assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
-                        top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
-                    )
-
-            # Layer 3: Regular events (memory/person/album)
-            if not notification:
-                eligible = [e for e in window_events
-                            if e in REGULAR_EVENTS
-                            and not (e == "memory" and not has_memories)
-                            and not (e == "album" and not user_album_names)]
-
-                for _attempt in range(3):
-                    if not eligible:
-                        break
-                    selected = select_event_type(eligible)
-                    notification = _execute_event(
-                        selected, user=user, config=config, state=state,
-                        target_date=target_date, slot=slot, parsed=parsed,
-                        assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
-                        top_person_ids=top_person_ids, test_mode=test_mode,
-                        logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
-                    )
-                    if notification:
-                        break
-                    eligible.remove(selected)
+            for _attempt in range(3):
+                if not eligible:
+                    break
+                selected = select_event_type(eligible)
+                notification = _execute_event(
+                    selected, user=user, config=config, state=state,
+                    target_date=target_date, slot=slot, parsed=parsed,
+                    assets_sent=assets_sent, assets_sent_today=assets_sent_today, top_persons=top_persons,
+                    top_person_ids=top_person_ids, test_mode=test_mode,
+                    logger=logger, click_base=click_base, dry_run=dry_run, policy=policy,
+                )
+                if notification:
+                    break
+                eligible.remove(selected)
 
         # Fallback: person photo
         if not notification:
@@ -361,7 +373,9 @@ def process_user_window(
 
         if not test_mode:
             mark_slot_sent(state, name, target_date, slot, notification.get("asset_id"))
-            mark_asset_sent_recent(state, name, target_date, notification.get("asset_id"))
+            # A lane shows several photos: all of them count as sent
+            for sent_asset_id in notification.get("asset_ids") or [notification.get("asset_id")]:
+                mark_asset_sent_recent(state, name, target_date, sent_asset_id)
             append_history(state, name, {
                 "date": target_date.isoformat(),
                 "time": datetime.now().isoformat(timespec="seconds"),
@@ -403,6 +417,8 @@ def process_user_window(
                     user_state["tan_pairs_used"] = pairs[-50:]
             elif notification.get("is_collage"):
                 mark_feature_fired(state, name, "last_collage_date", target_date)
+            elif notification.get("is_context"):
+                mark_context_used(state, name, notification["context_theme"], target_date)
             # Track that a special fired today (one per day)
             if notification.get("is_trip") or notification.get("is_then_and_now") or notification.get("is_collage"):
                 mark_special_sent_today(state, name, target_date)
@@ -447,6 +463,8 @@ def _execute_event(
     album_messages = config.get("album_messages", [])
     video_album_messages = config.get("video_album_messages", [])
     album_titles = config.get("album_titles", [])
+    context_messages = config.get("context_messages", [])
+    context_titles = config.get("context_titles", [])
     tan_messages = config.get("then_and_now_messages", [])
     tan_titles = config.get("then_and_now_titles", [])
     trip_messages = config.get("trip_highlights_messages", [])
@@ -505,6 +523,30 @@ def _execute_event(
             target_date=target_date,
             policy=policy,
         )
+
+    elif event_type == "context":
+        try:
+            notification = prepare_context_notification(
+                themes=settings.get("context_themes", []),
+                assets_sent=assets_sent,
+                immich_url=immich_url,
+                api_key=api_key,
+                messages=context_messages,
+                test_mode=test_mode,
+                logger=logger,
+                settings=settings,
+                title_templates=context_titles,
+                last_used=get_context_last_used(state, name),
+                upload=upload,
+                policy=policy,
+            )
+        except Exception as e:
+            logger.warning(f"  [{name}] Themed memory failed: {e}")
+            return None
+        if upload and notification and notification.get("lane_id"):
+            # Tracked as soon as it exists, so it is cleaned up even if sending fails
+            record_lane(state, name, notification["lane_id"], target_date)
+        return notification
 
     elif event_type == "then_and_now":
         tan_min_gap = settings.get("then_and_now_min_gap", 3)
@@ -607,7 +649,8 @@ def _execute_event(
 
 def _notification_kind(notification: dict) -> str:
     for flag, kind in (("is_birthday", "birthday"), ("is_then_and_now", "then_and_now"), ("is_trip", "trip"),
-                       ("is_collage", "collage"), ("is_album_photo", "album"), ("is_person_photo", "person")):
+                       ("is_collage", "collage"), ("is_context", "context"), ("is_album_photo", "album"),
+                       ("is_person_photo", "person")):
         if notification.get(flag):
             return kind
     return "memory"

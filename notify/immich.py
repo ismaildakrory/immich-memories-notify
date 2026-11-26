@@ -1,4 +1,4 @@
-"""Immich API: memories, people, assets, thumbnails, albums, tags."""
+"""Immich API: memories, search, people, assets, thumbnails, albums, tags."""
 
 import logging
 import random
@@ -135,6 +135,74 @@ def parse_memories(memories: list) -> dict:
     result["years"] = sorted(result["by_year"].keys(), reverse=True)
     result["by_year"] = dict(result["by_year"])
     return result
+
+
+# =============================================================================
+# Context search and custom memories ("lanes")
+# =============================================================================
+
+def search_smart(immich_url: str, api_key: str, query: str, size: int = 100, timeout: int = 60) -> list:
+    """Context (CLIP) search: photos matching a free-text query, best matches first."""
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    body = {"query": query, "size": size, "type": "IMAGE"}
+    response = requests.post(f"{immich_url}/api/search/smart", headers=headers, json=body, timeout=timeout)
+    response.raise_for_status()
+    data = response.json()
+    assets = data.get("assets") if isinstance(data, dict) else None
+    items = assets.get("items") if isinstance(assets, dict) else None
+    return items if isinstance(items, list) else []
+
+
+def _iso_utc(moment: datetime) -> str:
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def create_memory(
+    immich_url: str,
+    api_key: str,
+    asset_ids: list,
+    year: int,
+    memory_at: datetime,
+    show_at: datetime,
+    hide_at: datetime,
+    timeout: int = 30,
+) -> str:
+    """Create an Immich memory (the swipeable lane in the app) from the given assets.
+
+    Immich only has `on_this_day` and `birthday` memory types, so the lane is titled
+    "N years ago" in the app, based on `year`. Needs the memory.create permission.
+    All datetimes are naive UTC. Returns the new memory's id.
+    """
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    body = {
+        "type": "on_this_day",
+        "data": {"year": year},
+        "memoryAt": _iso_utc(memory_at),
+        "showAt": _iso_utc(show_at),
+        "hideAt": _iso_utc(hide_at),
+        "isSaved": False,
+        "assetIds": list(asset_ids),
+    }
+    response = requests.post(f"{immich_url}/api/memories", headers=headers, json=body, timeout=timeout)
+    response.raise_for_status()
+    return response.json()["id"]
+
+
+def fetch_memory(immich_url: str, api_key: str, memory_id: str, timeout: int = 10) -> Optional[dict]:
+    """One memory, or None if it no longer exists (Immich answers 400 or 404 for a deleted id)."""
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    response = requests.get(f"{immich_url}/api/memories/{memory_id}", headers=headers, timeout=timeout)
+    if response.status_code in (400, 404):
+        return None
+    response.raise_for_status()
+    return response.json()
+
+
+def delete_memory(immich_url: str, api_key: str, memory_id: str, timeout: int = 10) -> None:
+    """Delete a memory. Needs the memory.delete permission."""
+    headers = {"Accept": "application/json", "x-api-key": api_key}
+    response = requests.delete(f"{immich_url}/api/memories/{memory_id}", headers=headers, timeout=timeout)
+    response.raise_for_status()
 
 
 MAX_THUMBNAIL_BYTES = 20 * 1024 * 1024  # 20 MB

@@ -55,6 +55,9 @@ class Settings(BaseModel):
     trip_highlights_min_photos: int = Field(D["trip_highlights_min_photos"], ge=1, le=100)
     trip_highlights_repeat_days: int = Field(D["trip_highlights_repeat_days"], ge=0, le=3650)
     birthday_enabled: bool = D["birthday_enabled"]
+    context_themes: List[str] = Field(default_factory=lambda: list(D["context_themes"]))
+    lane_photos: int = Field(D["lane_photos"], ge=3, le=20)
+    lane_keep_days: int = Field(D["lane_keep_days"], ge=1, le=90)
 
 
 class UserInfo(BaseModel):
@@ -86,6 +89,8 @@ class FullConfig(BaseModel):
     then_and_now_titles: List[str]
     trip_highlights_titles: List[str]
     album_titles: List[str]
+    context_messages: List[str]
+    context_titles: List[str]
     birthday_messages: List[str]
     birthday_titles: List[str]
 
@@ -110,6 +115,8 @@ class MessagesUpdate(BaseModel):
     then_and_now_titles: Optional[List[str]] = None
     trip_highlights_titles: Optional[List[str]] = None
     album_titles: Optional[List[str]] = None
+    context_messages: Optional[List[str]] = None
+    context_titles: Optional[List[str]] = None
     birthday_messages: Optional[List[str]] = None
     birthday_titles: Optional[List[str]] = None
 
@@ -140,6 +147,9 @@ class SettingsUpdate(BaseModel):
     trip_highlights_min_photos: Optional[int] = Field(None, ge=1, le=100)
     trip_highlights_repeat_days: Optional[int] = Field(None, ge=0, le=3650)
     birthday_enabled: Optional[bool] = None
+    context_themes: Optional[List[str]] = None
+    lane_photos: Optional[int] = Field(None, ge=3, le=20)
+    lane_keep_days: Optional[int] = Field(None, ge=1, le=90)
 
 
 class UserEnabledUpdate(BaseModel):

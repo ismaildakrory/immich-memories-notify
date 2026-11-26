@@ -23,7 +23,7 @@ def test_load_config_applies_defaults_and_migrations(tmp_path, monkeypatch):
             "collage_year_range": 12,
             "weekly_collage_day": 6,
             "memory_notifications": 3,
-            "notification_windows": [{"start": "08:00", "end": "09:00"}],
+            "notification_windows": [{"start": "08:00", "end": "09:00"}, {"start": "12:00", "end": "13:00"}],
         },
     }))
     c = cfg.load_config(str(path))
@@ -32,7 +32,8 @@ def test_load_config_applies_defaults_and_migrations(tmp_path, monkeypatch):
     assert s["year_range"] == 12 and "collage_year_range" not in s
     assert "weekly_collage_day" not in s and "memory_notifications" not in s
     assert s["collage_cooldown_days"] == 7
-    assert s["notification_windows"][0]["events"] == cfg.ALL_EVENTS
+    assert s["notification_windows"][0]["events"] == ["memory"]  # what window 1 always sent
+    assert s["notification_windows"][1]["events"] == cfg.ALL_EVENTS
     assert c["users"][0]["notification_service"] == "ntfy"
 
 
